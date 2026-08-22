@@ -53,27 +53,28 @@
               <label class="form-label">備註</label>
               <input class="form-input" type="text" name="note" value="<%= row.existing ? (row.existing.note || '') : '' %>">
             </div>
-            <div class="form-group" style="margin-bottom:0;">
-              <label class="form-label">截圖（可多選）</label>
-              <input class="form-input" type="file" name="screenshots" multiple accept="image/jpeg,image/png,image/webp,image/gif">
-              <% if (row.photos && row.photos.length > 0) { %>
-                <div class="photo-thumb-list">
-                  <% row.photos.forEach(photo => { %>
-                    <div class="photo-thumb-list__item">
-                      <a href="/uploads/<%= batch.id %>/<%= photo.filename %>" target="_blank">
-                        <img class="screenshot-thumb" src="/uploads/<%= batch.id %>/<%= photo.filename %>" alt="已上傳截圖">
-                      </a>
-                      <form method="POST" action="/batches/<%= batch.id %>/photos/<%= photo.id %>/delete" onsubmit="return confirm('確定要刪除這張截圖嗎？');">
-                        <button type="submit" class="photo-thumb-list__delete" title="刪除這張截圖">刪除</button>
-                      </form>
-                    </div>
-                  <% }) %>
-                </div>
-              <% } %>
-            </div>
             <div>
               <button type="submit" class="btn btn--primary btn--sm">儲存</button>
             </div>
+          </div>
+
+          <div class="form-group checklist-row__photos">
+            <label class="form-label">截圖（可多選）</label>
+            <input class="form-input" type="file" name="screenshots" multiple accept="image/jpeg,image/png,image/webp,image/gif">
+            <% if (row.photos && row.photos.length > 0) { %>
+              <div class="photo-thumb-list">
+                <% row.photos.forEach(photo => { %>
+                  <div class="photo-thumb-list__item">
+                    <a href="/uploads/<%= batch.id %>/<%= photo.filename %>" target="_blank">
+                      <img class="screenshot-thumb" src="/uploads/<%= batch.id %>/<%= photo.filename %>" alt="已上傳截圖">
+                    </a>
+                    <form method="POST" action="/batches/<%= batch.id %>/photos/<%= photo.id %>/delete" onsubmit="return confirm('確定要刪除這張截圖嗎？');">
+                      <button type="submit" class="photo-thumb-list__delete" title="刪除這張截圖">刪除</button>
+                    </form>
+                  </div>
+                <% }) %>
+              </div>
+            <% } %>
           </div>
         </form>
       </div>

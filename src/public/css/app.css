@@ -261,22 +261,38 @@ p { margin: 0 0 var(--space-4) 0; }
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: var(--space-4);
-  align-items: end;
+  /* 之前用 end（底部對齊），截圖縮圖多的時候那一格變高，同一列的狀態／
+     數值／備註欄位會被一起往下推；改成 start 讓每個欄位固定貼齊頂端，
+     不受旁邊縮圖多寡影響。現在截圖區塊本來就已經移出這個 grid、獨占一整
+     列（見下面 .checklist-row__photos），這裡改 start 是防禦性寫法，
+     避免以後備註內容換行變兩行時又發生同樣的位移問題。 */
+  align-items: start;
+}
+
+.checklist-row__photos {
+  margin-top: var(--space-4);
+  margin-bottom: 0;
 }
 
 .screenshot-thumb {
-  max-width: 160px;
-  max-height: 120px;
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
   display: block;
 }
 
 .photo-thumb-list {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: var(--space-2);
   margin-top: var(--space-2);
+  max-width: 600px;
+}
+
+@media (max-width: 768px) {
+  .photo-thumb-list { grid-template-columns: repeat(2, 1fr); }
 }
 
 .photo-thumb-list__item {
