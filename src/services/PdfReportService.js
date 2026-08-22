@@ -13,7 +13,8 @@ const SIGNATURE_SECTION_HEIGHT = 100; // 標題 + 兩欄簽名（含圖片、簽
 const SIGNATURE_IMG_MAX_HEIGHT = 40;
 const SIGNATURE_IMG_MAX_WIDTH = 180;
 
-const IMAGE_DISPLAY_WIDTH = 260;
+const IMAGE_DISPLAY_WIDTH = 260; // 單張照片時的顯示寬度（維持原本大小，不受下面兩欄排版影響）
+const IMAGE_COL_GAP = 12; // 兩欄照片之間的水平間距
 const IMAGE_FALLBACK_HEIGHT = 180;
 const IMAGE_GAP = 8;
 const LABEL_ROW_HEIGHT = 22;
@@ -86,16 +87,28 @@ function registerFonts(doc) {
 }
 
 // 一個項目可能有多張照片，多張時每張的顯示高度上限縮小，避免單一區塊佔滿好幾頁；
-// estimateItemBlockHeight 與 drawItemBlock 都呼叫這個函式，確保估算/實際繪製用的是同一個高度上限。
+// estimateItemLeadHeight 與 drawItemBlock 都呼叫這個函式，確保估算/實際繪製用的是同一個高度上限。
 function getPerPhotoMaxHeight(photoCount, maxImageHeight) {
   return photoCount > 1 ? Math.min(150, maxImageHeight) : maxImageHeight;
 }
 
-// 依照片實際寬高比例算出顯示高度（寬固定為 IMAGE_DISPLAY_WIDTH），沒有寬高資訊時用保守固定值。
-// estimateItemBlockHeight 與 drawItemBlock 共用同一個計算，避免兩邊估算不一致。
-function computeImageDisplayHeight(photo, maxHeight) {
+// 只有一張照片時維持原本寬版單欄；有兩張以上時排成兩欄（一列兩張），
+// estimateItemLeadHeight 與 drawItemBlock 都呼叫這個函式，欄數判斷才不會兩邊各算一套。
+function getImageColumnCount(photoCount) {
+  return photoCount > 1 ? 2 : 1;
+}
+
+function getImageColumnWidth(photoCount, bodyWidth) {
+  return getImageColumnCount(photoCount) === 2
+    ? (bodyWidth - IMAGE_COL_GAP) / 2
+    : IMAGE_DISPLAY_WIDTH;
+}
+
+// 依照片實際寬高比例、指定的顯示寬度算出顯示高度，沒有寬高資訊時用保守固定值。
+// estimateItemLeadHeight 與 drawItemBlock 共用同一個計算，避免兩邊估算不一致。
+function computeImageDisplayHeight(photo, displayWidth, maxHeight) {
   const raw = (photo.width && photo.height)
-    ? IMAGE_DISPLAY_WIDTH * (photo.height / photo.width)
+    ? displayWidth * (photo.height / photo.width)
     : IMAGE_FALLBACK_HEIGHT;
   return Math.min(raw, maxHeight);
 }
@@ -108,8 +121,8 @@ function computeImageDisplayHeight(photo, maxHeight) {
  * 可能比一整頁的可用高度還高，這時候「必須整批擠進同一頁」的估算永遠不可能
  * 成立，實際發生過的結果是 cursorY 一路往下累加、超出頁面邊界的照片直接畫
  * 到看不見的地方、憑空消失。真正需要保持不可分割的只有「標籤/數值/備註＋
- * 第一張照片」，第二張之後改由 drawItemBlock() 自己逐張檢查換頁，一定會出現
- * 在某一頁上，只是不保證跟第一張同頁。
+ * 第一列照片（兩張以上時一列最多兩張）」，後面幾列改由 drawItemBlock() 自己
+ * 逐列檢查換頁，一定會出現在某一頁上，只是不保證跟第一列同頁。
  */
 function estimateItemLeadHeight(doc, item, contentWidth, maxImageHeight, fonts) {
   let height = LABEL_ROW_HEIGHT;
@@ -128,8 +141,13 @@ function estimateItemLeadHeight(doc, item, contentWidth, maxImageHeight, fonts) 
 
   const photos = item.photos || [];
   if (photos.length > 0) {
+    const columns = getImageColumnCount(photos.length);
+    const imgColWidth = getImageColumnWidth(photos.length, bodyWidth);
     const perPhotoMax = getPerPhotoMaxHeight(photos.length, maxImageHeight);
-    height += IMAGE_GAP + computeImageDisplayHeight(photos[0], perPhotoMax);
+    const firstRowHeight = Math.max(
+      ...photos.slice(0, columns).map(p => computeImageDisplayHeight(p, imgColWidth, perPhotoMax))
+    );
+    height += IMAGE_GAP + firstRowHeight;
   }
 
   return height + BLOCK_GAP;
@@ -191,36 +209,48 @@ async function drawItemBlock(doc, item, contentWidth, maxImageHeight, fonts) {
 
   const photos = item.photos || [];
   if (photos.length > 0) {
+    // 只有一張照片維持原本寬版單欄；兩張以上排成兩欄（一列兩張），跟
+    // estimateItemLeadHeight() 用同一組函式算欄數/欄寬，兩邊才不會兜不起來。
+    const columns = getImageColumnCount(photos.length);
+    const imgColWidth = getImageColumnWidth(photos.length, bodyWidth);
     const perPhotoMax = getPerPhotoMaxHeight(photos.length, maxImageHeight);
     const pageBottom = doc.page.height - doc.page.margins.bottom;
 
-    for (const photo of photos) {
-      const displayHeight = computeImageDisplayHeight(photo, perPhotoMax);
+    for (let i = 0; i < photos.length; i += columns) {
+      const rowPhotos = photos.slice(i, i + columns);
+      const rowHeights = rowPhotos.map(p => computeImageDisplayHeight(p, imgColWidth, perPhotoMax));
+      const rowHeight = Math.max(...rowHeights);
 
-      // 每張照片各自檢查剩餘空間，不夠就先換頁：一個項目上傳很多張照片時，
+      // 每一列各自檢查剩餘空間，不夠就先換頁：一個項目上傳很多張照片時，
       // 全部照片疊在一起可能比一整頁還高，不可能整批擠進同一頁——保證的是
-      // 「單一張照片」不會被硬切成兩半，不是整批照片一定同頁。呼叫端
-      // （estimateItemLeadHeight）只確保核心內容＋第一張擠得下才開始畫，
-      // 第二張之後就靠這裡逐張換頁；不這樣做的話，超出頁面邊界的照片會被
+      // 「同一列的照片」不會被拆到兩頁，不是整批照片一定同頁。呼叫端
+      // （estimateItemLeadHeight）只確保核心內容＋第一列擠得下才開始畫，
+      // 後面幾列就靠這裡逐列換頁；不這樣做的話，超出頁面邊界的照片會被
       // 畫到看不見的地方、報告裡憑空消失（先前發生過的 bug）。
-      if (cursorY + displayHeight > pageBottom) {
+      if (cursorY + rowHeight > pageBottom) {
         doc.addPage();
         cursorY = doc.y;
       }
 
-      try {
-        const pngBuffer = await decodeScreenshotToPng(photo.path);
-        doc.image(pngBuffer, startX, cursorY, {
-          fit: [IMAGE_DISPLAY_WIDTH, displayHeight],
-        });
-      } catch (err) {
-        // CJK 字型多半沒有斜體字重，找不到字型時退回的 Helvetica-Oblique 也
-        // 不支援中文，因此這裡統一用一般字重顯示，不強求斜體。
-        doc.font(fonts.regular).fontSize(9).fillColor('#DC2626');
-        doc.text('圖片無法顯示', startX, cursorY);
+      for (let col = 0; col < rowPhotos.length; col++) {
+        const photo = rowPhotos[col];
+        const displayHeight = rowHeights[col];
+        const x = startX + col * (imgColWidth + IMAGE_COL_GAP);
+
+        try {
+          const pngBuffer = await decodeScreenshotToPng(photo.path);
+          doc.image(pngBuffer, x, cursorY, {
+            fit: [imgColWidth, displayHeight],
+          });
+        } catch (err) {
+          // CJK 字型多半沒有斜體字重，找不到字型時退回的 Helvetica-Oblique 也
+          // 不支援中文，因此這裡統一用一般字重顯示，不強求斜體。
+          doc.font(fonts.regular).fontSize(9).fillColor('#DC2626');
+          doc.text('圖片無法顯示', x, cursorY);
+        }
       }
 
-      cursorY += displayHeight + IMAGE_GAP;
+      cursorY += rowHeight + IMAGE_GAP;
     }
   }
 
