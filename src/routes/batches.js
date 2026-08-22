@@ -314,6 +314,16 @@ router.post('/:id/signatures/:role', requireLogin, (req, res) => {
     return res.status(400).render('error', { title: '無效的簽名角色', message: '無效的簽名角色' });
   }
 
+  // 主管簽核只開放給系統角色是 admin 的帳號，避免技術人員帳號自己簽自己的
+  // 主管審核欄位、讓簽核失去稽核意義。工程師欄位任何登入帳號都能簽（本來就
+  // 代表「執行巡檢的人」，沒有審核性質）。
+  if (role === 'supervisor' && req.user.role !== 'admin') {
+    return res.status(403).render('error', {
+      title: '權限不足',
+      message: '主管簽核僅限管理員帳號，請聯絡管理員協助簽署',
+    });
+  }
+
   const dataUrl = req.body.signature_data || '';
   const match = /^data:image\/png;base64,(.+)$/.exec(dataUrl);
   if (!match) {

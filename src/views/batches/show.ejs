@@ -66,6 +66,9 @@
   <div class="signature-grid">
     <% signatureRoles.forEach(role => {
       const sig = signaturesByRole[role];
+      // 主管簽核僅限管理員帳號（見 routes/batches.js 的對應檢查），這裡只是
+      // 對應的 UI 提示——不要讓非管理員帳號簽完一整筆手寫簽名送出後才被拒絕。
+      const canSign = role !== 'supervisor' || (currentUser && currentUser.role === 'admin');
     %>
       <div class="signature-col">
         <h3 class="signature-col__title"><%= signatureRoleLabels[role] %></h3>
@@ -77,31 +80,36 @@
         <% } else { %>
           <p class="form-hint">尚未簽署</p>
         <% } %>
-        <button type="button" class="btn btn--secondary btn--sm signature-open-btn" data-dialog="signature-dialog-<%= role %>">
-          <%= sig ? '重新簽署' : '點此簽署' %>
-        </button>
 
-        <dialog id="signature-dialog-<%= role %>" class="signature-dialog">
-          <form class="signature-form" method="POST" action="/batches/<%= batch.id %>/signatures/<%= role %>">
-            <h3 class="signature-dialog__title"><%= signatureRoleLabels[role] %>簽名</h3>
-            <p class="form-hint">用滑鼠或筆電觸控板按住拖曳書寫，放開即完成這一筆。</p>
-            <canvas class="signature-pad" width="500" height="220"></canvas>
-            <input type="hidden" class="signature-data-input" name="signature_data">
-            <div class="form-group signature-form__type" style="margin-top: var(--space-2); margin-bottom: 0;">
-              <label class="form-label">不方便手寫？直接輸入姓名</label>
-              <input class="form-input signature-type-input" type="text" placeholder="輸入姓名會自動畫成簽名樣式">
-            </div>
-            <div class="form-group signature-form__upload" style="margin-top: var(--space-2); margin-bottom: 0;">
-              <label class="form-label">或上傳簽名圖檔（例如用 Mac 預覽程式／Word 的觸控板簽名功能簽好後匯出的圖片）</label>
-              <input class="form-input signature-file-input" type="file" accept="image/*">
-            </div>
-            <div class="signature-form__actions">
-              <button type="button" class="btn btn--secondary btn--sm signature-clear">清除</button>
-              <button type="button" class="btn btn--secondary btn--sm signature-cancel">取消</button>
-              <button type="submit" class="btn btn--primary btn--sm">確認簽署</button>
-            </div>
-          </form>
-        </dialog>
+        <% if (canSign) { %>
+          <button type="button" class="btn btn--secondary btn--sm signature-open-btn" data-dialog="signature-dialog-<%= role %>">
+            <%= sig ? '重新簽署' : '點此簽署' %>
+          </button>
+
+          <dialog id="signature-dialog-<%= role %>" class="signature-dialog">
+            <form class="signature-form" method="POST" action="/batches/<%= batch.id %>/signatures/<%= role %>">
+              <h3 class="signature-dialog__title"><%= signatureRoleLabels[role] %>簽名</h3>
+              <p class="form-hint">用滑鼠或筆電觸控板按住拖曳書寫，放開即完成這一筆。</p>
+              <canvas class="signature-pad" width="500" height="220"></canvas>
+              <input type="hidden" class="signature-data-input" name="signature_data">
+              <div class="form-group signature-form__type" style="margin-top: var(--space-2); margin-bottom: 0;">
+                <label class="form-label">不方便手寫？直接輸入姓名</label>
+                <input class="form-input signature-type-input" type="text" placeholder="輸入姓名會自動畫成簽名樣式">
+              </div>
+              <div class="form-group signature-form__upload" style="margin-top: var(--space-2); margin-bottom: 0;">
+                <label class="form-label">或上傳簽名圖檔（例如用 Mac 預覽程式／Word 的觸控板簽名功能簽好後匯出的圖片）</label>
+                <input class="form-input signature-file-input" type="file" accept="image/*">
+              </div>
+              <div class="signature-form__actions">
+                <button type="button" class="btn btn--secondary btn--sm signature-clear">清除</button>
+                <button type="button" class="btn btn--secondary btn--sm signature-cancel">取消</button>
+                <button type="submit" class="btn btn--primary btn--sm">確認簽署</button>
+              </div>
+            </form>
+          </dialog>
+        <% } else { %>
+          <p class="form-hint">主管簽核僅限管理員帳號</p>
+        <% } %>
       </div>
     <% }) %>
   </div>
