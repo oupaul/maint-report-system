@@ -181,6 +181,20 @@ fi
 
 log "✓ 程式碼同步完成"
 
+# rsync 剛把 update.sh 自己也同步成最新版寫進 ${INSTALL_DIR}/update.sh，但「目前
+# 這個 process」從一開始執行就已經把整支腳本讀進記憶體，接下來的步驟仍然會照
+# 啟動當下的舊邏輯跑，不會生效剛剛才寫進磁碟的新內容——如果這次更新剛好也是在
+# 修 update.sh 自己的 bug（先前發生過：同一個錯誤要多跑一次才會消失，讓人以為
+# 沒修好），不換一個全新 process 讀新檔案的話還是會重演一次舊行為。
+# deploy.sh 不受影響（下面用 bash deploy.sh 另開新 process 執行，本來就會讀到
+# 剛同步好的新版），只有 update.sh 自己這段需要這樣處理。
+if [ "${_MAINT_UPDATE_RESUMED:-}" != "1" ]; then
+    log "換成剛同步好的新版 update.sh 繼續執行..."
+    export _MAINT_UPDATE_RESUMED=1
+    export SKIP_UPDATE_CONFIRM=1  # 上面已經確認過一次，重新執行這段不用再問
+    exec bash "${INSTALL_DIR}/update.sh" "$BRANCH"
+fi
+
 # ── 執行增量部署（更新模式）─────────────────────────────────────
 log "啟動部署腳本（增量更新模式）..."
 echo ""
