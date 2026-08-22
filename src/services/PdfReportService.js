@@ -8,8 +8,8 @@ const dayjs = require('dayjs');
 const statusColors = require('../utils/statusColors');
 const { ASSET_CATEGORY_LABELS, SIGNATURE_ROLES, SIGNATURE_ROLE_LABELS } = require('../utils/validators');
 
-const SIGNATURE_BOX_HEIGHT = 130;
-const SIGNATURE_IMG_MAX_HEIGHT = 60;
+const SIGNATURE_SECTION_HEIGHT = 100; // 標題 + 兩欄簽名（含圖片、簽署人、時間）實際需要的高度上限
+const SIGNATURE_IMG_MAX_HEIGHT = 40;
 const SIGNATURE_IMG_MAX_WIDTH = 180;
 
 const IMAGE_DISPLAY_WIDTH = 260;
@@ -215,55 +215,61 @@ async function drawItemBlock(doc, item, contentWidth, maxImageHeight, fonts) {
  * 確認剩餘空間足夠即可。
  */
 function drawSignatureSection(doc, signaturesByRole, fonts) {
-  if (doc.y + SIGNATURE_BOX_HEIGHT > doc.page.height - doc.page.margins.bottom) {
+  // 簽核通常是報告最後一段，內容本身不高（標題＋一行簽名圖＋一行姓名/時間），
+  // 沒必要跟前面章節一樣保留一整頁的空間才畫——只要剩餘空間放得下這個精簡
+  // 版面就直接接在同一頁，放不下才換頁（例如前面內容剛好幾乎畫滿整頁）。
+  if (doc.y + SIGNATURE_SECTION_HEIGHT > doc.page.height - doc.page.margins.bottom) {
     doc.addPage();
   }
 
   const startX = doc.page.margins.left;
   const contentWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
   const colWidth = contentWidth / SIGNATURE_ROLES.length;
-  const topY = doc.y;
+  const colGap = 16;
 
   doc.font(fonts.bold).fontSize(12).fillColor('#1E293B');
-  doc.text('簽核', startX, topY);
-  doc.moveDown(0.5);
-  const boxTop = doc.y;
+  doc.text('簽核', startX, doc.y);
+  doc.moveDown(0.4);
+  const rowTop = doc.y;
 
   SIGNATURE_ROLES.forEach((role, i) => {
     const colX = startX + i * colWidth;
+    const colInnerWidth = colWidth - colGap;
     const sig = signaturesByRole[role];
-
-    doc.save();
-    doc.roundedRect(colX, boxTop, colWidth - 12, SIGNATURE_BOX_HEIGHT - 20, 4)
-      .strokeColor('#E2E8F0').stroke();
-    doc.restore();
+    let y = rowTop;
 
     doc.font(fonts.regular).fontSize(9).fillColor('#64748B');
-    doc.text(SIGNATURE_ROLE_LABELS[role] || role, colX + 10, boxTop + 8);
+    doc.text(SIGNATURE_ROLE_LABELS[role] || role, colX, y, { lineBreak: false });
+    y += 13;
 
     if (sig && sig.signature_path && fs.existsSync(sig.signature_path)) {
       try {
         const pngBuffer = fs.readFileSync(sig.signature_path);
-        doc.image(pngBuffer, colX + 10, boxTop + 24, {
+        doc.image(pngBuffer, colX, y, {
           fit: [SIGNATURE_IMG_MAX_WIDTH, SIGNATURE_IMG_MAX_HEIGHT],
         });
       } catch (err) {
         doc.font(fonts.regular).fontSize(9).fillColor('#DC2626');
-        doc.text('簽名圖片無法顯示', colX + 10, boxTop + 24 + SIGNATURE_IMG_MAX_HEIGHT / 2);
+        doc.text('簽名圖片無法顯示', colX, y, { lineBreak: false });
       }
+      y += SIGNATURE_IMG_MAX_HEIGHT + 4;
+
+      doc.moveTo(colX, y).lineTo(colX + colInnerWidth, y).strokeColor('#E2E8F0').stroke();
+      y += 4;
 
       const signerName = sig.display_name || sig.username;
-      doc.font(fonts.regular).fontSize(9).fillColor('#334155');
-      doc.text(signerName, colX + 10, boxTop + 24 + SIGNATURE_IMG_MAX_HEIGHT + 6);
       doc.font(fonts.regular).fontSize(8).fillColor('#94A3B8');
-      doc.text(dayjs(sig.signed_at).format('YYYY-MM-DD HH:mm'), colX + 10, doc.y);
+      doc.text(`${signerName} ・ ${dayjs(sig.signed_at).format('YYYY-MM-DD HH:mm')}`, colX, y, { lineBreak: false });
     } else {
-      doc.font(fonts.regular).fontSize(9).fillColor('#94A3B8');
-      doc.text('尚未簽署', colX + 10, boxTop + 24 + SIGNATURE_IMG_MAX_HEIGHT / 2);
+      y += SIGNATURE_IMG_MAX_HEIGHT + 4;
+      doc.moveTo(colX, y).lineTo(colX + colInnerWidth, y).strokeColor('#E2E8F0').stroke();
+      y += 4;
+      doc.font(fonts.regular).fontSize(8).fillColor('#94A3B8');
+      doc.text('尚未簽署', colX, y, { lineBreak: false });
     }
   });
 
-  doc.y = boxTop + SIGNATURE_BOX_HEIGHT - 20 + 10;
+  doc.y = rowTop + 13 + SIGNATURE_IMG_MAX_HEIGHT + 4 + 4 + 12;
 }
 
 /**
