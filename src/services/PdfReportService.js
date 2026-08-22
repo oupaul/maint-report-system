@@ -122,7 +122,7 @@ function estimateItemBlockHeight(doc, item, contentWidth, maxImageHeight, fonts)
   if (photos.length > 0) {
     const perPhotoMax = getPerPhotoMaxHeight(photos.length, maxImageHeight);
     for (const photo of photos) {
-      height += INNER_GAP + computeImageDisplayHeight(photo, perPhotoMax);
+      height += IMAGE_GAP + computeImageDisplayHeight(photo, perPhotoMax);
     }
   }
 
@@ -152,33 +152,35 @@ function drawStatusBadge(doc, x, y, status, fonts) {
   return badgeWidth;
 }
 
+// 這裡完全不依賴 pdfkit 的自動游標移動（doc.text() 自動推進 doc.y）或
+// doc.moveDown()（依「目前使用中字型的行高」換算間距）——兩者都曾經因為
+// drawStatusBadge() 暫時切換字級、或 CJK 字型行高與預期不同，算出來的間距
+// 不夠，導致下一行/圖片疊到前一行文字上。改成完全自己控制一個 cursorY，
+// 每畫一個元素就依固定常數往下推，跟 estimateItemBlockHeight() 用的是同一套
+// 常數（LABEL_ROW_HEIGHT / INNER_GAP / IMAGE_GAP），估算跟實際繪製才會一致。
 async function drawItemBlock(doc, item, contentWidth, maxImageHeight, fonts) {
   const startX = doc.page.margins.left;
   const bodyWidth = contentWidth - 20;
+  let cursorY = doc.y;
 
   // 標籤 + 狀態徽章列
   doc.font(fonts.bold).fontSize(11).fillColor('#1E293B');
-  doc.text(item.checklist_label, startX, doc.y, { continued: false, width: bodyWidth - 90 });
-  const labelY = doc.y - doc.currentLineHeight();
-  drawStatusBadge(doc, startX + bodyWidth - 80, labelY, item.status, fonts);
-  // drawStatusBadge() 內部呼叫 doc.font()/.fontSize() 改成 9pt 畫徽章文字，
-  // pdfkit 的 save()/restore() 只還原顏色/座標轉換等圖形狀態，不會還原目前
-  // 使用中的字型/字級——如果不在這裡重設回標籤原本的字型/字級，接下來的
-  // doc.moveDown() 會用徽章的 9pt 而不是標籤的 11pt 算行高，留的間距不夠，
-  // 中文字型（滿版方塊字，不像英文字母上下有留白）就會跟下一行文字疊在一起。
-  doc.font(fonts.bold).fontSize(11);
-  doc.moveDown(0.5);
+  doc.text(item.checklist_label, startX, cursorY, { lineBreak: false, width: bodyWidth - 90 });
+  drawStatusBadge(doc, startX + bodyWidth - 80, cursorY - 2, item.status, fonts);
+  cursorY += LABEL_ROW_HEIGHT;
 
   if (item.value_text) {
     doc.font(fonts.regular).fontSize(10).fillColor('#334155');
-    doc.text(`數值：${item.value_text}`, startX, doc.y, { width: bodyWidth });
-    doc.moveDown(0.3);
+    const text = `數值：${item.value_text}`;
+    doc.text(text, startX, cursorY, { width: bodyWidth });
+    cursorY += doc.heightOfString(text, { width: bodyWidth }) + INNER_GAP;
   }
 
   if (item.note) {
     doc.font(fonts.regular).fontSize(10).fillColor('#64748B');
-    doc.text(`備註：${item.note}`, startX, doc.y, { width: bodyWidth });
-    doc.moveDown(0.3);
+    const text = `備註：${item.note}`;
+    doc.text(text, startX, cursorY, { width: bodyWidth });
+    cursorY += doc.heightOfString(text, { width: bodyWidth }) + INNER_GAP;
   }
 
   const photos = item.photos || [];
@@ -186,28 +188,24 @@ async function drawItemBlock(doc, item, contentWidth, maxImageHeight, fonts) {
     const perPhotoMax = getPerPhotoMaxHeight(photos.length, maxImageHeight);
     for (const photo of photos) {
       const displayHeight = computeImageDisplayHeight(photo, perPhotoMax);
-      const drawY = doc.y;
 
       try {
         const pngBuffer = await decodeScreenshotToPng(photo.path);
-        doc.image(pngBuffer, startX, drawY, {
+        doc.image(pngBuffer, startX, cursorY, {
           fit: [IMAGE_DISPLAY_WIDTH, displayHeight],
         });
       } catch (err) {
         // CJK 字型多半沒有斜體字重，找不到字型時退回的 Helvetica-Oblique 也
         // 不支援中文，因此這裡統一用一般字重顯示，不強求斜體。
         doc.font(fonts.regular).fontSize(9).fillColor('#DC2626');
-        doc.text('圖片無法顯示', startX, drawY);
+        doc.text('圖片無法顯示', startX, cursorY);
       }
 
-      // doc.image() 跟 doc.text() 不一樣，畫完不會自動移動 doc.y，
-      // 一定要用估算時同一套高度公式手動往下推，否則下一張照片／下一個
-      // 項目區塊會直接疊畫在這張圖片上面（先前 PDF 版面錯位就是這個原因）。
-      doc.y = drawY + displayHeight + IMAGE_GAP;
+      cursorY += displayHeight + IMAGE_GAP;
     }
   }
 
-  doc.moveDown(0.6);
+  doc.y = cursorY + BLOCK_GAP;
 }
 
 /**
