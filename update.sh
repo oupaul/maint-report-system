@@ -190,6 +190,12 @@ log "✓ 程式碼同步完成"
 # 剛同步好的新版），只有 update.sh 自己這段需要這樣處理。
 if [ "${_MAINT_UPDATE_RESUMED:-}" != "1" ]; then
     log "換成剛同步好的新版 update.sh 繼續執行..."
+    # exec 是直接把目前這個 process 換成新程式繼續跑，PID（$$）不會變，
+    # 不會觸發上面設定的 `trap ... EXIT`（那只在 process 正常結束/exit 時
+    # 才會跑）。如果不在這裡手動清掉 $TMP，被 exec 進去的新 process 用同一個
+    # $$ 算出來的 $TMP 路徑會撞到還沒清掉的舊 clone，導致 git clone 因為目的
+    # 目錄已存在且非空而失敗。
+    rm -rf "$TMP"
     export _MAINT_UPDATE_RESUMED=1
     export SKIP_UPDATE_CONFIRM=1  # 上面已經確認過一次，重新執行這段不用再問
     exec bash "${INSTALL_DIR}/update.sh" "$BRANCH"
