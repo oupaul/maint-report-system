@@ -10,12 +10,12 @@
 
 ```bash
 # 公開 Repo
-bash <(curl -fsSL https://raw.githubusercontent.com/your-org/maint-report-system/main/setup.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/oupaul/maint-report-system/main/setup.sh)
 
 # 私有 Repo（curl 本身也需帶 token）
 export GH_TOKEN=github_pat_xxxxxxxxxxxx
 bash <(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
-  https://raw.githubusercontent.com/your-org/maint-report-system/main/setup.sh)
+  https://raw.githubusercontent.com/oupaul/maint-report-system/main/setup.sh)
 ```
 
 `setup.sh` 自動安裝 git、clone repo，並執行 `deploy.sh` 完成部署。部署前請先把 `setup.sh` / `update.sh` 裡的 `GITHUB_USER` / `GITHUB_REPO` 換成實際的 repo。
@@ -51,7 +51,7 @@ sudo /srv/apps/maint-report-system/update.sh
 # 或遠端一行指令
 export GH_TOKEN=github_pat_xxxxxxxxxxxx
 bash <(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
-  https://raw.githubusercontent.com/your-org/maint-report-system/main/update.sh)
+  https://raw.githubusercontent.com/oupaul/maint-report-system/main/update.sh)
 ```
 
 `update.sh` 自動偵測安裝目錄、rsync 同步程式碼（保留 `data/`、`uploads/`），再執行增量 migration。執行前會顯示目前／最新版本與 commit hash，並要求手動確認（建議先執行一次 `backup.sh`）；部署完成後會自動跑健康檢查（`scripts/health-check.sh`），若 migration 或健康檢查失敗會停止並印出排查方式，不會自動重試或回滾。全自動情境可設定 `SKIP_UPDATE_CONFIRM=1` 跳過確認步驟。

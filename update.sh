@@ -6,12 +6,12 @@
 #   sudo /srv/apps/maint-report-system/update.sh develop   # 指定 branch
 #
 # 或遠端一行指令（公開 Repo）：
-#   bash <(curl -fsSL https://raw.githubusercontent.com/your-org/maint-report-system/main/update.sh)
+#   bash <(curl -fsSL https://raw.githubusercontent.com/oupaul/maint-report-system/main/update.sh)
 #
 # 私有 Repo（curl 本身也需帶 token，支援 ghp_ 與 github_pat_ 格式）：
 #   export GH_TOKEN=github_pat_xxxxxxxxxxxx   # 或 ghp_xxxxxxxxxxxx
 #   bash <(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
-#     https://raw.githubusercontent.com/your-org/maint-report-system/main/update.sh)
+#     https://raw.githubusercontent.com/oupaul/maint-report-system/main/update.sh)
 #
 # GH_TOKEN 只會以 git 單次呼叫的 extra header 傳遞，不會寫進暫存 clone
 # 的 .git/config，暫存目錄結束時一律清除（含失敗中止的情況）。
@@ -25,7 +25,7 @@
 
 set -euo pipefail
 
-GITHUB_USER="your-org"
+GITHUB_USER="oupaul"
 GITHUB_REPO="maint-report-system"
 BRANCH="${1:-${DEPLOY_BRANCH:-main}}"
 
