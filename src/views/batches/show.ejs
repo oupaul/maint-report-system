@@ -86,7 +86,7 @@
         <dialog id="signature-dialog-<%= role %>" class="signature-dialog">
           <form class="signature-form" method="POST" action="/batches/<%= batch.id %>/signatures/<%= role %>">
             <h3 class="signature-dialog__title"><%= signatureRoleLabels[role] %>簽名</h3>
-            <p class="form-hint">觸控螢幕：手指按住拖曳書寫。滑鼠／筆電觸控板：點一下開始寫、移動游標畫線、再點一下結束這一筆，不用整段按著。</p>
+            <p class="form-hint">用滑鼠或筆電觸控板按住拖曳書寫，放開即完成這一筆。</p>
             <canvas class="signature-pad" width="500" height="220"></canvas>
             <input type="hidden" class="signature-data-input" name="signature_data">
             <div class="form-group signature-form__type" style="margin-top: var(--space-2); margin-bottom: 0;">
