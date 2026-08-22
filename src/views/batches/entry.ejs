@@ -81,4 +81,49 @@
   </section>
 <% }) %>
 
+<section class="asset-section">
+  <div class="asset-section__header">
+    <h2>新增設備到本次巡檢</h2>
+  </div>
+  <% if (addAssetError) { %>
+    <div class="form-error"><%= addAssetError %></div>
+  <% } %>
+  <form method="POST" action="/batches/<%= batch.id %>/assets">
+    <div class="form-group">
+      <label class="form-label">新增設備</label>
+      <p class="form-hint">巡檢途中發現漏掉的設備，直接在這裡加進本次批次，不用另外開新批次。</p>
+      <div id="new-asset-rows">
+        <div class="new-asset-row">
+          <input class="form-input" type="text" name="new_asset_name" placeholder="設備名稱，例如：前台PC-01">
+          <select class="form-select" name="new_asset_category">
+            <% categories.forEach(c => { %>
+              <option value="<%= c %>"><%= categoryLabels[c] %></option>
+            <% }) %>
+          </select>
+          <input class="form-input" type="text" name="new_asset_location" placeholder="位置（選填）">
+        </div>
+      </div>
+      <button type="button" id="add-asset-row" class="btn btn--secondary btn--sm">+ 新增一列</button>
+    </div>
+
+    <% if (availableAssets && availableAssets.length > 0) { %>
+      <div class="form-group">
+        <label class="form-label">或從已建立的設備清單勾選</label>
+        <div class="checkbox-grid">
+          <% availableAssets.forEach(a => { %>
+            <label class="checkbox-tile">
+              <input type="checkbox" name="asset_ids" value="<%= a.id %>">
+              <span><%= a.name %>（<%= categoryLabels[a.category] || a.category %>）</span>
+            </label>
+          <% }) %>
+        </div>
+      </div>
+    <% } %>
+
+    <button type="submit" class="btn btn--primary btn--md">加入本次巡檢</button>
+  </form>
+</section>
+
+<script src="/js/asset-quick-add.js"></script>
+
 <%- include('../partials/footer') %>

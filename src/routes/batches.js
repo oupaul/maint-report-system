@@ -92,6 +92,8 @@ function buildEntryData(batchId) {
   if (!batch) return null;
 
   const assets = InspectionBatch.getAssets(batchId);
+  const assetIdsInBatch = new Set(assets.map(a => a.id));
+  const availableAssets = Asset.findAll().filter(a => !assetIdsInBatch.has(a.id));
   const existingItems = InspectionItem.findByBatch(batchId);
 
   const photosByItemId = InspectionItemPhoto.findByItemIds(existingItems.map(i => i.id));
@@ -115,7 +117,7 @@ function buildEntryData(batchId) {
     return { asset, rows };
   });
 
-  return { batch, assetSections };
+  return { batch, assetSections, availableAssets };
 }
 
 router.get('/:id/entry', requireLogin, (req, res) => {
@@ -126,10 +128,65 @@ router.get('/:id/entry', requireLogin, (req, res) => {
   res.render('batches/entry', {
     batch: data.batch,
     assetSections: data.assetSections,
+    availableAssets: data.availableAssets,
+    categories: ASSET_CATEGORIES,
     categoryLabels: ASSET_CATEGORY_LABELS,
     statuses: ITEM_STATUSES,
     statusColors,
+    addAssetError: null,
   });
+});
+
+// 建立批次當下只是「先選一批」，巡檢途中常常需要臨時加一台漏掉的設備——
+// 不強制回到列表頁重開一個新批次，直接在填寫頁加進同一批次即可。跟
+// POST /batches/new 共用同一套「勾選既有 / 快速新增」邏輯。
+router.post('/:id/assets', requireLogin, (req, res) => {
+  const batch = InspectionBatch.findById(req.params.id);
+  if (!batch) {
+    return res.status(404).render('error', { title: '找不到批次', message: '找不到指定的巡檢批次' });
+  }
+
+  let assetIds = req.body.asset_ids || [];
+  if (!Array.isArray(assetIds)) assetIds = [assetIds];
+  assetIds = assetIds.filter(Boolean).map(id => parseInt(id, 10));
+
+  let newNames = req.body.new_asset_name || [];
+  let newCategories = req.body.new_asset_category || [];
+  let newLocations = req.body.new_asset_location || [];
+  if (!Array.isArray(newNames)) newNames = [newNames];
+  if (!Array.isArray(newCategories)) newCategories = [newCategories];
+  if (!Array.isArray(newLocations)) newLocations = [newLocations];
+
+  const createdAssetIds = [];
+  for (let i = 0; i < newNames.length; i++) {
+    const name = (newNames[i] || '').trim();
+    const category = newCategories[i];
+    if (!name || !isValidCategory(category)) continue;
+    const asset = Asset.create({ name, category, location: (newLocations[i] || '').trim() });
+    createdAssetIds.push(asset.id);
+  }
+
+  const allAssetIds = [...assetIds, ...createdAssetIds];
+
+  if (allAssetIds.length === 0) {
+    const data = buildEntryData(batch.id);
+    return res.status(400).render('batches/entry', {
+      batch: data.batch,
+      assetSections: data.assetSections,
+      availableAssets: data.availableAssets,
+      categories: ASSET_CATEGORIES,
+      categoryLabels: ASSET_CATEGORY_LABELS,
+      statuses: ITEM_STATUSES,
+      statusColors,
+      addAssetError: '請至少新增或勾選一項設備',
+    });
+  }
+
+  for (const assetId of allAssetIds) {
+    InspectionBatch.addAsset(batch.id, assetId);
+  }
+
+  res.redirect(`/batches/${batch.id}/entry`);
 });
 
 router.post('/:id/items/:checklistItemId', requireLogin, upload.array('screenshots', 10), async (req, res) => {
