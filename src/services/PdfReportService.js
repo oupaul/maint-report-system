@@ -100,10 +100,17 @@ function computeImageDisplayHeight(photo, maxHeight) {
 }
 
 /**
- * 估算單一 inspection_item 區塊畫出來需要多少高度，
- * 用來在畫之前決定要不要主動換頁（doc.heightOfString 不會移動 doc.y，可安全用來測量）。
+ * 只估算「核心內容＋第一張照片」需要的高度，用來在畫之前決定要不要主動換頁
+ * （doc.heightOfString 不會移動 doc.y，可安全用來測量）。
+ *
+ * 刻意不把全部照片加總：一個項目上傳很多張照片時（例如 7 張），全部加起來
+ * 可能比一整頁的可用高度還高，這時候「必須整批擠進同一頁」的估算永遠不可能
+ * 成立，實際發生過的結果是 cursorY 一路往下累加、超出頁面邊界的照片直接畫
+ * 到看不見的地方、憑空消失。真正需要保持不可分割的只有「標籤/數值/備註＋
+ * 第一張照片」，第二張之後改由 drawItemBlock() 自己逐張檢查換頁，一定會出現
+ * 在某一頁上，只是不保證跟第一張同頁。
  */
-function estimateItemBlockHeight(doc, item, contentWidth, maxImageHeight, fonts) {
+function estimateItemLeadHeight(doc, item, contentWidth, maxImageHeight, fonts) {
   let height = LABEL_ROW_HEIGHT;
 
   const bodyWidth = contentWidth - 20; // 區塊左右各留一點內距
@@ -121,9 +128,7 @@ function estimateItemBlockHeight(doc, item, contentWidth, maxImageHeight, fonts)
   const photos = item.photos || [];
   if (photos.length > 0) {
     const perPhotoMax = getPerPhotoMaxHeight(photos.length, maxImageHeight);
-    for (const photo of photos) {
-      height += IMAGE_GAP + computeImageDisplayHeight(photo, perPhotoMax);
-    }
+    height += IMAGE_GAP + computeImageDisplayHeight(photos[0], perPhotoMax);
   }
 
   return height + BLOCK_GAP;
@@ -186,8 +191,21 @@ async function drawItemBlock(doc, item, contentWidth, maxImageHeight, fonts) {
   const photos = item.photos || [];
   if (photos.length > 0) {
     const perPhotoMax = getPerPhotoMaxHeight(photos.length, maxImageHeight);
+    const pageBottom = doc.page.height - doc.page.margins.bottom;
+
     for (const photo of photos) {
       const displayHeight = computeImageDisplayHeight(photo, perPhotoMax);
+
+      // 每張照片各自檢查剩餘空間，不夠就先換頁：一個項目上傳很多張照片時，
+      // 全部照片疊在一起可能比一整頁還高，不可能整批擠進同一頁——保證的是
+      // 「單一張照片」不會被硬切成兩半，不是整批照片一定同頁。呼叫端
+      // （estimateItemLeadHeight）只確保核心內容＋第一張擠得下才開始畫，
+      // 第二張之後就靠這裡逐張換頁；不這樣做的話，超出頁面邊界的照片會被
+      // 畫到看不見的地方、報告裡憑空消失（先前發生過的 bug）。
+      if (cursorY + displayHeight > pageBottom) {
+        doc.addPage();
+        cursorY = doc.y;
+      }
 
       try {
         const pngBuffer = await decodeScreenshotToPng(photo.path);
@@ -339,7 +357,7 @@ async function generateBatchReport({ batch, assets, itemsByAssetId, signaturesBy
     }
 
     for (const item of items) {
-      const estimatedHeight = estimateItemBlockHeight(doc, item, contentWidth, maxImageHeight, fonts);
+      const estimatedHeight = estimateItemLeadHeight(doc, item, contentWidth, maxImageHeight, fonts);
 
       // 主動換頁：畫之前先判斷，避免區塊被硬切成兩頁
       if (doc.y + estimatedHeight > doc.page.height - doc.page.margins.bottom) {
