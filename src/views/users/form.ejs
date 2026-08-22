@@ -29,6 +29,11 @@
       </div>
     <% } %>
     <div class="form-group">
+      <label class="form-label" for="m365_email">M365 Email（選填，用於 Microsoft 365 登入）</label>
+      <input class="form-input" type="email" id="m365_email" name="m365_email" value="<%= targetUser ? (targetUser.m365_email || '') : '' %>" placeholder="user@yourcompany.com">
+      <p class="form-hint">設定後，此使用者用該 M365 帳號登入 Microsoft 就能直接進入系統，不用再輸入這裡的帳號密碼（帳號密碼仍可作為備用登入方式）。</p>
+    </div>
+    <div class="form-group">
       <label class="form-label" for="display_name">顯示名稱</label>
       <input class="form-input" type="text" id="display_name" name="display_name" value="<%= targetUser ? (targetUser.display_name || '') : '' %>">
     </div>

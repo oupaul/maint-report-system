@@ -130,6 +130,53 @@ sudo /srv/apps/maint-report-system/restore.sh
 
 ---
 
+## Microsoft 365 SSO（選用）
+
+登入頁可以顯示「使用 Microsoft 365 登入」按鈕，讓使用者用組織的 M365/Azure AD（Entra ID）帳號登入，不用額外記密碼。**帳號密碼登入永遠保留作為備用方式**，兩種方式並存。
+
+### 第 1 步：在 Azure Portal 建立 App Registration（需要 Azure/M365 系統管理員權限）
+
+1. 登入 [Azure Portal](https://portal.azure.com) → 搜尋「Microsoft Entra ID」→ 左側選單「App registrations」→「New registration」
+2. 名稱隨意（例如「維護巡檢報告系統」），「Supported account types」選你們組織內部使用即可（單一租戶：`Accounts in this organizational directory only`）
+3. 「Redirect URI」選 **Web**，填：`http://<主機IP或網域>:<port>/auth/m365/callback`（例如 `http://192.0.2.10:3000/auth/m365/callback`；正式對外服務建議改用 HTTPS 網域）
+4. 建立完成後，在「Overview」頁記下：
+   - **Application (client) ID** → 對應 `M365_CLIENT_ID`
+   - **Directory (tenant) ID** → 對應 `M365_TENANT_ID`
+5. 左側選單「Certificates & secrets」→「New client secret」→ 建立後**立刻複製 Value 欄位**（離開頁面後就看不到了）→ 對應 `M365_CLIENT_SECRET`
+6. 左側選單「API permissions」，預設應該已經有 `User.Read`（Microsoft Graph, Delegated），不用額外設定；本系統只用來確認登入者身分，不會存取信箱、檔案等其他資料
+
+### 第 2 步：在主機上設定環境變數
+
+`deploy.sh` 不會自動處理這四個變數（它們是選用的，跟必填的 `SESSION_SECRET` 不同），需要手動加進 systemd unit：
+
+```bash
+sudo systemctl edit --full maint-report-system
+```
+
+在 `[Service]` 區塊裡 `Environment=SESSION_SECRET=...` 那行下面加入（換成你在第 1 步記下的值）：
+
+```
+Environment=M365_CLIENT_ID=你的Client-ID
+Environment=M365_CLIENT_SECRET=你的Client-Secret
+Environment=M365_TENANT_ID=你的Tenant-ID
+Environment=M365_REDIRECT_URI=http://<主機IP或網域>:<port>/auth/m365/callback
+```
+
+存檔後：
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart maint-report-system
+```
+
+這是手動加在 systemd unit 上的設定，之後執行 `update.sh`/`deploy.sh` 不會覆蓋掉（`deploy.sh` 只在服務第一次安裝、或安裝目錄變更時才會重寫整份 unit 檔案，平常更新只會顯示「服務配置無需更新」）。
+
+### 第 3 步：幫使用者開通 SSO 登入
+
+系統**不會**讓任何能登入你們 M365 租戶的人自動取得帳號——管理員需要先在「使用者管理」建立好帳號（或編輯既有帳號），在「M365 Email」欄位填入該使用者的 M365 登入信箱，存檔後這個人就能用「使用 Microsoft 365 登入」進來，登入後對應到這個帳號的角色與權限。未被登記 M365 Email 的人即使能登入你們的 M365 租戶，也會被系統拒絕並提示「尚未被加入系統」。
+
+---
+
 ## 系統需求
 
 - Ubuntu 24.04 LTS（推薦）或其他 Linux

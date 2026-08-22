@@ -5,6 +5,7 @@ const path = require('path');
 const session = require('express-session');
 
 const config = require('./config');
+const M365AuthService = require('./services/M365AuthService');
 
 const app = express();
 
@@ -44,6 +45,9 @@ app.use((req, res, next) => {
   res.locals.currentUser = req.session ? req.session.user : null;
   res.locals.currentPath = req.path;
   res.locals.siteName = '維護巡檢報告系統';
+  // 全域設定，login.ejs 每個 render 路徑（包含各種錯誤訊息）都要用到，
+  // 不用每個 res.render('login', ...) 呼叫都各自記得傳一次。
+  res.locals.m365Enabled = M365AuthService.isEnabled();
   next();
 });
 

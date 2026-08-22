@@ -16,7 +16,7 @@ router.get('/new', requireRole('admin'), (req, res) => {
 });
 
 router.post('/', requireRole('admin'), async (req, res) => {
-  const { username, password, display_name, role } = req.body;
+  const { username, password, display_name, role, m365_email } = req.body;
 
   if (!username || !password || !isValidRole(role)) {
     return res.status(400).render('users/form', {
@@ -34,8 +34,16 @@ router.post('/', requireRole('admin'), async (req, res) => {
     });
   }
 
+  if (m365_email && User.findByM365Email(m365_email)) {
+    return res.status(400).render('users/form', {
+      targetUser: req.body,
+      roles: USER_ROLES,
+      error: '此 M365 Email 已被其他帳號使用',
+    });
+  }
+
   const password_hash = await AuthService.hashPassword(password);
-  User.create({ username, password_hash, display_name, role });
+  User.create({ username, password_hash, display_name, role, m365_email });
   res.redirect('/users');
 });
 
@@ -53,7 +61,7 @@ router.post('/:id/edit', requireRole('admin'), async (req, res) => {
     return res.status(404).render('error', { title: '找不到使用者', message: '找不到指定的使用者' });
   }
 
-  const { display_name, role, is_active, new_password } = req.body;
+  const { display_name, role, is_active, new_password, m365_email } = req.body;
 
   if (!isValidRole(role)) {
     return res.status(400).render('users/form', {
@@ -63,10 +71,22 @@ router.post('/:id/edit', requireRole('admin'), async (req, res) => {
     });
   }
 
+  if (m365_email) {
+    const existing = User.findByM365Email(m365_email);
+    if (existing && existing.id !== targetUser.id) {
+      return res.status(400).render('users/form', {
+        targetUser: { ...targetUser, ...req.body },
+        roles: USER_ROLES,
+        error: '此 M365 Email 已被其他帳號使用',
+      });
+    }
+  }
+
   User.update(targetUser.id, {
     display_name,
     role,
     is_active: is_active === 'on' || is_active === '1',
+    m365_email,
   });
 
   if (new_password && new_password.trim().length > 0) {
