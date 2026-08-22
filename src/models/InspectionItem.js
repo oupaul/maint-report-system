@@ -24,29 +24,22 @@ const InspectionItem = {
     ).get(batchId, assetId, checklistItemId);
   },
 
+  // 截圖改存在 inspection_item_photos（一對多，見 InspectionItemPhoto model），
+  // 本 model 只處理 inspection_items 本身的欄位。
   upsert({
     batch_id, asset_id, checklist_item_id, status, value_text, note,
-    screenshot_path, screenshot_format, screenshot_width, screenshot_height,
     source, source_ref, recorded_by,
   }) {
     const existing = InspectionItem.findOne(batch_id, asset_id, checklist_item_id);
 
     if (existing) {
-      // 若這次沒有上傳新截圖，保留舊的截圖欄位
-      const finalScreenshotPath = screenshot_path !== undefined ? screenshot_path : existing.screenshot_path;
-      const finalScreenshotFormat = screenshot_path !== undefined ? screenshot_format : existing.screenshot_format;
-      const finalScreenshotWidth = screenshot_path !== undefined ? screenshot_width : existing.screenshot_width;
-      const finalScreenshotHeight = screenshot_path !== undefined ? screenshot_height : existing.screenshot_height;
-
       db.prepare(
         `UPDATE inspection_items SET
            status = ?, value_text = ?, note = ?,
-           screenshot_path = ?, screenshot_format = ?, screenshot_width = ?, screenshot_height = ?,
            source = ?, source_ref = ?, recorded_by = ?, recorded_at = datetime('now')
          WHERE id = ?`
       ).run(
         status, value_text || null, note || null,
-        finalScreenshotPath || null, finalScreenshotFormat || null, finalScreenshotWidth || null, finalScreenshotHeight || null,
         source || 'manual', source_ref || null, recorded_by || null,
         existing.id
       );
@@ -56,12 +49,10 @@ const InspectionItem = {
     const result = db.prepare(
       `INSERT INTO inspection_items (
          batch_id, asset_id, checklist_item_id, status, value_text, note,
-         screenshot_path, screenshot_format, screenshot_width, screenshot_height,
          source, source_ref, recorded_by
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       batch_id, asset_id, checklist_item_id, status, value_text || null, note || null,
-      screenshot_path || null, screenshot_format || null, screenshot_width || null, screenshot_height || null,
       source || 'manual', source_ref || null, recorded_by || null
     );
     return InspectionItem.findById(result.lastInsertRowid);

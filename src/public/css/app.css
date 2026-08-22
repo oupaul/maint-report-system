@@ -270,7 +270,35 @@ p { margin: 0 0 var(--space-4) 0; }
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
   display: block;
+}
+
+.photo-thumb-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
   margin-top: var(--space-2);
+}
+
+.photo-thumb-list__item {
+  position: relative;
+}
+
+.photo-thumb-list__delete {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  background: var(--color-status-critical);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  padding: 0.1rem 0.5rem;
+  cursor: pointer;
+  opacity: 0.9;
+}
+
+.photo-thumb-list__delete:hover {
+  opacity: 1;
 }
 
 .empty-state {

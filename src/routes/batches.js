@@ -1,4 +1,5 @@
 const express = require('express');
+const fs = require('fs');
 const path = require('path');
 const router = express.Router();
 
@@ -6,6 +7,7 @@ const { requireLogin } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const InspectionBatch = require('../models/InspectionBatch');
 const InspectionItem = require('../models/InspectionItem');
+const InspectionItemPhoto = require('../models/InspectionItemPhoto');
 const ChecklistItem = require('../models/ChecklistItem');
 const Asset = require('../models/Asset');
 const ImageService = require('../services/ImageService');
@@ -65,6 +67,8 @@ function buildEntryData(batchId) {
   const assets = InspectionBatch.getAssets(batchId);
   const existingItems = InspectionItem.findByBatch(batchId);
 
+  const photosByItemId = InspectionItemPhoto.findByItemIds(existingItems.map(i => i.id));
+
   const itemsByAssetAndChecklist = new Map();
   for (const item of existingItems) {
     itemsByAssetAndChecklist.set(`${item.asset_id}:${item.checklist_item_id}`, item);
@@ -74,13 +78,11 @@ function buildEntryData(batchId) {
     const checklistItems = ChecklistItem.findByCategory(asset.category);
     const rows = checklistItems.map(ci => {
       const existing = itemsByAssetAndChecklist.get(`${asset.id}:${ci.id}`);
-      const screenshotFilename = existing && existing.screenshot_path
-        ? path.basename(existing.screenshot_path)
-        : null;
+      const photos = existing ? (photosByItemId.get(existing.id) || []) : [];
       return {
         checklistItem: ci,
         existing: existing || null,
-        screenshotFilename,
+        photos: photos.map(p => ({ ...p, filename: path.basename(p.path) })),
       };
     });
     return { asset, rows };
@@ -103,7 +105,7 @@ router.get('/:id/entry', requireLogin, (req, res) => {
   });
 });
 
-router.post('/:id/items/:checklistItemId', requireLogin, upload.single('screenshot'), async (req, res) => {
+router.post('/:id/items/:checklistItemId', requireLogin, upload.array('screenshots', 10), async (req, res) => {
   const batch = InspectionBatch.findById(req.params.id);
   if (!batch) {
     return res.status(404).render('error', { title: '找不到批次', message: '找不到指定的巡檢批次' });
@@ -125,29 +127,47 @@ router.post('/:id/items/:checklistItemId', requireLogin, upload.single('screensh
     return res.redirect(`/batches/${batch.id}/entry`);
   }
 
-  let screenshotFields = {};
-  if (req.file) {
-    const destPath = path.join(config.UPLOADS_DIR, String(batch.id), `${asset.id}-${checklistItem.id}`);
-    const result = await ImageService.processScreenshot(req.file.buffer, req.file.mimetype, destPath);
-    screenshotFields = {
-      screenshot_path: result.path,
-      screenshot_format: result.format,
-      screenshot_width: result.width,
-      screenshot_height: result.height,
-    };
-  }
-
-  InspectionItem.upsert({
+  const item = InspectionItem.upsert({
     batch_id: batch.id,
     asset_id: asset.id,
     checklist_item_id: checklistItem.id,
     status,
     value_text: req.body.value_text,
     note: req.body.note,
-    ...screenshotFields,
     source: 'manual',
     recorded_by: req.user.id,
   });
+
+  // 每張照片先插入佔位列取得 id（檔名需要用到），轉檔完成後再回填實際路徑/尺寸
+  if (req.files && req.files.length > 0) {
+    const existingCount = InspectionItemPhoto.findByItemId(item.id).length;
+    for (let i = 0; i < req.files.length; i++) {
+      const file = req.files[i];
+      const photo = InspectionItemPhoto.create({ inspection_item_id: item.id, sort_order: existingCount + i });
+      const destPath = path.join(config.UPLOADS_DIR, String(batch.id), `${asset.id}-${checklistItem.id}-${photo.id}`);
+      const result = await ImageService.processScreenshot(file.buffer, file.mimetype, destPath);
+      InspectionItemPhoto.updateFile(photo.id, result);
+    }
+  }
+
+  res.redirect(`/batches/${batch.id}/entry`);
+});
+
+router.post('/:id/photos/:photoId/delete', requireLogin, (req, res) => {
+  const batch = InspectionBatch.findById(req.params.id);
+  if (!batch) {
+    return res.status(404).render('error', { title: '找不到批次', message: '找不到指定的巡檢批次' });
+  }
+
+  const photo = InspectionItemPhoto.findById(req.params.photoId);
+  if (photo && photo.path) {
+    try {
+      fs.unlinkSync(photo.path);
+    } catch (err) {
+      // 檔案可能已經不存在，不影響刪除這筆紀錄
+    }
+    InspectionItemPhoto.remove(photo.id);
+  }
 
   res.redirect(`/batches/${batch.id}/entry`);
 });
@@ -169,10 +189,12 @@ router.get('/:id', requireLogin, (req, res) => {
 
   const assets = InspectionBatch.getAssets(batch.id);
   const items = InspectionItem.findByBatch(batch.id);
+  const photosByItemId = InspectionItemPhoto.findByItemIds(items.map(i => i.id));
 
   const itemsByAssetId = new Map();
   for (const item of items) {
-    item.screenshotFilename = item.screenshot_path ? path.basename(item.screenshot_path) : null;
+    const photos = photosByItemId.get(item.id) || [];
+    item.photos = photos.map(p => ({ ...p, filename: path.basename(p.path) }));
     if (!itemsByAssetId.has(item.asset_id)) itemsByAssetId.set(item.asset_id, []);
     itemsByAssetId.get(item.asset_id).push(item);
   }

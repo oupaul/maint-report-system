@@ -46,8 +46,8 @@
                 <td><%= item.value_text || '-' %></td>
                 <td><%= item.note || '-' %></td>
                 <td>
-                  <% if (item.screenshotFilename) { %>
-                    <a href="/uploads/<%= batch.id %>/<%= item.screenshotFilename %>" target="_blank">查看</a>
+                  <% if (item.photos && item.photos.length > 0) { %>
+                    <% item.photos.forEach((photo, i) => { %><a href="/uploads/<%= batch.id %>/<%= photo.filename %>" target="_blank">查看<%= item.photos.length > 1 ? (i + 1) : '' %></a><%= i < item.photos.length - 1 ? '　' : '' %><% }) %>
                   <% } else { %>
                     -
                   <% } %>

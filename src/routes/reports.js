@@ -6,6 +6,7 @@ const router = express.Router();
 const { requireLogin } = require('../middleware/auth');
 const InspectionBatch = require('../models/InspectionBatch');
 const InspectionItem = require('../models/InspectionItem');
+const InspectionItemPhoto = require('../models/InspectionItemPhoto');
 const PdfReportService = require('../services/PdfReportService');
 const config = require('../config');
 
@@ -17,9 +18,11 @@ router.get('/batches/:id/report.pdf', requireLogin, async (req, res) => {
 
   const assets = InspectionBatch.getAssets(batch.id);
   const items = InspectionItem.findByBatch(batch.id);
+  const photosByItemId = InspectionItemPhoto.findByItemIds(items.map(i => i.id));
 
   const itemsByAssetId = new Map();
   for (const item of items) {
+    item.photos = photosByItemId.get(item.id) || [];
     if (!itemsByAssetId.has(item.asset_id)) itemsByAssetId.set(item.asset_id, []);
     itemsByAssetId.get(item.asset_id).push(item);
   }

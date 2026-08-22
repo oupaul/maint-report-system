@@ -14,6 +14,7 @@ const DB_PATH = path.join(DATA_DIR, 'maint_report.db');
 // 依執行順序排列 — 只能在最後新增，不可改變已有項目的位置
 const MIGRATIONS = [
   'migrate_0001_init',
+  'migrate_0002_multi_photos',
 ];
 
 async function run() {

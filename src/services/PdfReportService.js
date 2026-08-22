@@ -10,6 +10,7 @@ const { ASSET_CATEGORY_LABELS } = require('../utils/validators');
 
 const IMAGE_DISPLAY_WIDTH = 260;
 const IMAGE_FALLBACK_HEIGHT = 180;
+const IMAGE_GAP = 8;
 const LABEL_ROW_HEIGHT = 22;
 const BLOCK_GAP = 14;
 const INNER_GAP = 6;
@@ -77,6 +78,21 @@ function registerFonts(doc) {
   return { regular: 'Helvetica', bold: 'Helvetica-Bold' };
 }
 
+// 一個項目可能有多張照片，多張時每張的顯示高度上限縮小，避免單一區塊佔滿好幾頁；
+// estimateItemBlockHeight 與 drawItemBlock 都呼叫這個函式，確保估算/實際繪製用的是同一個高度上限。
+function getPerPhotoMaxHeight(photoCount, maxImageHeight) {
+  return photoCount > 1 ? Math.min(150, maxImageHeight) : maxImageHeight;
+}
+
+// 依照片實際寬高比例算出顯示高度（寬固定為 IMAGE_DISPLAY_WIDTH），沒有寬高資訊時用保守固定值。
+// estimateItemBlockHeight 與 drawItemBlock 共用同一個計算，避免兩邊估算不一致。
+function computeImageDisplayHeight(photo, maxHeight) {
+  const raw = (photo.width && photo.height)
+    ? IMAGE_DISPLAY_WIDTH * (photo.height / photo.width)
+    : IMAGE_FALLBACK_HEIGHT;
+  return Math.min(raw, maxHeight);
+}
+
 /**
  * 估算單一 inspection_item 區塊畫出來需要多少高度，
  * 用來在畫之前決定要不要主動換頁（doc.heightOfString 不會移動 doc.y，可安全用來測量）。
@@ -96,15 +112,12 @@ function estimateItemBlockHeight(doc, item, contentWidth, maxImageHeight, fonts)
     height += INNER_GAP + doc.heightOfString(noteText, { width: bodyWidth });
   }
 
-  if (item.screenshot_path) {
-    let imgHeight;
-    if (item.screenshot_width && item.screenshot_height) {
-      imgHeight = IMAGE_DISPLAY_WIDTH * (item.screenshot_height / item.screenshot_width);
-    } else {
-      imgHeight = IMAGE_FALLBACK_HEIGHT;
+  const photos = item.photos || [];
+  if (photos.length > 0) {
+    const perPhotoMax = getPerPhotoMaxHeight(photos.length, maxImageHeight);
+    for (const photo of photos) {
+      height += INNER_GAP + computeImageDisplayHeight(photo, perPhotoMax);
     }
-    imgHeight = Math.min(imgHeight, maxImageHeight);
-    height += INNER_GAP + imgHeight;
   }
 
   return height + BLOCK_GAP;
@@ -156,21 +169,29 @@ async function drawItemBlock(doc, item, contentWidth, maxImageHeight, fonts) {
     doc.moveDown(0.15);
   }
 
-  if (item.screenshot_path) {
-    try {
-      const pngBuffer = await decodeScreenshotToPng(item.screenshot_path);
-      doc.image(pngBuffer, startX, doc.y, {
-        width: IMAGE_DISPLAY_WIDTH,
-        height: maxImageHeight, // pdfkit 會以此為上限，並保持比例（fit）
-        fit: [IMAGE_DISPLAY_WIDTH, maxImageHeight],
-      });
-      doc.moveDown(0.5);
-    } catch (err) {
-      // CJK 字型多半沒有斜體字重，找不到字型時退回的 Helvetica-Oblique 也
-      // 不支援中文，因此這裡統一用一般字重顯示，不強求斜體。
-      doc.font(fonts.regular).fontSize(9).fillColor('#DC2626');
-      doc.text('圖片無法顯示', startX, doc.y);
-      doc.moveDown(0.3);
+  const photos = item.photos || [];
+  if (photos.length > 0) {
+    const perPhotoMax = getPerPhotoMaxHeight(photos.length, maxImageHeight);
+    for (const photo of photos) {
+      const displayHeight = computeImageDisplayHeight(photo, perPhotoMax);
+      const drawY = doc.y;
+
+      try {
+        const pngBuffer = await decodeScreenshotToPng(photo.path);
+        doc.image(pngBuffer, startX, drawY, {
+          fit: [IMAGE_DISPLAY_WIDTH, displayHeight],
+        });
+      } catch (err) {
+        // CJK 字型多半沒有斜體字重，找不到字型時退回的 Helvetica-Oblique 也
+        // 不支援中文，因此這裡統一用一般字重顯示，不強求斜體。
+        doc.font(fonts.regular).fontSize(9).fillColor('#DC2626');
+        doc.text('圖片無法顯示', startX, drawY);
+      }
+
+      // doc.image() 跟 doc.text() 不一樣，畫完不會自動移動 doc.y，
+      // 一定要用估算時同一套高度公式手動往下推，否則下一張照片／下一個
+      // 項目區塊會直接疊畫在這張圖片上面（先前 PDF 版面錯位就是這個原因）。
+      doc.y = drawY + displayHeight + IMAGE_GAP;
     }
   }
 
