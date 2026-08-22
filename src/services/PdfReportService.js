@@ -32,10 +32,12 @@ function findFont(candidates) {
 
 function getCjkFontPaths() {
   const regular = findFont([
+    path.join(FONTS_DIR, 'NotoSansTC-Regular.otf'), // 隨 repo 附帶的預設字型
     path.join(FONTS_DIR, 'NotoSansTC-Regular.ttf'),
     path.join(FONTS_DIR, 'NotoSansCJKtc-Regular.otf'),
   ]);
   const bold = findFont([
+    path.join(FONTS_DIR, 'NotoSansTC-Bold.otf'),
     path.join(FONTS_DIR, 'NotoSansTC-Bold.ttf'),
     path.join(FONTS_DIR, 'NotoSansCJKtc-Bold.otf'),
   ]);
@@ -159,18 +161,24 @@ async function drawItemBlock(doc, item, contentWidth, maxImageHeight, fonts) {
   doc.text(item.checklist_label, startX, doc.y, { continued: false, width: bodyWidth - 90 });
   const labelY = doc.y - doc.currentLineHeight();
   drawStatusBadge(doc, startX + bodyWidth - 80, labelY, item.status, fonts);
-  doc.moveDown(0.3);
+  // drawStatusBadge() 內部呼叫 doc.font()/.fontSize() 改成 9pt 畫徽章文字，
+  // pdfkit 的 save()/restore() 只還原顏色/座標轉換等圖形狀態，不會還原目前
+  // 使用中的字型/字級——如果不在這裡重設回標籤原本的字型/字級，接下來的
+  // doc.moveDown() 會用徽章的 9pt 而不是標籤的 11pt 算行高，留的間距不夠，
+  // 中文字型（滿版方塊字，不像英文字母上下有留白）就會跟下一行文字疊在一起。
+  doc.font(fonts.bold).fontSize(11);
+  doc.moveDown(0.5);
 
   if (item.value_text) {
     doc.font(fonts.regular).fontSize(10).fillColor('#334155');
     doc.text(`數值：${item.value_text}`, startX, doc.y, { width: bodyWidth });
-    doc.moveDown(0.15);
+    doc.moveDown(0.3);
   }
 
   if (item.note) {
     doc.font(fonts.regular).fontSize(10).fillColor('#64748B');
     doc.text(`備註：${item.note}`, startX, doc.y, { width: bodyWidth });
-    doc.moveDown(0.15);
+    doc.moveDown(0.3);
   }
 
   const photos = item.photos || [];

@@ -12,8 +12,3 @@ deploy.config.json
 nas_config.json
 coverage/
 .DS_Store
-
-# PDF 中文字型（授權條款通常不允許隨意重新散布，見 fonts/README.md）
-fonts/*.ttf
-fonts/*.otf
-fonts/*.ttc

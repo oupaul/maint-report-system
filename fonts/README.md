@@ -1,17 +1,12 @@
 # PDF 中文字型
 
-PDF 報告功能（`src/services/PdfReportService.js`）預設字型（pdfkit 內建的 Helvetica 系列）不支援中文，若需正確顯示中文，請將支援 CJK 的字型檔置於此目錄。
+PDF 報告功能（`src/services/PdfReportService.js`）需要支援 CJK 的字型才能正確顯示中文，pdfkit 內建的 Helvetica 系列不支援。
 
-**建議字型：**
-- [Google Noto Sans CJK TC](https://github.com/googlefonts/noto-cjk)（思源黑體繁體中文）
-- 檔名範例：`NotoSansTC-Regular.ttf`（必要）、`NotoSansTC-Bold.ttf`（選填，找不到會自動退回用 Regular 代替粗體）
-- 也接受：`NotoSansCJKtc-Regular.otf` / `NotoSansCJKtc-Bold.otf`
+**本專案預設已內建** [Google Noto Sans TC](https://github.com/notofonts/noto-cjk)（思源黑體繁體中文，`NotoSansTC-Regular.otf` / `NotoSansTC-Bold.otf`），隨 repo 一起 clone/更新，不需要額外下載或手動放置，`update.sh` 也不會刪除它。授權條款見 `OFL.txt`（SIL Open Font License 1.1，明文允許隨軟體重新發布/內嵌，此為官方發行的原始字型檔，未經修改）。
 
-**放置方式：**
-1. 下載 Noto Sans TC 的 TTF 或 OTF 檔
-2. 將字型檔複製到本專案的 `fonts/` 目錄，檔名需符合上方其中一組
-3. 重新產生 PDF 報告即可正確顯示中文
+**若要改用其他字型**：把字型檔（`.ttf` / `.otf`，需支援中文字符集）放到本目錄，檔名符合下列其中一組，`PdfReportService.js` 會優先採用（找不到才退回內建的 Noto Sans TC）：
 
-若未放置字型，PDF 中的中文文字會顯示為空白或亂碼（英數字與版面配置仍正常），伺服器 log 會印出一次警告提醒，但不會導致報告產生失敗。
+- `NotoSansTC-Regular.ttf` / `NotoSansTC-Bold.ttf`
+- `NotoSansCJKtc-Regular.otf` / `NotoSansCJKtc-Bold.otf`
 
-本目錄下的字型檔已加入 `.gitignore`（字型授權條款通常不允許隨意重新散布），需要每個部署環境自行放置。
+若換成非 OFL 或其他不允許自由重新散布的授權字型，記得自行把該檔名加回 `.gitignore`，避免不小心 commit 進 repo。
