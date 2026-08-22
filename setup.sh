@@ -67,4 +67,8 @@ chmod +x "${CLONE_DIR}/deploy.sh"
 
 log "啟動部署腳本..."
 echo ""
-exec sudo bash "${CLONE_DIR}/deploy.sh"
+# 本腳本執行到這裡已經保證是 root（上方 EUID 檢查），不需要也不能再包一層 sudo：
+# 從已經是 root 的行程再呼叫一次 sudo，sudo 會把 $SUDO_USER 重設成 root（而不是
+# 保留原本從一般帳號 sudo 進來時的使用者），deploy.sh 判斷「是否以 root 身份執行
+# 服務」的檢查就會誤判失敗。直接執行即可自然繼承目前環境變數（含 $SUDO_USER）。
+exec bash "${CLONE_DIR}/deploy.sh"

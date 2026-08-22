@@ -187,7 +187,10 @@ echo ""
 cd "${INSTALL_DIR}"
 chmod +x deploy.sh
 
-if ! sudo SKIP_BACKUP_PROMPT=1 bash deploy.sh; then
+# 本腳本執行到這裡已經保證是 root（上方 EUID 檢查），不需要也不能再包一層 sudo，
+# 理由同 setup.sh 的對應註解：從已經是 root 的行程再呼叫一次 sudo 會把
+# $SUDO_USER 重設成 root，讓 deploy.sh 誤判成「直接以 root 身份執行」而失敗。
+if ! SKIP_BACKUP_PROMPT=1 bash deploy.sh; then
     error "deploy.sh 執行失敗，更新已停止。請檢查上方輸出。
   - 程式碼本身沒有自動回滾機制，如需恢復舊版本，需重新從舊的 tag/commit 手動部署
   - 服務日誌：sudo journalctl -u <service-name> -n 50"
