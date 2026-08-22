@@ -301,12 +301,17 @@ async function generateBatchReport({ batch, assets, itemsByAssetId, signaturesBy
   }
   doc.moveDown(1);
 
-  for (const asset of assets) {
-    // 資產群組標題可自然跨頁換行，不需要主動換頁保護
-    if (doc.y + 40 > doc.page.height - doc.page.margins.bottom) {
+  for (let assetIndex = 0; assetIndex < assets.length; assetIndex++) {
+    const asset = assets[assetIndex];
+    // 每個資產都從新的一頁開始（第一個資產緊接在報告標題後面，不用換頁）。
+    // 原本只在「剩餘空間放不下資產標題本身」時才換頁，結果標題可能剛好卡在
+    // 頁尾擠得下、但底下的檢查項目/截圖整批被推到下一頁，標題跟內容斷開、
+    // 讀起來很奇怪；改成一個資產固定佔用自己的頁面，報告也更適合逐設備列印。
+    if (assetIndex > 0) {
       doc.addPage();
+    } else {
+      doc.moveDown(0.5);
     }
-    doc.moveDown(0.5);
     doc.font(fonts.bold).fontSize(14).fillColor('#F97316');
     doc.text(`${asset.name}`, doc.page.margins.left, doc.y);
     doc.font(fonts.regular).fontSize(9).fillColor('#64748B');
