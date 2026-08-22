@@ -1,0 +1,47 @@
+<%- include('../layout', { title: asset && asset.id ? '編輯資產' : '新增資產' }) %>
+
+<div class="page-header">
+  <h1><%= asset && asset.id ? '編輯資產' : '新增資產' %></h1>
+</div>
+
+<div class="card" style="max-width: 560px;">
+  <% if (error) { %>
+    <div class="form-error"><%= error %></div>
+  <% } %>
+  <form method="POST" action="<%= asset && asset.id ? `/assets/${asset.id}/edit` : '/assets' %>">
+    <div class="form-group">
+      <label class="form-label" for="name">資產名稱</label>
+      <input class="form-input" type="text" id="name" name="name" value="<%= asset ? (asset.name || '') : '' %>" required>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="category">類別</label>
+      <select class="form-select" id="category" name="category" required>
+        <% categories.forEach(c => { %>
+          <option value="<%= c %>" <%= asset && asset.category === c ? 'selected' : '' %>><%= categoryLabels[c] %></option>
+        <% }) %>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="location">位置</label>
+      <input class="form-input" type="text" id="location" name="location" value="<%= asset ? (asset.location || '') : '' %>">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="identifier">識別碼（IP / 序號等）</label>
+      <input class="form-input" type="text" id="identifier" name="identifier" value="<%= asset ? (asset.identifier || '') : '' %>">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="notes">備註</label>
+      <textarea class="form-textarea" id="notes" name="notes"><%= asset ? (asset.notes || '') : '' %></textarea>
+    </div>
+    <% if (asset && asset.id) { %>
+      <div class="form-group form-checkbox-row">
+        <input type="checkbox" id="is_active" name="is_active" <%= asset.is_active ? 'checked' : '' %>>
+        <label class="form-label" for="is_active" style="margin:0;">啟用中</label>
+      </div>
+    <% } %>
+    <button type="submit" class="btn btn--primary btn--md">儲存</button>
+    <a href="/assets" class="btn btn--secondary btn--md">取消</a>
+  </form>
+</div>
+
+<%- include('../partials/footer') %>

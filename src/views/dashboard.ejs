@@ -1,0 +1,59 @@
+<%- include('layout', { title: '儀表板' }) %>
+
+<div class="page-header">
+  <h1>儀表板</h1>
+  <div class="page-actions">
+    <a href="/batches/new" class="btn btn--primary btn--md">建立新巡檢批次</a>
+  </div>
+</div>
+
+<div class="stat-row">
+  <div class="card stat-card">
+    <div class="stat-card__value"><%= batches.length %></div>
+    <div class="stat-card__label">近期批次數</div>
+  </div>
+  <div class="card stat-card">
+    <div class="stat-card__value"><%= assetCount %></div>
+    <div class="stat-card__label">資產總數</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>近期巡檢批次</h2>
+  <% if (batches.length === 0) { %>
+    <div class="empty-state">尚無巡檢批次，點擊右上角建立第一筆。</div>
+  <% } else { %>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>標題</th>
+            <th>日期</th>
+            <th>狀態</th>
+            <th>建立者</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% batches.forEach(b => { %>
+            <tr>
+              <td><%= b.title %></td>
+              <td><%= b.batch_date %></td>
+              <td>
+                <% if (b.status === 'completed') { %>
+                  <span class="badge">已完成</span>
+                <% } else { %>
+                  <span class="badge" style="color: var(--color-primary); border-color: var(--color-primary);">草稿</span>
+                <% } %>
+              </td>
+              <td><%= b.created_by_name || b.created_by_username %></td>
+              <td><a href="/batches/<%= b.id %>">查看</a></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>
+
+<%- include('partials/footer') %>

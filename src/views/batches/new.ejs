@@ -1,0 +1,44 @@
+<%- include('../layout', { title: '建立巡檢批次' }) %>
+
+<div class="page-header">
+  <h1>建立巡檢批次</h1>
+</div>
+
+<div class="card" style="max-width: 720px;">
+  <% if (error) { %>
+    <div class="form-error"><%= error %></div>
+  <% } %>
+  <form method="POST" action="/batches/new">
+    <div class="form-group">
+      <label class="form-label" for="title">批次標題</label>
+      <input class="form-input" type="text" id="title" name="title" placeholder="例如：2026年8月例行巡檢" value="<%= formValues ? (formValues.title || '') : '' %>" required>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="batch_date">巡檢日期</label>
+      <input class="form-input" type="date" id="batch_date" name="batch_date" value="<%= formValues ? (formValues.batch_date || '') : '' %>" required>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="notes">備註</label>
+      <textarea class="form-textarea" id="notes" name="notes"><%= formValues ? (formValues.notes || '') : '' %></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">選擇本次要巡檢的資產</label>
+      <% if (assets.length === 0) { %>
+        <div class="form-hint">尚無資產，請先至「資產管理」新增資產。</div>
+      <% } else { %>
+        <div class="checkbox-grid">
+          <% assets.forEach(a => { %>
+            <label class="checkbox-tile">
+              <input type="checkbox" name="asset_ids" value="<%= a.id %>">
+              <span><%= a.name %>（<%= categoryLabels[a.category] || a.category %>）</span>
+            </label>
+          <% }) %>
+        </div>
+      <% } %>
+    </div>
+    <button type="submit" class="btn btn--primary btn--md">建立並開始填寫</button>
+    <a href="/batches" class="btn btn--secondary btn--md">取消</a>
+  </form>
+</div>
+
+<%- include('../partials/footer') %>

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= typeof title !== 'undefined' ? title + ' - ' : '' %><%= siteName %></title>
+  <link rel="stylesheet" href="/css/tokens.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+<div class="app-shell">
+  <nav class="app-nav">
+    <a href="/" class="app-nav__brand"><%= siteName %></a>
+    <div class="app-nav__links">
+      <a href="/" class="<%= currentPath === '/' ? 'is-active' : '' %>">儀表板</a>
+      <a href="/batches" class="<%= currentPath && currentPath.startsWith('/batches') ? 'is-active' : '' %>">巡檢批次</a>
+      <a href="/assets" class="<%= currentPath && currentPath.startsWith('/assets') ? 'is-active' : '' %>">資產管理</a>
+      <% if (currentUser && currentUser.role === 'admin') { %>
+        <a href="/users" class="<%= currentPath && currentPath.startsWith('/users') ? 'is-active' : '' %>">使用者管理</a>
+      <% } %>
+    </div>
+    <div class="app-nav__user">
+      <% if (currentUser) { %>
+        <span><%= currentUser.display_name || currentUser.username %>（<%= currentUser.role === 'admin' ? '管理員' : '技術人員' %>）</span>
+        <form method="POST" action="/logout" style="margin:0;">
+          <button type="submit" class="btn btn--sm btn--secondary" style="border-color: rgba(255,255,255,0.35); color:#F1F5F9;">登出</button>
+        </form>
+      <% } %>
+    </div>
+  </nav>
+  <main class="app-main">

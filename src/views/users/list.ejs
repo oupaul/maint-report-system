@@ -1,0 +1,49 @@
+<%- include('../layout', { title: '使用者管理' }) %>
+
+<div class="page-header">
+  <h1>使用者管理</h1>
+  <div class="page-actions">
+    <a href="/users/new" class="btn btn--primary btn--md">新增使用者</a>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>帳號</th>
+          <th>顯示名稱</th>
+          <th>角色</th>
+          <th>狀態</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% users.forEach(u => { %>
+          <tr>
+            <td><%= u.username %></td>
+            <td><%= u.display_name || '-' %></td>
+            <td>
+              <% if (u.role === 'admin') { %>
+                <span class="badge badge--role-admin">管理員</span>
+              <% } else { %>
+                <span class="badge">技術人員</span>
+              <% } %>
+            </td>
+            <td>
+              <% if (u.is_active) { %>
+                <span class="status-badge status-badge--normal">啟用</span>
+              <% } else { %>
+                <span class="status-badge status-badge--critical">停用</span>
+              <% } %>
+            </td>
+            <td><a href="/users/<%= u.id %>/edit">編輯</a></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

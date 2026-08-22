@@ -1,0 +1,52 @@
+<%- include('../layout', { title: '巡檢批次' }) %>
+
+<div class="page-header">
+  <h1>巡檢批次</h1>
+  <div class="page-actions">
+    <a href="/batches/new" class="btn btn--primary btn--md">建立新批次</a>
+  </div>
+</div>
+
+<div class="card">
+  <% if (batches.length === 0) { %>
+    <div class="empty-state">尚無巡檢批次。</div>
+  <% } else { %>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>標題</th>
+            <th>日期</th>
+            <th>狀態</th>
+            <th>建立者</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% batches.forEach(b => { %>
+            <tr>
+              <td><%= b.title %></td>
+              <td><%= b.batch_date %></td>
+              <td>
+                <% if (b.status === 'completed') { %>
+                  <span class="badge">已完成</span>
+                <% } else { %>
+                  <span class="badge" style="color: var(--color-primary); border-color: var(--color-primary);">草稿</span>
+                <% } %>
+              </td>
+              <td><%= b.created_by_name || b.created_by_username %></td>
+              <td>
+                <a href="/batches/<%= b.id %>">查看</a>
+                <% if (b.status === 'draft') { %>
+                  &nbsp;|&nbsp;<a href="/batches/<%= b.id %>/entry">填寫</a>
+                <% } %>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>
+
+<%- include('../partials/footer') %>

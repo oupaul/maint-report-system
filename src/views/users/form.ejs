@@ -1,0 +1,54 @@
+<%- include('../layout', { title: targetUser && targetUser.id ? '編輯使用者' : '新增使用者' }) %>
+
+<div class="page-header">
+  <h1><%= targetUser && targetUser.id ? '編輯使用者' : '新增使用者' %></h1>
+</div>
+
+<div class="card" style="max-width: 560px;">
+  <% if (error) { %>
+    <div class="form-error"><%= error %></div>
+  <% } %>
+  <form method="POST" action="<%= targetUser && targetUser.id ? `/users/${targetUser.id}/edit` : '/users' %>">
+    <div class="form-group">
+      <label class="form-label" for="username">帳號</label>
+      <% if (targetUser && targetUser.id) { %>
+        <input class="form-input" type="text" value="<%= targetUser.username %>" disabled>
+      <% } else { %>
+        <input class="form-input" type="text" id="username" name="username" value="<%= targetUser ? (targetUser.username || '') : '' %>" required>
+      <% } %>
+    </div>
+    <% if (!(targetUser && targetUser.id)) { %>
+      <div class="form-group">
+        <label class="form-label" for="password">密碼</label>
+        <input class="form-input" type="password" id="password" name="password" required>
+      </div>
+    <% } else { %>
+      <div class="form-group">
+        <label class="form-label" for="new_password">重設密碼（留空則不變更）</label>
+        <input class="form-input" type="password" id="new_password" name="new_password">
+      </div>
+    <% } %>
+    <div class="form-group">
+      <label class="form-label" for="display_name">顯示名稱</label>
+      <input class="form-input" type="text" id="display_name" name="display_name" value="<%= targetUser ? (targetUser.display_name || '') : '' %>">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="role">角色</label>
+      <select class="form-select" id="role" name="role" required>
+        <% roles.forEach(r => { %>
+          <option value="<%= r %>" <%= targetUser && targetUser.role === r ? 'selected' : '' %>><%= r === 'admin' ? '管理員' : '技術人員' %></option>
+        <% }) %>
+      </select>
+    </div>
+    <% if (targetUser && targetUser.id) { %>
+      <div class="form-group form-checkbox-row">
+        <input type="checkbox" id="is_active" name="is_active" <%= targetUser.is_active ? 'checked' : '' %>>
+        <label class="form-label" for="is_active" style="margin:0;">啟用中</label>
+      </div>
+    <% } %>
+    <button type="submit" class="btn btn--primary btn--md">儲存</button>
+    <a href="/users" class="btn btn--secondary btn--md">取消</a>
+  </form>
+</div>
+
+<%- include('../partials/footer') %>

@@ -1,0 +1,71 @@
+const db = require('./db');
+
+const InspectionItem = {
+  findById(id) {
+    return db.prepare('SELECT * FROM inspection_items WHERE id = ?').get(id);
+  },
+
+  findByBatch(batchId) {
+    return db.prepare(
+      `SELECT ii.*, a.name AS asset_name, a.category AS asset_category,
+              ci.code AS checklist_code, ci.label AS checklist_label, ci.sort_order
+       FROM inspection_items ii
+       JOIN assets a ON a.id = ii.asset_id
+       JOIN checklist_items ci ON ci.id = ii.checklist_item_id
+       WHERE ii.batch_id = ?
+       ORDER BY a.category ASC, a.name ASC, ci.sort_order ASC`
+    ).all(batchId);
+  },
+
+  findOne(batchId, assetId, checklistItemId) {
+    return db.prepare(
+      `SELECT * FROM inspection_items
+       WHERE batch_id = ? AND asset_id = ? AND checklist_item_id = ?`
+    ).get(batchId, assetId, checklistItemId);
+  },
+
+  upsert({
+    batch_id, asset_id, checklist_item_id, status, value_text, note,
+    screenshot_path, screenshot_format, screenshot_width, screenshot_height,
+    source, source_ref, recorded_by,
+  }) {
+    const existing = InspectionItem.findOne(batch_id, asset_id, checklist_item_id);
+
+    if (existing) {
+      // 若這次沒有上傳新截圖，保留舊的截圖欄位
+      const finalScreenshotPath = screenshot_path !== undefined ? screenshot_path : existing.screenshot_path;
+      const finalScreenshotFormat = screenshot_path !== undefined ? screenshot_format : existing.screenshot_format;
+      const finalScreenshotWidth = screenshot_path !== undefined ? screenshot_width : existing.screenshot_width;
+      const finalScreenshotHeight = screenshot_path !== undefined ? screenshot_height : existing.screenshot_height;
+
+      db.prepare(
+        `UPDATE inspection_items SET
+           status = ?, value_text = ?, note = ?,
+           screenshot_path = ?, screenshot_format = ?, screenshot_width = ?, screenshot_height = ?,
+           source = ?, source_ref = ?, recorded_by = ?, recorded_at = datetime('now')
+         WHERE id = ?`
+      ).run(
+        status, value_text || null, note || null,
+        finalScreenshotPath || null, finalScreenshotFormat || null, finalScreenshotWidth || null, finalScreenshotHeight || null,
+        source || 'manual', source_ref || null, recorded_by || null,
+        existing.id
+      );
+      return InspectionItem.findById(existing.id);
+    }
+
+    const result = db.prepare(
+      `INSERT INTO inspection_items (
+         batch_id, asset_id, checklist_item_id, status, value_text, note,
+         screenshot_path, screenshot_format, screenshot_width, screenshot_height,
+         source, source_ref, recorded_by
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      batch_id, asset_id, checklist_item_id, status, value_text || null, note || null,
+      screenshot_path || null, screenshot_format || null, screenshot_width || null, screenshot_height || null,
+      source || 'manual', source_ref || null, recorded_by || null
+    );
+    return InspectionItem.findById(result.lastInsertRowid);
+  },
+};
+
+module.exports = InspectionItem;

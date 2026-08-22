@@ -1,0 +1,64 @@
+<%- include('../layout', { title: batch.title }) %>
+
+<div class="page-header">
+  <h1><%= batch.title %></h1>
+  <div class="page-actions">
+    <% if (batch.status === 'draft') { %>
+      <a href="/batches/<%= batch.id %>/entry" class="btn btn--secondary btn--md">繼續填寫</a>
+    <% } %>
+    <a href="/batches/<%= batch.id %>/report.pdf" class="btn btn--primary btn--md" target="_blank">下載 PDF 報告</a>
+  </div>
+</div>
+
+<p class="form-hint">
+  巡檢日期：<%= batch.batch_date %>
+  ・狀態：<%= batch.status === 'completed' ? '已完成' : '草稿' %>
+  <% if (batch.notes) { %>・備註：<%= batch.notes %><% } %>
+</p>
+
+<% assets.forEach(asset => {
+  const items = itemsByAssetId.get(asset.id) || [];
+%>
+  <section class="asset-section">
+    <div class="asset-section__header">
+      <h2><%= asset.name %></h2>
+      <span class="form-hint"><%= categoryLabels[asset.category] || asset.category %></span>
+    </div>
+    <% if (items.length === 0) { %>
+      <div class="empty-state">此資產尚無檢查紀錄</div>
+    <% } else { %>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>檢查項目</th>
+              <th>狀態</th>
+              <th>數值</th>
+              <th>備註</th>
+              <th>截圖</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% items.forEach(item => { %>
+              <tr>
+                <td><%= item.checklist_label %></td>
+                <td><span class="status-badge status-badge--<%= item.status %>"><%= item.status === 'normal' ? '正常' : (item.status === 'warning' ? '警告' : '異常') %></span></td>
+                <td><%= item.value_text || '-' %></td>
+                <td><%= item.note || '-' %></td>
+                <td>
+                  <% if (item.screenshotFilename) { %>
+                    <a href="/uploads/<%= batch.id %>/<%= item.screenshotFilename %>" target="_blank">查看</a>
+                  <% } else { %>
+                    -
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </section>
+<% }) %>
+
+<%- include('../partials/footer') %>

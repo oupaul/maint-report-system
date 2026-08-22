@@ -1,0 +1,53 @@
+<%- include('../layout', { title: '資產管理' }) %>
+
+<div class="page-header">
+  <h1>資產管理</h1>
+  <div class="page-actions">
+    <% if (currentUser && currentUser.role === 'admin') { %>
+      <a href="/assets/new" class="btn btn--primary btn--md">新增資產</a>
+    <% } %>
+  </div>
+</div>
+
+<div class="card">
+  <% if (assets.length === 0) { %>
+    <div class="empty-state">尚無資產資料。</div>
+  <% } else { %>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>名稱</th>
+            <th>類別</th>
+            <th>位置</th>
+            <th>識別碼</th>
+            <th>狀態</th>
+            <% if (currentUser && currentUser.role === 'admin') { %><th></th><% } %>
+          </tr>
+        </thead>
+        <tbody>
+          <% assets.forEach(a => { %>
+            <tr>
+              <td><%= a.name %></td>
+              <td><%= categoryLabels[a.category] || a.category %></td>
+              <td><%= a.location || '-' %></td>
+              <td><%= a.identifier || '-' %></td>
+              <td>
+                <% if (a.is_active) { %>
+                  <span class="status-badge status-badge--normal">啟用</span>
+                <% } else { %>
+                  <span class="status-badge status-badge--critical">停用</span>
+                <% } %>
+              </td>
+              <% if (currentUser && currentUser.role === 'admin') { %>
+                <td><a href="/assets/<%= a.id %>/edit">編輯</a></td>
+              <% } %>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>
+
+<%- include('../partials/footer') %>

@@ -1,0 +1,78 @@
+/* === Button === */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  font-weight: 600;
+  text-decoration: none;
+  border: 2px solid transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color var(--transition-fast),
+              color var(--transition-fast),
+              border-color var(--transition-fast);
+}
+.btn--sm { padding: 0.4rem 0.875rem;  font-size: var(--text-sm); }
+.btn--md { padding: 0.625rem 1.25rem; font-size: var(--text-base); }
+.btn--lg { padding: 0.875rem 1.75rem; font-size: var(--text-base); }
+
+.btn--primary {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+}
+.btn--primary:hover {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+}
+
+.btn--secondary {
+  background: transparent;
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+.btn--secondary:hover {
+  background: var(--color-bg-soft);
+  border-color: var(--color-text-muted);
+}
+.section--dark .btn--secondary {
+  color: #F1F5F9;
+  border-color: rgba(255,255,255,0.35);
+}
+.section--dark .btn--secondary:hover {
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.65);
+}
+
+/* === Section === */
+.section {
+  padding: var(--spacing-section) var(--spacing-container);
+}
+.section--soft { background: var(--color-bg-soft); }
+.section--dark { background: var(--color-text); color: #fff; }
+
+.section__inner         { max-width: var(--max-width-content); margin-inline: auto; }
+.section__inner--narrow { max-width: var(--max-width-narrow);  margin-inline: auto; }
+
+/* === Card === */
+.card {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-8);
+  box-shadow: var(--shadow-sm);
+}
+.card--soft        { background: var(--color-bg-soft); }
+.card--accent      { border-left: 3px solid var(--color-primary); }
+.card--interactive {
+  transition: transform var(--transition-fast),
+              box-shadow var(--transition-base),
+              border-color var(--transition-base);
+}
+.card--interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-primary);
+}

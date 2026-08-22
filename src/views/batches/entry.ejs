@@ -1,0 +1,73 @@
+<%- include('../layout', { title: '填寫巡檢 - ' + batch.title }) %>
+
+<div class="page-header">
+  <h1><%= batch.title %></h1>
+  <div class="page-actions">
+    <a href="/batches/<%= batch.id %>" class="btn btn--secondary btn--md">查看摘要</a>
+    <% if (batch.status === 'draft') { %>
+      <form method="POST" action="/batches/<%= batch.id %>/complete" onsubmit="return confirm('確定要將此批次標記為已完成嗎？完成後仍可查看與產生報告。');" style="display:inline;">
+        <button type="submit" class="btn btn--primary btn--md">標記為已完成</button>
+      </form>
+    <% } %>
+  </div>
+</div>
+
+<p class="form-hint">巡檢日期：<%= batch.batch_date %><% if (batch.status === 'completed') { %> ・ <strong style="color: var(--color-status-normal);">已完成</strong><% } %></p>
+
+<% assetSections.forEach(section => { %>
+  <section class="asset-section">
+    <div class="asset-section__header">
+      <h2><%= section.asset.name %></h2>
+      <span class="form-hint"><%= categoryLabels[section.asset.category] || section.asset.category %><% if (section.asset.location) { %> ・ <%= section.asset.location %><% } %></span>
+    </div>
+
+    <% section.rows.forEach(row => { %>
+      <div class="checklist-row">
+        <div class="checklist-row__title">
+          <strong><%= row.checklistItem.label %></strong>
+          <% if (row.existing) {
+            const st = row.existing.status;
+            const stLabel = st === 'normal' ? '正常' : (st === 'warning' ? '警告' : '異常');
+          %>
+            <span class="status-badge status-badge--<%= st %>"><%= stLabel %></span>
+          <% } %>
+        </div>
+        <form method="POST" action="/batches/<%= batch.id %>/items/<%= row.checklistItem.id %>" enctype="multipart/form-data">
+          <input type="hidden" name="asset_id" value="<%= section.asset.id %>">
+          <div class="checklist-row__grid">
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label">狀態</label>
+              <select class="form-select" name="status" required>
+                <% statuses.forEach(s => {
+                  const stLabel = s === 'normal' ? '正常' : (s === 'warning' ? '警告' : '異常');
+                %>
+                  <option value="<%= s %>" <%= row.existing && row.existing.status === s ? 'selected' : '' %>><%= stLabel %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label">數值 / 備註內容</label>
+              <input class="form-input" type="text" name="value_text" value="<%= row.existing ? (row.existing.value_text || '') : '' %>" placeholder="例如：剩餘 45%">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label">備註</label>
+              <input class="form-input" type="text" name="note" value="<%= row.existing ? (row.existing.note || '') : '' %>">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label">截圖</label>
+              <input class="form-input" type="file" name="screenshot" accept="image/jpeg,image/png,image/webp,image/gif">
+              <% if (row.screenshotFilename) { %>
+                <img class="screenshot-thumb" src="/uploads/<%= batch.id %>/<%= row.screenshotFilename %>" alt="已上傳截圖">
+              <% } %>
+            </div>
+            <div>
+              <button type="submit" class="btn btn--primary btn--sm">儲存</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    <% }) %>
+  </section>
+<% }) %>
+
+<%- include('../partials/footer') %>
