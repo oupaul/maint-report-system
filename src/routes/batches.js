@@ -14,7 +14,7 @@ const Asset = require('../models/Asset');
 const ImageService = require('../services/ImageService');
 const statusColors = require('../utils/statusColors');
 const {
-  ASSET_CATEGORY_LABELS, ITEM_STATUSES, isValidStatus,
+  ASSET_CATEGORIES, ASSET_CATEGORY_LABELS, ITEM_STATUSES, isValidStatus, isValidCategory,
   SIGNATURE_ROLES, SIGNATURE_ROLE_LABELS, isValidSignatureRole,
 } = require('../utils/validators');
 const config = require('../config');
@@ -28,24 +28,47 @@ router.get('/new', requireLogin, (req, res) => {
   const assets = Asset.findAll();
   res.render('batches/new', {
     assets,
+    categories: ASSET_CATEGORIES,
     categoryLabels: ASSET_CATEGORY_LABELS,
     error: null,
     formValues: null,
   });
 });
 
+// 這個系統的核心用途是產生巡檢報告，不是資產管理系統——設備清單不強制先到
+// 「資產管理」建檔才能用，這裡可以直接一次輸入新設備。內部仍然寫進 assets
+// 表（保留設備跨批次的歷史記錄可以查），只是不再是必要的前置步驟。
 router.post('/new', requireLogin, (req, res) => {
   const { title, batch_date, notes } = req.body;
   let assetIds = req.body.asset_ids || [];
   if (!Array.isArray(assetIds)) assetIds = [assetIds];
   assetIds = assetIds.filter(Boolean).map(id => parseInt(id, 10));
 
-  if (!title || !batch_date || assetIds.length === 0) {
+  let newNames = req.body.new_asset_name || [];
+  let newCategories = req.body.new_asset_category || [];
+  let newLocations = req.body.new_asset_location || [];
+  if (!Array.isArray(newNames)) newNames = [newNames];
+  if (!Array.isArray(newCategories)) newCategories = [newCategories];
+  if (!Array.isArray(newLocations)) newLocations = [newLocations];
+
+  const createdAssetIds = [];
+  for (let i = 0; i < newNames.length; i++) {
+    const name = (newNames[i] || '').trim();
+    const category = newCategories[i];
+    if (!name || !isValidCategory(category)) continue; // 空白列直接跳過，不當成錯誤
+    const asset = Asset.create({ name, category, location: (newLocations[i] || '').trim() });
+    createdAssetIds.push(asset.id);
+  }
+
+  const allAssetIds = [...assetIds, ...createdAssetIds];
+
+  if (!title || !batch_date || allAssetIds.length === 0) {
     const assets = Asset.findAll();
     return res.status(400).render('batches/new', {
       assets,
+      categories: ASSET_CATEGORIES,
       categoryLabels: ASSET_CATEGORY_LABELS,
-      error: '請輸入標題、日期，並至少選擇一項資產',
+      error: '請輸入標題、日期，並至少新增或勾選一項設備',
       formValues: req.body,
     });
   }
@@ -57,7 +80,7 @@ router.post('/new', requireLogin, (req, res) => {
     notes,
   });
 
-  for (const assetId of assetIds) {
+  for (const assetId of allAssetIds) {
     InspectionBatch.addAsset(batch.id, assetId);
   }
 

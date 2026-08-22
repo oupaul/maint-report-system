@@ -336,6 +336,17 @@ p { margin: 0 0 var(--space-4) 0; }
   margin-top: var(--space-2);
 }
 
+.new-asset-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1.5fr;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+@media (max-width: 768px) {
+  .new-asset-row { grid-template-columns: 1fr; }
+}
+
 .empty-state {
   text-align: center;
   padding: var(--space-12);

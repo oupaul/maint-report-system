@@ -22,10 +22,25 @@
       <textarea class="form-textarea" id="notes" name="notes"><%= formValues ? (formValues.notes || '') : '' %></textarea>
     </div>
     <div class="form-group">
-      <label class="form-label">選擇本次要巡檢的資產</label>
-      <% if (assets.length === 0) { %>
-        <div class="form-hint">尚無資產，請先至「資產管理」新增資產。</div>
-      <% } else { %>
+      <label class="form-label">新增本次巡檢設備</label>
+      <p class="form-hint">直接輸入設備名稱即可，不用先到「資產管理」建檔；建立後會保留下來，下次巡檢同一台設備時可以直接從清單勾選。</p>
+      <div id="new-asset-rows">
+        <div class="new-asset-row">
+          <input class="form-input" type="text" name="new_asset_name" placeholder="設備名稱，例如：前台PC-01">
+          <select class="form-select" name="new_asset_category">
+            <% categories.forEach(c => { %>
+              <option value="<%= c %>"><%= categoryLabels[c] %></option>
+            <% }) %>
+          </select>
+          <input class="form-input" type="text" name="new_asset_location" placeholder="位置（選填）">
+        </div>
+      </div>
+      <button type="button" id="add-asset-row" class="btn btn--secondary btn--sm">+ 新增一列</button>
+    </div>
+
+    <% if (assets.length > 0) { %>
+      <div class="form-group">
+        <label class="form-label">或從已建立的設備清單勾選</label>
         <div class="checkbox-grid">
           <% assets.forEach(a => { %>
             <label class="checkbox-tile">
@@ -34,11 +49,13 @@
             </label>
           <% }) %>
         </div>
-      <% } %>
-    </div>
+      </div>
+    <% } %>
     <button type="submit" class="btn btn--primary btn--md">建立並開始填寫</button>
     <a href="/batches" class="btn btn--secondary btn--md">取消</a>
   </form>
 </div>
+
+<script src="/js/asset-quick-add.js"></script>
 
 <%- include('../partials/footer') %>

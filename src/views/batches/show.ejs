@@ -81,6 +81,10 @@
         <form class="signature-form" method="POST" action="/batches/<%= batch.id %>/signatures/<%= role %>">
           <canvas class="signature-pad" width="360" height="140"></canvas>
           <input type="hidden" class="signature-data-input" name="signature_data">
+          <div class="form-group signature-form__type" style="margin-top: var(--space-2); margin-bottom: 0;">
+            <label class="form-label">不方便手寫？直接輸入姓名</label>
+            <input class="form-input signature-type-input" type="text" placeholder="輸入姓名會自動畫成簽名樣式">
+          </div>
           <div class="signature-form__actions">
             <button type="button" class="btn btn--secondary btn--sm signature-clear">清除</button>
             <button type="submit" class="btn btn--primary btn--sm"><%= sig ? '重新簽署' : '簽署' %></button>
