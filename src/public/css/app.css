@@ -336,6 +336,31 @@ p { margin: 0 0 var(--space-4) 0; }
   margin-top: var(--space-2);
 }
 
+.signature-dialog {
+  border: none;
+  border-radius: var(--radius-lg);
+  padding: var(--space-8);
+  box-shadow: var(--shadow-lg);
+  max-width: 560px;
+  width: 90vw;
+}
+
+.signature-dialog::backdrop {
+  background: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+
+.signature-dialog__title {
+  margin: 0 0 var(--space-2) 0;
+  font-size: var(--text-lg);
+}
+
+.signature-dialog .signature-pad {
+  width: 100%;
+  max-width: 500px;
+  height: auto;
+  aspect-ratio: 500 / 220;
+}
+
 .new-asset-row {
   display: grid;
   grid-template-columns: 2fr 1fr 1.5fr;

@@ -118,4 +118,29 @@
   }
 
   document.querySelectorAll('form.signature-form').forEach(setupPad);
+
+  // 點「簽署」按鈕才跳出簽名視窗（<dialog>），畫完送出後瀏覽器會自然重新
+  // 整理頁面，不需要額外處理關閉。<dialog> 是瀏覽器原生元素，內建 modal
+  // 行為（含 ESC 關閉），不用額外套件或自己刻遮罩層。
+  document.querySelectorAll('.signature-open-btn').forEach(function (btn) {
+    const dialog = document.getElementById(btn.dataset.dialog);
+    if (!dialog) return;
+    btn.addEventListener('click', function () {
+      dialog.showModal();
+    });
+  });
+
+  document.querySelectorAll('.signature-dialog').forEach(function (dialog) {
+    const cancelBtn = dialog.querySelector('.signature-cancel');
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', function () {
+        dialog.close();
+      });
+    }
+    // 點視窗外側的遮罩（backdrop）也可以直接關閉，event.target 只有點在
+    // dialog 元素本身（不是裡面的子元素）時才會等於 dialog。
+    dialog.addEventListener('click', function (evt) {
+      if (evt.target === dialog) dialog.close();
+    });
+  });
 })();
