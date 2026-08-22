@@ -275,6 +275,30 @@ if [ -z "$NODE_PATH" ]; then
     error "找不到 Node.js 執行檔"
 fi
 
+# M365 SSO 是選用功能，設定值（含 Client Secret）不能寫進 systemd unit 本身
+# ——unit 檔案在 /etc/systemd/system/ 底下預設是所有人可讀（644），任何一個
+# 能登入這台主機的帳號都看得到。改成一個權限鎖死（600，只有服務執行帳號能讀）
+# 的獨立檔案，unit 只用 EnvironmentFile 引用路徑。這裡只在檔案不存在時建立
+# 一份空白範本，不會覆蓋既有設定；使用者只需要編輯這個檔案的內容，不用再碰
+# systemd unit。
+M365_ENV_DIR="/etc/maint-report-system"
+M365_ENV_FILE="${M365_ENV_DIR}/m365.env"
+if [ ! -f "$M365_ENV_FILE" ]; then
+    mkdir -p "$M365_ENV_DIR"
+    cat > "$M365_ENV_FILE" <<'EOF'
+# Microsoft 365 SSO 設定（選用）——四個都填了才會在登入頁顯示「使用 Microsoft
+# 365 登入」按鈕，不填的話系統照常只用帳號密碼登入，不會出錯。
+# 申請/填寫步驟見 README.md「Microsoft 365 SSO」一節。
+# M365_CLIENT_ID=
+# M365_CLIENT_SECRET=
+# M365_TENANT_ID=
+# M365_REDIRECT_URI=http://your-domain-or-ip:3000/auth/m365/callback
+EOF
+    chown "${CURRENT_USER}:${CURRENT_USER}" "$M365_ENV_FILE"
+    chmod 600 "$M365_ENV_FILE"
+    log "✓ 已建立 ${M365_ENV_FILE}（空白範本，權限已鎖為僅服務帳號可讀）"
+fi
+
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 
 NEED_UPDATE=false
@@ -285,6 +309,12 @@ else
     if ! grep -q "WorkingDirectory=${PROJECT_DIR}" "$SERVICE_FILE" 2>/dev/null; then
         NEED_UPDATE=true
         log "檢測到專案目錄變更，需要更新服務文件"
+    fi
+    # 舊版部署的 unit 檔案可能是在支援 M365 EnvironmentFile 之前產生的，
+    # 補上這行才能讀到 m365.env，不用因為這樣就要求使用者整個重新安裝。
+    if ! grep -q "^EnvironmentFile=-${M365_ENV_FILE}$" "$SERVICE_FILE" 2>/dev/null; then
+        NEED_UPDATE=true
+        log "偵測到服務文件缺少 M365 EnvironmentFile 設定，需要更新服務文件"
     fi
 fi
 
@@ -311,6 +341,7 @@ Environment=NODE_ENV=production
 Environment=PORT=${PORT}
 Environment="PATH=${PATH}"
 Environment=SESSION_SECRET=${EXISTING_SECRET}
+EnvironmentFile=-${M365_ENV_FILE}
 ExecStart=${NODE_PATH} ${PROJECT_DIR}/src/app.js
 Restart=always
 RestartSec=10
