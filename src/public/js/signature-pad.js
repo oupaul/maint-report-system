@@ -12,6 +12,7 @@
     const input = form.querySelector('.signature-data-input');
     const clearBtn = form.querySelector('.signature-clear');
     const typeInput = form.querySelector('.signature-type-input');
+    const fileInput = form.querySelector('.signature-file-input');
     if (!canvas || !input) return;
 
     const ctx = canvas.getContext('2d');
@@ -126,6 +127,7 @@
         clearCanvas();
         hasDrawn = false;
         if (typeInput) typeInput.value = '';
+        if (fileInput) fileInput.value = '';
       });
     }
 
@@ -145,6 +147,32 @@
         ctx.textBaseline = 'middle';
         ctx.fillText(name, 12, canvas.height / 2, canvas.width - 24);
         hasDrawn = true;
+      });
+    }
+
+    // 瀏覽器沒有辦法讀取「手指有沒有放在觸控板上但還沒按」這種原始資料
+    // （像 Mac 預覽程式/Word 那種以觸控板簽名的功能，用的是作業系統私有
+    // API，網頁完全存取不到），所以另外提供「上傳圖檔」——可以先用作業系統
+    // 內建的簽名工具（例如 Mac 預覽程式的觸控板簽名）簽好存成圖片，再上傳，
+    // 一樣會畫進同一塊畫布、走同一套送出流程。
+    if (fileInput) {
+      fileInput.addEventListener('change', function () {
+        const file = fileInput.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function (loadEvt) {
+          const img = new Image();
+          img.onload = function () {
+            clearCanvas();
+            const scale = Math.min(canvas.width / img.width, canvas.height / img.height, 1);
+            const w = img.width * scale;
+            const h = img.height * scale;
+            ctx.drawImage(img, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
+            hasDrawn = true;
+          };
+          img.src = loadEvt.target.result;
+        };
+        reader.readAsDataURL(file);
       });
     }
 
