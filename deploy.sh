@@ -262,6 +262,14 @@ if [ -z "$CURRENT_USER" ] || [ "$CURRENT_USER" = "root" ]; then
     error "本服務不應以 root 身份執行，請使用 sudo 但以一般使用者帳號登入後執行（\$SUDO_USER 需為非 root 使用者）"
 fi
 
+# 本腳本整體以 root 執行（含前面的 migration 步驟），data/uploads 目錄與
+# SQLite 檔案因此會是 root 擁有；但 systemd service 是以 ${CURRENT_USER}
+# 身份執行，若不修正擁有者，服務啟動時會因為無法在 data/ 目錄寫入
+# WAL/SHM 檔案而以 SQLITE_READONLY_DIRECTORY 崩潰。每次部署都修正一次，
+# 確保重複執行／更新後擁有者不會因為某次以 root 手動操作而跑掉。
+chown -R "${CURRENT_USER}:${CURRENT_USER}" "${PROJECT_DIR}/data" "${PROJECT_DIR}/uploads" "${BACKUP_DIR}" \
+    || warning "調整 data/uploads/${BACKUP_DIR} 擁有者失敗，服務可能無法寫入資料庫或截圖"
+
 NODE_PATH=$(which node)
 if [ -z "$NODE_PATH" ]; then
     error "找不到 Node.js 執行檔"
