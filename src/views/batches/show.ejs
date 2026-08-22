@@ -61,4 +61,36 @@
   </section>
 <% }) %>
 
+<section class="asset-section">
+  <div class="asset-section__header">
+    <h2>簽核</h2>
+  </div>
+  <div class="signature-grid">
+    <% signatureRoles.forEach(role => {
+      const sig = signaturesByRole[role];
+    %>
+      <div class="signature-col">
+        <h3 class="signature-col__title"><%= signatureRoleLabels[role] %></h3>
+        <% if (sig) { %>
+          <div class="signature-existing">
+            <img class="signature-existing__img" src="/uploads/<%= batch.id %>/<%= sig.filename %>" alt="<%= signatureRoleLabels[role] %>簽名">
+            <p class="form-hint"><%= sig.display_name || sig.username %> ・ <%= new Date(sig.signed_at).toLocaleString('zh-TW') %></p>
+          </div>
+          <p class="form-hint">重新簽署：</p>
+        <% } %>
+        <form class="signature-form" method="POST" action="/batches/<%= batch.id %>/signatures/<%= role %>">
+          <canvas class="signature-pad" width="360" height="140"></canvas>
+          <input type="hidden" class="signature-data-input" name="signature_data">
+          <div class="signature-form__actions">
+            <button type="button" class="btn btn--secondary btn--sm signature-clear">清除</button>
+            <button type="submit" class="btn btn--primary btn--sm"><%= sig ? '重新簽署' : '簽署' %></button>
+          </div>
+        </form>
+      </div>
+    <% }) %>
+  </div>
+</section>
+
+<script src="/js/signature-pad.js"></script>
+
 <%- include('../partials/footer') %>

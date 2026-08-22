@@ -6,7 +6,11 @@ const sharp = require('sharp');
 const dayjs = require('dayjs');
 
 const statusColors = require('../utils/statusColors');
-const { ASSET_CATEGORY_LABELS } = require('../utils/validators');
+const { ASSET_CATEGORY_LABELS, SIGNATURE_ROLES, SIGNATURE_ROLE_LABELS } = require('../utils/validators');
+
+const SIGNATURE_BOX_HEIGHT = 130;
+const SIGNATURE_IMG_MAX_HEIGHT = 60;
+const SIGNATURE_IMG_MAX_WIDTH = 180;
 
 const IMAGE_DISPLAY_WIDTH = 260;
 const IMAGE_FALLBACK_HEIGHT = 180;
@@ -199,6 +203,64 @@ async function drawItemBlock(doc, item, contentWidth, maxImageHeight, fonts) {
 }
 
 /**
+ * 報告最後的簽名區塊：工程師／主管並排各一欄，簽名圖直接是 PNG（畫布
+ * canvas.toDataURL() 產生），doc.image() 原生支援，不需要像截圖那樣經過
+ * sharp 轉碼。固定高度、不像項目區塊需要動態估算，換頁保護只需在畫之前
+ * 確認剩餘空間足夠即可。
+ */
+function drawSignatureSection(doc, signaturesByRole, fonts) {
+  if (doc.y + SIGNATURE_BOX_HEIGHT > doc.page.height - doc.page.margins.bottom) {
+    doc.addPage();
+  }
+
+  const startX = doc.page.margins.left;
+  const contentWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  const colWidth = contentWidth / SIGNATURE_ROLES.length;
+  const topY = doc.y;
+
+  doc.font(fonts.bold).fontSize(12).fillColor('#1E293B');
+  doc.text('簽核', startX, topY);
+  doc.moveDown(0.5);
+  const boxTop = doc.y;
+
+  SIGNATURE_ROLES.forEach((role, i) => {
+    const colX = startX + i * colWidth;
+    const sig = signaturesByRole[role];
+
+    doc.save();
+    doc.roundedRect(colX, boxTop, colWidth - 12, SIGNATURE_BOX_HEIGHT - 20, 4)
+      .strokeColor('#E2E8F0').stroke();
+    doc.restore();
+
+    doc.font(fonts.regular).fontSize(9).fillColor('#64748B');
+    doc.text(SIGNATURE_ROLE_LABELS[role] || role, colX + 10, boxTop + 8);
+
+    if (sig && sig.signature_path && fs.existsSync(sig.signature_path)) {
+      try {
+        const pngBuffer = fs.readFileSync(sig.signature_path);
+        doc.image(pngBuffer, colX + 10, boxTop + 24, {
+          fit: [SIGNATURE_IMG_MAX_WIDTH, SIGNATURE_IMG_MAX_HEIGHT],
+        });
+      } catch (err) {
+        doc.font(fonts.regular).fontSize(9).fillColor('#DC2626');
+        doc.text('簽名圖片無法顯示', colX + 10, boxTop + 24 + SIGNATURE_IMG_MAX_HEIGHT / 2);
+      }
+
+      const signerName = sig.display_name || sig.username;
+      doc.font(fonts.regular).fontSize(9).fillColor('#334155');
+      doc.text(signerName, colX + 10, boxTop + 24 + SIGNATURE_IMG_MAX_HEIGHT + 6);
+      doc.font(fonts.regular).fontSize(8).fillColor('#94A3B8');
+      doc.text(dayjs(sig.signed_at).format('YYYY-MM-DD HH:mm'), colX + 10, doc.y);
+    } else {
+      doc.font(fonts.regular).fontSize(9).fillColor('#94A3B8');
+      doc.text('尚未簽署', colX + 10, boxTop + 24 + SIGNATURE_IMG_MAX_HEIGHT / 2);
+    }
+  });
+
+  doc.y = boxTop + SIGNATURE_BOX_HEIGHT - 20 + 10;
+}
+
+/**
  * 產生單一 inspection_batches 的巡檢報告 PDF，依資產分組，每個 inspection_item
  * 視為不可分頁區塊（先估算高度、必要時主動換頁，再畫）。
  *
@@ -208,7 +270,7 @@ async function drawItemBlock(doc, item, contentWidth, maxImageHeight, fonts) {
  * @param {Map<number, Array<object>>} params.itemsByAssetId asset_id -> inspection_items（含 join 欄位）
  * @param {import('stream').Writable} outputStream 目標輸出串流（例如 Express res）
  */
-async function generateBatchReport({ batch, assets, itemsByAssetId }, outputStream) {
+async function generateBatchReport({ batch, assets, itemsByAssetId, signaturesByRole }, outputStream) {
   const doc = new PDFDocument({ size: 'A4', margin: 50, bufferPages: true });
   doc.pipe(outputStream);
 
@@ -270,6 +332,8 @@ async function generateBatchReport({ batch, assets, itemsByAssetId }, outputStre
       await drawItemBlock(doc, item, contentWidth, maxImageHeight, fonts);
     }
   }
+
+  drawSignatureSection(doc, signaturesByRole || {}, fonts);
 
   doc.end();
 

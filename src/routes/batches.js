@@ -8,11 +8,15 @@ const upload = require('../middleware/upload');
 const InspectionBatch = require('../models/InspectionBatch');
 const InspectionItem = require('../models/InspectionItem');
 const InspectionItemPhoto = require('../models/InspectionItemPhoto');
+const BatchSignature = require('../models/BatchSignature');
 const ChecklistItem = require('../models/ChecklistItem');
 const Asset = require('../models/Asset');
 const ImageService = require('../services/ImageService');
 const statusColors = require('../utils/statusColors');
-const { ASSET_CATEGORY_LABELS, ITEM_STATUSES, isValidStatus } = require('../utils/validators');
+const {
+  ASSET_CATEGORY_LABELS, ITEM_STATUSES, isValidStatus,
+  SIGNATURE_ROLES, SIGNATURE_ROLE_LABELS, isValidSignatureRole,
+} = require('../utils/validators');
 const config = require('../config');
 
 router.get('/', requireLogin, (req, res) => {
@@ -199,13 +203,56 @@ router.get('/:id', requireLogin, (req, res) => {
     itemsByAssetId.get(item.asset_id).push(item);
   }
 
+  const signatures = BatchSignature.findByBatchId(batch.id);
+  const signaturesByRole = {};
+  for (const sig of signatures) {
+    signaturesByRole[sig.role] = { ...sig, filename: path.basename(sig.signature_path) };
+  }
+
   res.render('batches/show', {
     batch,
     assets,
     itemsByAssetId,
     categoryLabels: ASSET_CATEGORY_LABELS,
     statusColors,
+    signatureRoles: SIGNATURE_ROLES,
+    signatureRoleLabels: SIGNATURE_ROLE_LABELS,
+    signaturesByRole,
   });
+});
+
+// 簽名畫布送出的是 canvas.toDataURL() 產生的 base64 PNG（data:image/png;base64,....），
+// 簽署者一律用目前登入帳號，不開放自由填名——簽名紀錄才有稽核意義。
+router.post('/:id/signatures/:role', requireLogin, (req, res) => {
+  const batch = InspectionBatch.findById(req.params.id);
+  if (!batch) {
+    return res.status(404).render('error', { title: '找不到批次', message: '找不到指定的巡檢批次' });
+  }
+
+  const role = req.params.role;
+  if (!isValidSignatureRole(role)) {
+    return res.status(400).render('error', { title: '無效的簽名角色', message: '無效的簽名角色' });
+  }
+
+  const dataUrl = req.body.signature_data || '';
+  const match = /^data:image\/png;base64,(.+)$/.exec(dataUrl);
+  if (!match) {
+    return res.status(400).render('error', { title: '無效的簽名資料', message: '請先在畫布上簽名再送出' });
+  }
+
+  const buffer = Buffer.from(match[1], 'base64');
+  const destPath = path.join(config.UPLOADS_DIR, String(batch.id), `signature-${role}.png`);
+  fs.mkdirSync(path.dirname(destPath), { recursive: true });
+  fs.writeFileSync(destPath, buffer);
+
+  BatchSignature.upsert({
+    batch_id: batch.id,
+    role,
+    user_id: req.user.id,
+    signature_path: destPath,
+  });
+
+  res.redirect(`/batches/${batch.id}`);
 });
 
 module.exports = router;

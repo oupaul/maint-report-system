@@ -24,8 +24,9 @@ app.use(session({
 }));
 console.log('[啟動] Session 配置完成');
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// 簽名畫布會以 base64 PNG 帶在 urlencoded body 裡送出，預設 100kb 限制太小，調高到 2mb
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.set('view engine', 'ejs');

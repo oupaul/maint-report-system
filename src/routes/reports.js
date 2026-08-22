@@ -7,6 +7,7 @@ const { requireLogin } = require('../middleware/auth');
 const InspectionBatch = require('../models/InspectionBatch');
 const InspectionItem = require('../models/InspectionItem');
 const InspectionItemPhoto = require('../models/InspectionItemPhoto');
+const BatchSignature = require('../models/BatchSignature');
 const PdfReportService = require('../services/PdfReportService');
 const config = require('../config');
 
@@ -27,11 +28,17 @@ router.get('/batches/:id/report.pdf', requireLogin, async (req, res) => {
     itemsByAssetId.get(item.asset_id).push(item);
   }
 
+  const signatures = BatchSignature.findByBatchId(batch.id);
+  const signaturesByRole = {};
+  for (const sig of signatures) {
+    signaturesByRole[sig.role] = sig;
+  }
+
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `inline; filename="batch-${batch.id}-report.pdf"`);
 
   try {
-    await PdfReportService.generateBatchReport({ batch, assets, itemsByAssetId }, res);
+    await PdfReportService.generateBatchReport({ batch, assets, itemsByAssetId, signaturesByRole }, res);
   } catch (err) {
     console.error('[reports] PDF 產生失敗:', err);
     if (!res.headersSent) {

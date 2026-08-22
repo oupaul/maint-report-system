@@ -7,6 +7,11 @@ const ASSET_CATEGORY_LABELS = {
 };
 const ITEM_STATUSES = ['normal', 'warning', 'critical'];
 const USER_ROLES = ['admin', 'technician'];
+const SIGNATURE_ROLES = ['engineer', 'supervisor'];
+const SIGNATURE_ROLE_LABELS = {
+  engineer: '工程師',
+  supervisor: '主管',
+};
 
 function isValidCategory(category) {
   return ASSET_CATEGORIES.includes(category);
@@ -20,12 +25,19 @@ function isValidRole(role) {
   return USER_ROLES.includes(role);
 }
 
+function isValidSignatureRole(role) {
+  return SIGNATURE_ROLES.includes(role);
+}
+
 module.exports = {
   ASSET_CATEGORIES,
   ASSET_CATEGORY_LABELS,
   ITEM_STATUSES,
   USER_ROLES,
+  SIGNATURE_ROLES,
+  SIGNATURE_ROLE_LABELS,
   isValidCategory,
   isValidStatus,
   isValidRole,
+  isValidSignatureRole,
 };
