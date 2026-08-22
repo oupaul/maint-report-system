@@ -147,20 +147,38 @@ sudo /srv/apps/maint-report-system/restore.sh
 
 ### 第 2 步：在主機上設定環境變數
 
-`deploy.sh` 不會自動處理這四個變數（它們是選用的，跟必填的 `SESSION_SECRET` 不同），需要手動加進 systemd unit：
+`deploy.sh` 不會自動處理這四個變數（它們是選用的，跟必填的 `SESSION_SECRET` 不同），需要手動設定。
+
+**不要**直接用 `systemctl edit --full` 把 Client Secret 寫進 `Environment=` 那種寫法——unit 檔案存在 `/etc/systemd/system/`，預設權限是所有人可讀（`644`），這台主機上任何一個帳號都能直接看到明文密鑰。改用**權限鎖死的獨立檔案**，unit 只引用路徑：
+
+```bash
+# 建立存放機密設定的目錄與檔案（USER 換成 deploy.sh 設定的服務執行帳號，例如 itadmin）
+sudo mkdir -p /etc/maint-report-system
+sudo tee /etc/maint-report-system/m365.env > /dev/null <<'EOF'
+M365_CLIENT_ID=你的Client-ID
+M365_CLIENT_SECRET=你的Client-Secret
+M365_TENANT_ID=你的Tenant-ID
+M365_REDIRECT_URI=http://<主機IP或網域>:<port>/auth/m365/callback
+EOF
+
+# 只給服務執行帳號讀取權限，其他人（含其他一般使用者）完全無法讀取
+sudo chown <USER>:<USER> /etc/maint-report-system/m365.env
+sudo chmod 600 /etc/maint-report-system/m365.env
+```
+
+再讓 unit 引用這個檔案（**不要**直接寫 `Environment=M365_...`）：
 
 ```bash
 sudo systemctl edit --full maint-report-system
 ```
 
-在 `[Service]` 區塊裡 `Environment=SESSION_SECRET=...` 那行下面加入（換成你在第 1 步記下的值）：
+在 `[Service]` 區塊裡 `Environment=SESSION_SECRET=...` 那行下面加入一行：
 
 ```
-Environment=M365_CLIENT_ID=你的Client-ID
-Environment=M365_CLIENT_SECRET=你的Client-Secret
-Environment=M365_TENANT_ID=你的Tenant-ID
-Environment=M365_REDIRECT_URI=http://<主機IP或網域>:<port>/auth/m365/callback
+EnvironmentFile=-/etc/maint-report-system/m365.env
 ```
+
+（開頭的 `-` 代表這個檔案不存在也沒關係，服務照常啟動，只是不會顯示 M365 登入按鈕——符合這個功能本來就是選用的設計。）
 
 存檔後：
 
@@ -169,7 +187,7 @@ sudo systemctl daemon-reload
 sudo systemctl restart maint-report-system
 ```
 
-這是手動加在 systemd unit 上的設定，之後執行 `update.sh`/`deploy.sh` 不會覆蓋掉（`deploy.sh` 只在服務第一次安裝、或安裝目錄變更時才會重寫整份 unit 檔案，平常更新只會顯示「服務配置無需更新」）。
+這是手動加在 systemd unit 上的設定，之後執行 `update.sh`/`deploy.sh` 不會覆蓋掉（`deploy.sh` 只在服務第一次安裝、或安裝目錄變更時才會重寫整份 unit 檔案，平常更新只會顯示「服務配置無需更新」），`/etc/maint-report-system/m365.env` 也完全不受程式碼更新影響。
 
 ### 第 3 步：幫使用者開通 SSO 登入
 
