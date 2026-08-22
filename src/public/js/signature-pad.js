@@ -23,6 +23,8 @@
     let drawing = false;
     let hasDrawn = false;
     let points = [];
+    let strokeMoved = false;
+    const DRAG_THRESHOLD = 4; // canvas 座標空間內的像素，超過這個距離才算「有拖曳」
 
     function pos(evt) {
       const rect = canvas.getBoundingClientRect();
@@ -36,20 +38,56 @@
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
 
-    function start(evt) {
+    function beginStroke(evt) {
       drawing = true;
       hasDrawn = true;
       // 用 pointer capture 讓這根手指/游標即使畫出畫布範圍（觸控板移動常常
       // 不像滑鼠那麼精準，很容易滑出這塊小畫布）也還是持續收得到後續的
-      // pointermove／pointerup，不會讓筆畫斷掉、卡在「還在畫」的狀態。
+      // pointermove，不會讓筆畫斷掉、卡在「還在畫」的狀態。
       canvas.setPointerCapture(evt.pointerId);
       points = [pos(evt)];
+    }
+
+    function endStroke(evt) {
+      drawing = false;
+      points = [];
+      if (evt && canvas.hasPointerCapture && canvas.hasPointerCapture(evt.pointerId)) {
+        canvas.releasePointerCapture(evt.pointerId);
+      }
+    }
+
+    // 觸控螢幕：手指碰到就開始畫、放開就結束，跟現實中手指畫圖一樣自然，
+    // 保留原本「按住拖曳」的邏輯。
+    //
+    // 滑鼠／觸控板（含筆電觸控板——瀏覽器把觸控板移動視為 pointerType
+    // "mouse"，不是 "touch"）：兩種手勢都支援，放開時（見 up()）依有沒有
+    // 明顯拖曳來判斷是哪一種——
+    //   (a) 按住拖曳：跟以前一樣，放開就收筆，習慣滑鼠拖曳的人不受影響。
+    //   (b) 點一下（幾乎沒移動就放開）：當作「落筆」，維持畫筆狀態，游標
+    //       移動就畫，不需要整段按著；再點一下（幾乎沒移動）才收筆。這是
+    //       給觸控板用的——觸控板要一直維持按壓才能拖曳畫線很不自然。
+    function start(evt) {
+      if (evt.pointerType !== 'touch' && drawing) {
+        // 目前正處於「點一下切換」後的落筆狀態，這次點擊代表收筆。
+        endStroke(evt);
+        evt.preventDefault();
+        return;
+      }
+      beginStroke(evt);
+      strokeMoved = false;
       evt.preventDefault();
     }
 
     function move(evt) {
       if (!drawing) return;
-      points.push(pos(evt));
+      const p = pos(evt);
+
+      if (evt.pointerType !== 'touch' && !strokeMoved) {
+        const last = points[points.length - 1];
+        if (Math.hypot(p.x - last.x, p.y - last.y) > DRAG_THRESHOLD) strokeMoved = true;
+      }
+
+      points.push(p);
 
       // 用二次貝茲曲線通過相鄰兩點的中點來畫，筆畫比逐點直線連接平滑，
       // 觸控板取樣點通常比滑鼠稀疏、抖動也較明顯，平滑後比較不會看起來鋸齒狀。
@@ -65,20 +103,23 @@
       evt.preventDefault();
     }
 
-    function end(evt) {
+    function up(evt) {
       if (!drawing) return;
-      drawing = false;
-      points = [];
-      if (evt && canvas.hasPointerCapture && canvas.hasPointerCapture(evt.pointerId)) {
-        canvas.releasePointerCapture(evt.pointerId);
-      }
+      // 觸控螢幕、或滑鼠/觸控板「有明顯拖曳」：放開就收筆（傳統行為）。
+      // 滑鼠/觸控板「幾乎沒動就放開」：當成點一下切換落筆，維持畫筆狀態，
+      // 交給下一次點擊（見 start()）收筆，這裡先不結束。
+      if (evt.pointerType === 'touch' || strokeMoved) endStroke(evt);
+    }
+
+    function cancel(evt) {
+      if (drawing) endStroke(evt);
     }
 
     canvas.style.touchAction = 'none'; // 避免觸控畫簽名時同時觸發頁面捲動
     canvas.addEventListener('pointerdown', start);
     canvas.addEventListener('pointermove', move);
-    canvas.addEventListener('pointerup', end);
-    canvas.addEventListener('pointercancel', end);
+    canvas.addEventListener('pointerup', up);
+    canvas.addEventListener('pointercancel', cancel);
 
     if (clearBtn) {
       clearBtn.addEventListener('click', function () {
