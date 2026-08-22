@@ -1,4 +1,5 @@
 const db = require('./db');
+const { nowTaipei } = require('../utils/time');
 
 const InspectionItemPhoto = {
   findById(id) {
@@ -34,9 +35,9 @@ const InspectionItemPhoto = {
   // 先插入一筆佔位資料以取得 id（檔名需要用到 photo id），轉檔完成後再用 updateFile 補上實際路徑/尺寸
   create({ inspection_item_id, sort_order }) {
     const result = db.prepare(
-      `INSERT INTO inspection_item_photos (inspection_item_id, path, format, sort_order)
-       VALUES (?, '', '', ?)`
-    ).run(inspection_item_id, sort_order || 0);
+      `INSERT INTO inspection_item_photos (inspection_item_id, path, format, sort_order, uploaded_at)
+       VALUES (?, '', '', ?, ?)`
+    ).run(inspection_item_id, sort_order || 0, nowTaipei());
     return InspectionItemPhoto.findById(result.lastInsertRowid);
   },
 

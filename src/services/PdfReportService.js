@@ -4,6 +4,7 @@ const PDFDocument = require('pdfkit');
 const fontkit = require('fontkit');
 const sharp = require('sharp');
 const dayjs = require('dayjs');
+const { nowTaipei } = require('../utils/time');
 
 const statusColors = require('../utils/statusColors');
 const { ASSET_CATEGORY_LABELS, SIGNATURE_ROLES, SIGNATURE_ROLE_LABELS } = require('../utils/validators');
@@ -313,7 +314,7 @@ async function generateBatchReport({ batch, assets, itemsByAssetId, signaturesBy
   doc.font(fonts.bold).fontSize(20).fillColor('#1E293B').text(batch.title, { align: 'left' });
   doc.font(fonts.regular).fontSize(10).fillColor('#64748B');
   doc.text(`巡檢日期：${dayjs(batch.batch_date).format('YYYY-MM-DD')}`);
-  doc.text(`報告產生時間：${dayjs().format('YYYY-MM-DD HH:mm')}`);
+  doc.text(`報告產生時間：${dayjs(nowTaipei()).format('YYYY-MM-DD HH:mm')}`);
   if (batch.notes) {
     doc.text(`備註：${batch.notes}`);
   }

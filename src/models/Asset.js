@@ -1,4 +1,5 @@
 const db = require('./db');
+const { nowTaipei } = require('../utils/time');
 
 const Asset = {
   findById(id) {
@@ -20,9 +21,9 @@ const Asset = {
 
   create({ name, category, location, identifier, notes }) {
     const result = db.prepare(
-      `INSERT INTO assets (name, category, location, identifier, notes, is_active)
-       VALUES (?, ?, ?, ?, ?, 1)`
-    ).run(name, category, location || null, identifier || null, notes || null);
+      `INSERT INTO assets (name, category, location, identifier, notes, is_active, created_at)
+       VALUES (?, ?, ?, ?, ?, 1, ?)`
+    ).run(name, category, location || null, identifier || null, notes || null, nowTaipei());
     return Asset.findById(result.lastInsertRowid);
   },
 

@@ -1,4 +1,5 @@
 const db = require('./db');
+const { nowTaipei } = require('../utils/time');
 
 const InspectionBatch = {
   findById(id) {
@@ -16,16 +17,16 @@ const InspectionBatch = {
 
   create({ title, batch_date, created_by, notes }) {
     const result = db.prepare(
-      `INSERT INTO inspection_batches (title, batch_date, status, created_by, notes)
-       VALUES (?, ?, 'draft', ?, ?)`
-    ).run(title, batch_date, created_by, notes || null);
+      `INSERT INTO inspection_batches (title, batch_date, status, created_by, notes, created_at)
+       VALUES (?, ?, 'draft', ?, ?, ?)`
+    ).run(title, batch_date, created_by, notes || null, nowTaipei());
     return InspectionBatch.findById(result.lastInsertRowid);
   },
 
   complete(id) {
     db.prepare(
-      `UPDATE inspection_batches SET status = 'completed', completed_at = datetime('now') WHERE id = ?`
-    ).run(id);
+      `UPDATE inspection_batches SET status = 'completed', completed_at = ? WHERE id = ?`
+    ).run(nowTaipei(), id);
     return InspectionBatch.findById(id);
   },
 

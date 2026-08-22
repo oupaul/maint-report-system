@@ -1,4 +1,5 @@
 const db = require('./db');
+const { nowTaipei } = require('../utils/time');
 
 const User = {
   findById(id) {
@@ -21,9 +22,9 @@ const User = {
 
   create({ username, password_hash, display_name, role, m365_email }) {
     const result = db.prepare(
-      `INSERT INTO users (username, password_hash, display_name, role, m365_email, is_active)
-       VALUES (?, ?, ?, ?, ?, 1)`
-    ).run(username, password_hash, display_name || null, role, (m365_email || '').trim() || null);
+      `INSERT INTO users (username, password_hash, display_name, role, m365_email, is_active, created_at)
+       VALUES (?, ?, ?, ?, ?, 1, ?)`
+    ).run(username, password_hash, display_name || null, role, (m365_email || '').trim() || null, nowTaipei());
     return User.findById(result.lastInsertRowid);
   },
 

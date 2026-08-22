@@ -1,4 +1,5 @@
 const db = require('./db');
+const { nowTaipei } = require('../utils/time');
 
 const InspectionItem = {
   findById(id) {
@@ -36,11 +37,12 @@ const InspectionItem = {
       db.prepare(
         `UPDATE inspection_items SET
            status = ?, value_text = ?, note = ?,
-           source = ?, source_ref = ?, recorded_by = ?, recorded_at = datetime('now')
+           source = ?, source_ref = ?, recorded_by = ?, recorded_at = ?
          WHERE id = ?`
       ).run(
         status, value_text || null, note || null,
         source || 'manual', source_ref || null, recorded_by || null,
+        nowTaipei(),
         existing.id
       );
       return InspectionItem.findById(existing.id);
@@ -49,11 +51,11 @@ const InspectionItem = {
     const result = db.prepare(
       `INSERT INTO inspection_items (
          batch_id, asset_id, checklist_item_id, status, value_text, note,
-         source, source_ref, recorded_by
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         source, source_ref, recorded_by, recorded_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       batch_id, asset_id, checklist_item_id, status, value_text || null, note || null,
-      source || 'manual', source_ref || null, recorded_by || null
+      source || 'manual', source_ref || null, recorded_by || null, nowTaipei()
     );
     return InspectionItem.findById(result.lastInsertRowid);
   },

@@ -1,4 +1,5 @@
 const db = require('./db');
+const { nowTaipei } = require('../utils/time');
 
 const BatchSignature = {
   findByBatchId(batchId) {
@@ -14,12 +15,12 @@ const BatchSignature = {
   upsert({ batch_id, role, user_id, signature_path }) {
     db.prepare(
       `INSERT INTO batch_signatures (batch_id, role, user_id, signature_path, signed_at)
-       VALUES (?, ?, ?, ?, datetime('now'))
+       VALUES (?, ?, ?, ?, ?)
        ON CONFLICT(batch_id, role) DO UPDATE SET
          user_id = excluded.user_id,
          signature_path = excluded.signature_path,
          signed_at = excluded.signed_at`
-    ).run(batch_id, role, user_id, signature_path);
+    ).run(batch_id, role, user_id, signature_path, nowTaipei());
 
     return db.prepare(
       'SELECT * FROM batch_signatures WHERE batch_id = ? AND role = ?'
