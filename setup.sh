@@ -44,15 +44,17 @@ if ! command -v git &>/dev/null; then
 fi
 log "✓ git $(git --version | awk '{print $3}')"
 
-if [ -n "$GH_TOKEN" ]; then
-    GIT_URL="https://${GH_TOKEN}@github.com/${GITHUB_USER}/${GITHUB_REPO}.git"
+# token 不放進 clone URL（會留在 .git/config 與程序參數裡），改成只在這一次
+# git 呼叫以 extraHeader 帶入，跟 update.sh 做法一致。
+GIT_URL="https://github.com/${GITHUB_USER}/${GITHUB_REPO}.git"
+GIT_AUTH_ARGS=()
+if [ -n "${GH_TOKEN:-}" ]; then
+    GIT_AUTH_ARGS=(-c "http.extraHeader=Authorization: Bearer ${GH_TOKEN}")
     log "使用 GH_TOKEN 進行認證"
-else
-    GIT_URL="https://github.com/${GITHUB_USER}/${GITHUB_REPO}.git"
 fi
 
 log "正在從 GitHub 下載（branch: ${BRANCH}）..."
-if ! git clone --depth=1 -b "$BRANCH" "$GIT_URL" "$CLONE_DIR" 2>&1; then
+if ! git "${GIT_AUTH_ARGS[@]}" clone --depth=1 -b "$BRANCH" "$GIT_URL" "$CLONE_DIR" 2>&1; then
     echo ""
     error "下載失敗。可能原因：
   1. Repo 為私有 → 請設定 GH_TOKEN：

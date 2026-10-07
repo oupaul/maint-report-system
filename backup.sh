@@ -103,7 +103,8 @@ fi
 if [ "$USE_INSTALL_BACKUP_DIR" -eq 1 ]; then
     if [ "$EUID" -eq 0 ]; then
         mkdir -p "$BACKUP_DIR"
-        chmod 755 "$BACKUP_DIR" || true
+        # 備份裡有資料庫（含密碼雜湊）、巡檢截圖與簽名圖，只有 root 能進這個目錄
+        chmod 700 "$BACKUP_DIR" || true
     else
         mkdir -p "$BACKUP_DIR" 2>/dev/null || true
     fi
@@ -213,7 +214,10 @@ EOF
 # 壓縮備份
 log "壓縮備份檔案..."
 cd "$BACKUP_DIR"
-tar -czf "${BACKUP_NAME}.tar.gz" "$BACKUP_NAME" || error "備份壓縮失敗"
+# 壓縮檔一律 600；順便把舊版產生的備份檔（預設 umask 下是 644）也補收權限
+( umask 077; tar -czf "${BACKUP_NAME}.tar.gz" "$BACKUP_NAME" ) || error "備份壓縮失敗"
+chmod 600 "${BACKUP_NAME}.tar.gz" 2>/dev/null || true
+chmod 600 "${BACKUP_DIR}"/backup_*.tar.gz 2>/dev/null || true
 rm -rf "$BACKUP_NAME" || warning "無法刪除臨時備份目錄"
 BACKUP_SIZE=$(du -h "${BACKUP_NAME}.tar.gz" | cut -f1)
 log "備份壓縮完成，大小: $BACKUP_SIZE"

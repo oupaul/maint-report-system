@@ -231,16 +231,16 @@ fi
 log "步驟 2/6: 檢查並更新依賴套件..."
 cd "${PROJECT_DIR}"
 if [ "${PROJECT_DIR}/package.json" -nt "${PROJECT_DIR}/node_modules/.package-lock.json" ] 2>/dev/null || \
+   [ "${PROJECT_DIR}/package-lock.json" -nt "${PROJECT_DIR}/node_modules/.package-lock.json" ] 2>/dev/null || \
    [ ! -d "${PROJECT_DIR}/node_modules" ]; then
-    log "檢測到 package.json 更新，重新安裝依賴..."
-    npm install || error "依賴套件安裝失敗"
-    if [ -z "${SKIP_AUDIT_FIX:-}" ]; then
-        log "修復已知安全性漏洞（僅套用不需要 --force 的修復，不含破壞性變更）..."
-        npm audit fix 2>&1 | tail -10 || true
-        info "若上方仍列出需要 --force 才能修的項目，代表該修復含破壞性變更，不會自動套用，需手動評估後執行 npm audit fix --force"
-    else
-        info "SKIP_AUDIT_FIX=1，略過自動修復已知安全性漏洞"
-    fi
+    log "檢測到 package.json／package-lock.json 更新，重新安裝依賴..."
+    # npm ci 嚴格依照 package-lock.json 安裝（版本可重現），--omit=dev 不安裝
+    # jest／nodemon 這些開發用套件，正式主機不需要，也減少攻擊面。
+    npm ci --omit=dev || error "依賴套件安裝失敗"
+    # 只回報、不自動修復：npm audit fix 會在主機上改動 package-lock.json，造成
+    # 主機與 GitHub 上的版本不一致；依賴升級一律在開發端做完 commit 進 repo。
+    log "檢查已知安全性漏洞（僅回報，不自動修改）..."
+    npm audit --omit=dev --audit-level=high 2>&1 | tail -8 || true
     log "✓ 依賴套件更新完成"
 else
     log "✓ 依賴套件無需更新"
@@ -301,6 +301,24 @@ fi
 
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 
+# SESSION_SECRET 同樣不寫進 systemd unit（644，所有本機帳號可讀），改放權限 600
+# 的獨立檔案。舊版部署把它直接寫在 unit 裡，這裡第一次遇到時把既有值搬過去
+# （沿用同一把金鑰，不會讓目前已登入的人被登出）；全新安裝才產生新的亂數。
+SESSION_ENV_FILE="${M365_ENV_DIR}/session.env"
+if [ ! -f "$SESSION_ENV_FILE" ]; then
+    mkdir -p "$M365_ENV_DIR"
+    OLD_SESSION_SECRET=$(grep "^Environment=SESSION_SECRET=" "$SERVICE_FILE" 2>/dev/null | cut -d'=' -f3- || true)
+    if [ -z "$OLD_SESSION_SECRET" ]; then
+        OLD_SESSION_SECRET=$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | sha256sum | cut -d' ' -f1)
+        log "已產生新的 SESSION_SECRET"
+    else
+        log "已把既有的 SESSION_SECRET 從 systemd unit 搬到 ${SESSION_ENV_FILE}"
+    fi
+    ( umask 077; printf 'SESSION_SECRET=%s\n' "$OLD_SESSION_SECRET" > "$SESSION_ENV_FILE" )
+    chown "${CURRENT_USER}:${CURRENT_USER}" "$SESSION_ENV_FILE"
+    chmod 600 "$SESSION_ENV_FILE"
+fi
+
 NEED_UPDATE=false
 if [ ! -f "$SERVICE_FILE" ]; then
     NEED_UPDATE=true
@@ -309,6 +327,13 @@ else
     if ! grep -q "WorkingDirectory=${PROJECT_DIR}" "$SERVICE_FILE" 2>/dev/null; then
         NEED_UPDATE=true
         log "檢測到專案目錄變更，需要更新服務文件"
+    fi
+    # 舊版 unit 把 SESSION_SECRET 直接寫在裡面（所有人可讀），需要重寫成引用
+    # session.env。
+    if grep -q "^Environment=SESSION_SECRET=" "$SERVICE_FILE" 2>/dev/null || \
+       ! grep -q "^EnvironmentFile=${SESSION_ENV_FILE}$" "$SERVICE_FILE" 2>/dev/null; then
+        NEED_UPDATE=true
+        log "偵測到服務文件仍把 SESSION_SECRET 寫在 unit 內，需要更新服務文件"
     fi
     # 舊版部署的 unit 檔案可能是在支援 M365 EnvironmentFile 之前產生的，
     # 補上這行才能讀到 m365.env，不用因為這樣就要求使用者整個重新安裝。
@@ -320,12 +345,6 @@ fi
 
 if [ "$NEED_UPDATE" = true ]; then
     log "更新 systemd 服務文件..."
-    # 保留現有 SESSION_SECRET；首次安裝時產生隨機值
-    EXISTING_SECRET=$(grep "^Environment=SESSION_SECRET=" "$SERVICE_FILE" 2>/dev/null | cut -d'=' -f3-)
-    if [ -z "$EXISTING_SECRET" ]; then
-        EXISTING_SECRET=$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | sha256sum | cut -d' ' -f1)
-        log "已產生新的 SESSION_SECRET"
-    fi
     sudo tee "$SERVICE_FILE" > /dev/null <<EOF
 [Unit]
 Description=維護巡檢報告系統
@@ -340,7 +359,7 @@ WorkingDirectory=${PROJECT_DIR}
 Environment=NODE_ENV=production
 Environment=PORT=${PORT}
 Environment="PATH=${PATH}"
-Environment=SESSION_SECRET=${EXISTING_SECRET}
+EnvironmentFile=${SESSION_ENV_FILE}
 EnvironmentFile=-${M365_ENV_FILE}
 ExecStart=${NODE_PATH} ${PROJECT_DIR}/src/app.js
 Restart=always

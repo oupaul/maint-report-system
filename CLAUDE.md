@@ -19,7 +19,7 @@ Node.js + Express + SQLite（`better-sqlite3`）的 IT 例行維護巡檢紀錄�
 ## 密鑰與敏感設定放在哪裡
 
 - Gitignored 設定檔：`.env`、`deploy.config.json`、`deploy.config.sh`
-- `SESSION_SECRET`：`deploy.sh` 首次部署時以 `openssl rand -hex 32` 產生，直接寫入 systemd unit 的 `Environment=`，不會落地在 repo 內任何檔案；本機開發若未設定，`src/config/index.js` 會每次啟動自動產生一組亂數金鑰，代表每次重啟都會讓所有人被登出
+- `SESSION_SECRET`：`deploy.sh` 首次部署時以 `openssl rand -hex 32` 產生，寫入 `/etc/maint-report-system/session.env`（權限 600，只有服務執行帳號能讀），systemd unit 只用 `EnvironmentFile=` 引用，不會落地在 repo 內任何檔案，也不放在所有人可讀的 unit 檔案裡（舊版部署會在第一次執行新版 `deploy.sh` 時自動把既有值搬過去）；本機開發若未設定，`src/config/index.js` 會每次啟動自動產生一組亂數金鑰，代表每次重啟都會讓所有人被登出
 - 本專案未安裝 `dotenv`，`.env` 不會被自動載入；`.env.example` 只是文件用範本
 
 ## 已知需要留意的技術現況（動手改 `src/` 前先確認）
@@ -39,7 +39,7 @@ Node.js + Express + SQLite（`better-sqlite3`）的 IT 例行維護巡檢紀錄�
 
 ## `update.sh` / `deploy.sh` 目前的行為（供改動前參考）
 
-沿用姊妹專案（pbg-system）驗證過的安全模式：更新前顯示明確版本來源（GitHub commit hash）、更新前要求手動確認並提醒先跑 `backup.sh`（可用 `SKIP_UPDATE_CONFIRM=1` 跳過供全自動情境使用）、`deploy.sh` 失敗會停止並印出排查方式、部署完成後呼叫 `scripts/health-check.sh` 打 `GET /login` 驗證服務真的有回應（而不是只看 `systemctl is-active`）、停服務時的 `kill -9` 只在確認佔用該 port 的程序指令包含 `app.js` 才殺、`npm audit fix`（不含 `--force`）預設每次部署自動執行（可用 `SKIP_AUDIT_FIX=1` 跳過）。**沒有自動回滾**——失敗時腳本只會停下來給出資訊，不會自己嘗試修復或還原。
+沿用姊妹專案（pbg-system）驗證過的安全模式：更新前顯示明確版本來源（GitHub commit hash）、更新前要求手動確認並提醒先跑 `backup.sh`（可用 `SKIP_UPDATE_CONFIRM=1` 跳過供全自動情境使用）、`deploy.sh` 失敗會停止並印出排查方式、部署完成後呼叫 `scripts/health-check.sh` 打 `GET /login` 驗證服務真的有回應（而不是只看 `systemctl is-active`）、停服務時的 `kill -9` 只在確認佔用該 port 的程序指令包含 `app.js` 才殺、依賴安裝用 `npm ci --omit=dev`（嚴格依 package-lock.json、不裝開發用套件），之後只執行 `npm audit --omit=dev` 回報、不自動修復——依賴升級一律在開發端做完 commit 進 repo，避免主機與 GitHub 版本不一致。**沒有自動回滾**——失敗時腳本只會停下來給出資訊，不會自己嘗試修復或還原。
 
 ## Docker／Compose
 
