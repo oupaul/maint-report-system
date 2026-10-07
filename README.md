@@ -183,3 +183,16 @@ sudo systemctl restart maint-report-system
 - Ubuntu 24.04 LTS（推薦）或其他 Linux
 - Node.js 20.x
 - 記憶體 512MB 以上、硬碟 1GB 以上
+
+---
+
+## 授權
+
+本專案採用 **GNU Affero General Public License v3.0（AGPL-3.0）** 授權，完整條款見 [LICENSE](LICENSE)。
+
+AGPL-3.0 與一般 GPL 最大的差別在第 13 條：如果你修改了本專案並讓使用者**透過網路**與它互動（例如部署成內部或對外的網站），必須向這些使用者提供修改後版本的完整原始碼。單純自己內部使用、沒有修改，則不受此限。
+
+第三方元件各自適用其原本的授權：
+
+- `fonts/NotoSansTC-*.otf`（思源黑體繁體中文）：SIL Open Font License 1.1，授權全文見 [fonts/OFL.txt](fonts/OFL.txt)
+- `node_modules/` 內的 npm 套件：各自的授權條款
