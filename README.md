@@ -188,6 +188,8 @@ sudo systemctl restart maint-report-system
 
 ## 授權
 
+Copyright (C) 2026 OU SHOU SHUO
+
 本專案採用 **GNU Affero General Public License v3.0（AGPL-3.0）** 授權，完整條款見 [LICENSE](LICENSE)。
 
 AGPL-3.0 與一般 GPL 最大的差別在第 13 條：如果你修改了本專案並讓使用者**透過網路**與它互動（例如部署成內部或對外的網站），必須向這些使用者提供修改後版本的完整原始碼。單純自己內部使用、沒有修改，則不受此限。

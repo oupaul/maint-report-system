@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "IT 例行維護巡檢紀錄與 PDF 報告系統",
   "private": true,
+  "author": "OU SHOU SHUO",
   "license": "AGPL-3.0-only",
   "main": "src/app.js",
   "scripts": {
