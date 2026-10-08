@@ -39,7 +39,10 @@
   async function completeRedirectLogin(app, csrf, onError) {
     let result;
     try {
-      result = await app.handleRedirectPromise();
+      // navigateToLoginRequestUrl: false —— 在「收到 Microsoft 導回」的這一頁直接處理登入結果。
+      // MSAL 預設會把結果暫存起來、再自動導回當初按登入按鈕的那一頁（/login）才處理，
+      // 但導回去的時候網址上的結果已經不見了，登入頁就會看起來像「一直回到登入畫面」卻沒有任何錯誤。
+      result = await app.handleRedirectPromise({ navigateToLoginRequestUrl: false });
     } catch (err) {
       onError('Microsoft 登入失敗：' + (err.errorMessage || err.message || err));
       return true;
