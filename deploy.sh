@@ -100,6 +100,8 @@ if [ -f "${PROJECT_DIR}/deploy.config.sh" ]; then
 else
     input_config
 fi
+# 舊版的 deploy.config.sh 可能沒有 BACKUP_DIR，補上預設值（服務與網頁備份管理都需要這個路徑）
+BACKUP_DIR="${BACKUP_DIR:-/srv/apps/${BACKUP_DIR_NAME:-maint-report-system-backups}}"
 
 # 開始部署
 echo "============================================"
@@ -281,6 +283,8 @@ fi
 # 身份執行，若不修正擁有者，服務啟動時會因為無法在 data/ 目錄寫入
 # WAL/SHM 檔案而以 SQLITE_READONLY_DIRECTORY 崩潰。每次部署都修正一次，
 # 確保重複執行／更新後擁有者不會因為某次以 root 手動操作而跑掉。
+# 網頁「備份管理」由服務帳號寫入備份目錄；更新（非首次安裝）時目錄也可能還不存在
+mkdir -p "${BACKUP_DIR}"
 chown -R "${CURRENT_USER}:${CURRENT_USER}" "${PROJECT_DIR}/data" "${PROJECT_DIR}/uploads" "${BACKUP_DIR}" \
     || warning "調整 data/uploads/${BACKUP_DIR} 擁有者失敗，服務可能無法寫入資料庫或截圖"
 
@@ -355,6 +359,11 @@ else
         NEED_UPDATE=true
         log "偵測到服務文件缺少 M365 EnvironmentFile 設定，需要更新服務文件"
     fi
+    # 網頁「備份管理」要把備份檔寫進安裝時選的備份目錄，服務需要知道這個路徑
+    if ! grep -q "^Environment=BACKUP_DIR=${BACKUP_DIR}$" "$SERVICE_FILE" 2>/dev/null; then
+        NEED_UPDATE=true
+        log "偵測到服務文件缺少 BACKUP_DIR 設定，需要更新服務文件"
+    fi
 fi
 
 if [ "$NEED_UPDATE" = true ]; then
@@ -372,6 +381,7 @@ Group=${CURRENT_USER}
 WorkingDirectory=${PROJECT_DIR}
 Environment=NODE_ENV=production
 Environment=PORT=${PORT}
+Environment=BACKUP_DIR=${BACKUP_DIR}
 Environment="PATH=${PATH}"
 EnvironmentFile=${SESSION_ENV_FILE}
 EnvironmentFile=-${M365_ENV_FILE}

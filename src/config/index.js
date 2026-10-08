@@ -41,6 +41,9 @@ module.exports = {
   DATA_DIR: path.join(PROJECT_ROOT, 'data'),
   DB_PATH: path.join(PROJECT_ROOT, 'data', 'maint_report.db'),
   UPLOADS_DIR: path.join(PROJECT_ROOT, 'uploads'),
+  // 網頁「備份管理」產生備份檔的位置；deploy.sh 會在 systemd unit 設成安裝時選的備份目錄，
+  // 沒設定（本機開發）就放在專案內被 gitignore 的 backups/。
+  BACKUP_DIR: process.env.BACKUP_DIR || path.join(PROJECT_ROOT, 'backups'),
   M365_CLIENT_ID,
   M365_TENANT_ID,
   M365_REDIRECT_URI,

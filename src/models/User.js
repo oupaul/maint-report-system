@@ -36,6 +36,10 @@ const User = {
     return User.findById(id);
   },
 
+  recordLogin(id) {
+    db.prepare('UPDATE users SET last_login_at = ? WHERE id = ?').run(nowTaipei(), id);
+  },
+
   // mustChange：本人自己改密碼 → false（清掉強制改密碼旗標）；管理員幫別人重設 → true
   updatePassword(id, password_hash, { mustChange = false } = {}) {
     db.prepare('UPDATE users SET password_hash = ?, must_change_password = ? WHERE id = ?')

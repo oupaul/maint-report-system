@@ -11,4 +11,21 @@ function nowTaipei() {
   return new Date(taipeiMs).toISOString().slice(0, 19).replace('T', ' ');
 }
 
-module.exports = { nowTaipei };
+// 把毫秒時間戳記換成台北時間的零件（年月日時分、星期），排程與畫面顯示共用。
+function taipeiParts(ms = Date.now()) {
+  const d = new Date(ms + 8 * 60 * 60 * 1000);
+  const pad = (n) => String(n).padStart(2, '0');
+  return {
+    date: `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`,
+    time: `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`,
+    weekday: d.getUTCDay(), // 0 = 星期日
+    stamp: `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}_${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}`,
+  };
+}
+
+function formatTaipei(ms) {
+  if (!ms) return '-';
+  return new Date(ms + 8 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
+}
+
+module.exports = { nowTaipei, taipeiParts, formatTaipei };

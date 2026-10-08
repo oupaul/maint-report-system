@@ -18,6 +18,7 @@ const MIGRATIONS = [
   'migrate_0003_batch_signatures',
   'migrate_0004_m365_sso',
   'migrate_0005_password_policy',
+  'migrate_0006_backup_and_activity',
 ];
 
 async function run() {

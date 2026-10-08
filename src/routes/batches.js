@@ -189,52 +189,69 @@ router.post('/:id/assets', requireLogin, (req, res) => {
   res.redirect(`/batches/${batch.id}/entry`);
 });
 
-router.post('/:id/items/:checklistItemId', requireLogin, upload.array('screenshots', 10), async (req, res) => {
-  const batch = InspectionBatch.findById(req.params.id);
-  if (!batch) {
-    return res.status(404).render('error', { title: '找不到批次', message: '找不到指定的巡檢批次' });
-  }
-
-  const checklistItem = ChecklistItem.findById(req.params.checklistItemId);
-  if (!checklistItem) {
-    return res.status(404).render('error', { title: '找不到檢查項目', message: '找不到指定的檢查項目' });
-  }
-
-  const assetId = parseInt(req.body.asset_id, 10);
-  const asset = Asset.findById(assetId);
-  if (!asset) {
-    return res.status(400).render('error', { title: '無效的資產', message: '找不到指定的資產' });
-  }
-
-  const status = req.body.status;
-  if (!isValidStatus(status)) {
-    return res.redirect(`/batches/${batch.id}/entry`);
-  }
-
-  const item = InspectionItem.upsert({
-    batch_id: batch.id,
-    asset_id: asset.id,
-    checklist_item_id: checklistItem.id,
-    status,
-    value_text: req.body.value_text,
-    note: req.body.note,
-    source: 'manual',
-    recorded_by: req.user.id,
-  });
-
-  // 每張照片先插入佔位列取得 id（檔名需要用到），轉檔完成後再回填實際路徑/尺寸
-  if (req.files && req.files.length > 0) {
-    const existingCount = InspectionItemPhoto.findByItemId(item.id).length;
-    for (let i = 0; i < req.files.length; i++) {
-      const file = req.files[i];
-      const photo = InspectionItemPhoto.create({ inspection_item_id: item.id, sort_order: existingCount + i });
-      const destPath = path.join(config.UPLOADS_DIR, String(batch.id), `${asset.id}-${checklistItem.id}-${photo.id}`);
-      const result = await ImageService.processScreenshot(file.buffer, file.mimetype, destPath);
-      InspectionItemPhoto.updateFile(photo.id, result);
+router.post('/:id/items/:checklistItemId', requireLogin, upload.array('screenshots', 10), async (req, res, next) => {
+  try {
+    const batch = InspectionBatch.findById(req.params.id);
+    if (!batch) {
+      return res.status(404).render('error', { title: '找不到批次', message: '找不到指定的巡檢批次' });
     }
-  }
 
-  res.redirect(`/batches/${batch.id}/entry`);
+    const checklistItem = ChecklistItem.findById(req.params.checklistItemId);
+    if (!checklistItem) {
+      return res.status(404).render('error', { title: '找不到檢查項目', message: '找不到指定的檢查項目' });
+    }
+
+    const assetId = parseInt(req.body.asset_id, 10);
+    const asset = Asset.findById(assetId);
+    if (!asset) {
+      return res.status(400).render('error', { title: '無效的資產', message: '找不到指定的資產' });
+    }
+
+    const status = req.body.status;
+    if (!isValidStatus(status)) {
+      return res.redirect(`/batches/${batch.id}/entry`);
+    }
+
+    const item = InspectionItem.upsert({
+      batch_id: batch.id,
+      asset_id: asset.id,
+      checklist_item_id: checklistItem.id,
+      status,
+      value_text: req.body.value_text,
+      note: req.body.note,
+      source: 'manual',
+      recorded_by: req.user.id,
+    });
+
+    // 每張照片先插入佔位列取得 id（檔名需要用到），轉檔完成後再回填實際路徑/尺寸
+    if (req.files && req.files.length > 0) {
+      const existingCount = InspectionItemPhoto.findByItemId(item.id).length;
+      for (let i = 0; i < req.files.length; i++) {
+        const file = req.files[i];
+        const photo = InspectionItemPhoto.create({ inspection_item_id: item.id, sort_order: existingCount + i });
+        const destPath = path.join(config.UPLOADS_DIR, String(batch.id), `${asset.id}-${checklistItem.id}-${photo.id}`);
+        let result;
+        try {
+          result = await ImageService.processScreenshot(file.buffer, file.mimetype, destPath);
+        } catch (err) {
+          // 這張處理失敗：清掉佔位列，並告訴使用者是「哪一個檔案」的問題（前面已處理成功的檔案會保留）
+          InspectionItemPhoto.remove(photo.id);
+          if (err.userFacing) {
+            return res.status(400).render('error', {
+              title: '圖片上傳失敗',
+              message: `「${upload.decodeFilename(file.originalname)}」：${err.message}`,
+            });
+          }
+          throw err;
+        }
+        InspectionItemPhoto.updateFile(photo.id, result);
+      }
+    }
+
+    res.redirect(`/batches/${batch.id}/entry`);
+  } catch (err) {
+    next(err);
+  }
 });
 
 router.post('/:id/photos/:photoId/delete', requireLogin, (req, res) => {

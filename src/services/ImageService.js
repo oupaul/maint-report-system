@@ -9,10 +9,24 @@ const MIME_TO_EXT = {
   'image/gif': 'gif',
 };
 
+// 長邊上限（寬、高都不超過這個值）：手機截圖／相機照片動輒 4000px 以上、好幾 MB，
+// 巡檢截圖只要看得清楚文字即可。縮小 + WebP 壓縮通常能把檔案壓到原本的 20~40%。
+const MAX_DIMENSION = 2000;
+const WEBP_QUALITY = 82;
+
+// 檔案根本不是能解碼的圖片（毀損、上傳到一半、副檔名/類型是假的）：回給使用者一個看得懂的訊息，
+// 不要讓不明內容以「圖片」的名義存進系統。
+class UnsupportedImageError extends Error {
+  constructor(message) {
+    super(message);
+    this.userFacing = true;
+  }
+}
+
 /**
- * 處理上傳的截圖：優先轉成 WebP（縮圖 + 壓縮），失敗時退回存原始檔案。
- * 絕不 throw — 呼叫端（路由）必須在失敗情況下仍能成功儲存 inspection_item，
- * 只是沒有可靠的寬高資訊。
+ * 處理上傳的截圖：轉成 WebP（依 EXIF 轉正、限制長邊、壓縮）。
+ * - 檔案能解碼、但轉 WebP 這一步失敗（很少見）：退回存原始檔案，不讓使用者的截圖丟掉。
+ * - 檔案根本無法解碼：丟出 UnsupportedImageError（userFacing），由呼叫端顯示訊息。
  *
  * @param {Buffer} buffer 上傳檔案的原始 buffer
  * @param {string} mimetype 上傳檔案的 mimetype
@@ -25,8 +39,8 @@ async function processScreenshot(buffer, mimetype, destPath) {
   try {
     const { data, info } = await sharp(buffer)
       .rotate()
-      .resize({ width: 1600, withoutEnlargement: true })
-      .webp({ quality: 82 })
+      .resize({ width: MAX_DIMENSION, height: MAX_DIMENSION, fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: WEBP_QUALITY })
       .toBuffer({ resolveWithObject: true });
 
     const finalPath = `${destPath}.webp`;
@@ -39,24 +53,20 @@ async function processScreenshot(buffer, mimetype, destPath) {
       format: 'webp',
     };
   } catch (err) {
-    console.warn(`[ImageService] sharp 轉檔失敗，改存原始檔案: ${err.message}`);
+    console.warn(`[ImageService] sharp 轉檔失敗: ${err.message}`);
+
+    let metadata;
+    try {
+      metadata = await sharp(buffer).metadata();
+    } catch (metaErr) {
+      throw new UnsupportedImageError('圖片檔案無法處理，請確認檔案沒有毀損，或改用 JPG / PNG 格式重新上傳');
+    }
 
     const ext = MIME_TO_EXT[mimetype] || 'bin';
     const finalPath = `${destPath}.${ext}`;
     fs.writeFileSync(finalPath, buffer);
-
-    let width = null;
-    let height = null;
-    try {
-      const metadata = await sharp(buffer).metadata();
-      width = metadata.width || null;
-      height = metadata.height || null;
-    } catch (metaErr) {
-      // best-effort，讀取失敗就留 null，不影響上層流程
-    }
-
-    return { path: finalPath, width, height, format: ext };
+    return { path: finalPath, width: metadata.width || null, height: metadata.height || null, format: ext };
   }
 }
 
-module.exports = { processScreenshot };
+module.exports = { processScreenshot, UnsupportedImageError };

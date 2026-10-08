@@ -6,6 +6,7 @@ const User = require('../models/User');
 const AuthService = require('../services/AuthService');
 const M365AuthService = require('../services/M365AuthService');
 const LoginRateLimit = require('../middleware/loginRateLimit');
+const ActivityTracker = require('../services/ActivityTracker');
 const { establishSession } = require('../utils/session');
 
 // 帳號不存在時也跑一次 argon2 驗證（對一個不可能符合的雜湊），讓「帳號不存在」跟
@@ -111,6 +112,7 @@ router.post('/auth/m365/token', async (req, res) => {
 });
 
 router.post('/logout', (req, res) => {
+  ActivityTracker.remove(req.sessionID);
   req.session.destroy(() => {
     res.redirect('/login');
   });

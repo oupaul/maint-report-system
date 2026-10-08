@@ -9,6 +9,9 @@ const M365AuthService = require('./services/M365AuthService');
 const SqliteSessionStore = require('./services/SqliteSessionStore');
 const db = require('./models/db');
 const User = require('./models/User');
+const ActivityTracker = require('./services/ActivityTracker');
+const BackupService = require('./services/BackupService');
+const HealthService = require('./services/HealthService');
 const { securityHeaders } = require('./middleware/securityHeaders');
 const { csrfProtection } = require('./middleware/csrf');
 
@@ -23,6 +26,14 @@ if (config.TRUST_PROXY !== false) {
 }
 
 app.use(securityHeaders);
+
+// 給外部監控（Uptime Kuma、Cloudflare Health Check 等）用：不需登入、不建立 session、
+// 只回「服務活著且資料庫可讀」，不洩漏任何系統細節（詳細狀態在登入後的「系統狀態」頁）
+app.get('/healthz', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  const ok = HealthService.liveness();
+  res.status(ok ? 200 : 503).json({ status: ok ? 'ok' : 'error' });
+});
 
 // 靜態檔案放在 session 前面：載入 css/js 不需要（也不該）建立或更新 session
 app.use(express.static(path.join(__dirname, 'public')));
@@ -93,6 +104,9 @@ app.use((req, res, next) => {
   next();
 });
 
+// 記錄誰在線上（給「系統狀態」頁用）
+app.use(ActivityTracker.middleware);
+
 // 必須先改密碼的帳號（初始亂數密碼、管理員代建或重設的密碼）只能進到變更密碼頁與登出
 const ALLOWED_WHEN_MUST_CHANGE = new Set(['/account/password', '/logout']);
 app.use((req, res, next) => {
@@ -111,6 +125,7 @@ try {
   const batchRoutes = require('./routes/batches');
   const reportRoutes = require('./routes/reports');
   const accountRoutes = require('./routes/account');
+  const adminRoutes = require('./routes/admin');
   console.log('[啟動] ✓ 路由模組載入完成');
 
   const { requireLogin } = require('./middleware/auth');
@@ -123,6 +138,7 @@ try {
   app.use('/assets', assetRoutes);
   app.use('/users', userRoutes);
   app.use('/account', accountRoutes);
+  app.use('/admin', adminRoutes);
   app.use('/batches', batchRoutes);
   app.use('/', reportRoutes); // 內部各路由自行掛 requireLogin（含 /batches/:id/report.pdf 與 /uploads/:batchId/:filename）
 
@@ -186,6 +202,7 @@ const server = app.listen(config.PORT, () => {
   console.log(`\n維護巡檢報告系統`);
   console.log(`   運行於 http://localhost:${config.PORT}`);
   console.log(`   環境: ${config.NODE_ENV}\n`);
+  BackupService.startScheduler();
 });
 
 server.on('error', (err) => {

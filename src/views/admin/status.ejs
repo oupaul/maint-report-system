@@ -1,0 +1,153 @@
+<%- include('../layout', { title: '系統狀態' }) %>
+
+<div class="page-header">
+  <h1>系統狀態</h1>
+  <div class="page-actions">
+    <span class="status-badge status-badge--<%= fmt.STATUS_CLASS[health.overall] %>">整體：<%= fmt.STATUS_LABEL[health.overall] %></span>
+    <a href="/admin/status" class="btn btn--secondary btn--md">立即重新整理</a>
+  </div>
+</div>
+<p class="form-hint">檢查時間：<%= fmt.time(health.checkedAt) %>（台北時間）<% if (typeof refreshSeconds !== 'undefined' && refreshSeconds) { %>・每 <%= refreshSeconds %> 秒自動更新<% } %></p>
+
+<div class="stat-row">
+  <div class="card stat-card">
+    <div class="stat-card__value"><%= onlineUsers %></div>
+    <div class="stat-card__label">目前線上使用者（5 分鐘內有操作）</div>
+  </div>
+  <div class="card stat-card">
+    <div class="stat-card__value"><%= online.length %></div>
+    <div class="stat-card__label">線上連線數（工作階段）</div>
+  </div>
+  <div class="card stat-card">
+    <div class="stat-card__value"><%= fmt.duration(health.app.uptimeSec) %></div>
+    <div class="stat-card__label">服務已連續運作</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>健康檢查</h2>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead><tr><th>項目</th><th>狀態</th><th>說明</th></tr></thead>
+      <tbody>
+        <% health.checks.forEach(c => { %>
+          <tr>
+            <td><%= c.label %></td>
+            <td><span class="status-badge status-badge--<%= fmt.STATUS_CLASS[c.status] %>"><%= fmt.STATUS_LABEL[c.status] %></span></td>
+            <td><%= c.detail %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <form method="POST" action="/admin/status/db-check" style="margin-top: var(--space-4);">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <button type="submit" class="btn btn--secondary btn--sm">執行資料庫完整性檢查</button>
+    <% if (dbCheck) { %>
+      <span class="status-badge status-badge--<%= dbCheck.ok ? 'normal' : 'critical' %>" style="margin-left: var(--space-3);">
+        <%= dbCheck.ok ? '完整性檢查通過' : '發現問題：' + dbCheck.result %>（<%= dbCheck.ms %> ms）
+      </span>
+    <% } else { %>
+      <span class="form-hint" style="margin-left: var(--space-3);">資料庫很大時會花一點時間，所以不會自動執行。</span>
+    <% } %>
+  </form>
+</div>
+
+<div class="card">
+  <h2>線上使用者</h2>
+  <% if (online.length === 0) { %>
+    <div class="empty-state">目前沒有使用者在線上。</div>
+  <% } else { %>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr><th>使用者</th><th>角色</th><th>來源 IP</th><th>裝置</th><th>最後操作</th><th>連線開始</th></tr>
+        </thead>
+        <tbody>
+          <% online.forEach(e => { %>
+            <tr>
+              <td><%= e.displayName || e.username %><% if (e.displayName) { %> <span class="form-hint">（<%= e.username %>）</span><% } %></td>
+              <td><%= e.role === 'admin' ? '管理員' : '技術人員' %></td>
+              <td><%= e.ip %></td>
+              <td><%= e.agent %></td>
+              <td><%= fmt.ago(e.lastSeen) %></td>
+              <td><%= fmt.time(e.firstSeen) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+  <p class="form-hint">以工作階段為單位，同一個人在兩台裝置登入會顯示兩列。資料只存在記憶體，服務重新啟動後會清空，使用者下一次操作就會重新出現。</p>
+</div>
+
+<div class="card">
+  <h2>最近登入</h2>
+  <% if (recentLogins.length === 0) { %>
+    <div class="empty-state">尚無登入紀錄（這個功能啟用之後的登入才會記錄）。</div>
+  <% } else { %>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>帳號</th><th>顯示名稱</th><th>最近登入時間（台北時間）</th></tr></thead>
+        <tbody>
+          <% recentLogins.forEach(u => { %>
+            <tr><td><%= u.username %></td><td><%= u.display_name || '-' %></td><td><%= u.last_login_at %></td></tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>
+
+<div class="detail-grid">
+  <div class="card">
+    <h2>服務</h2>
+    <dl class="kv-list">
+      <dt>系統版本</dt><dd><%= health.app.version %></dd>
+      <dt>Node.js</dt><dd><%= health.app.node %></dd>
+      <dt>執行環境</dt><dd><%= health.app.env %>（port <%= health.app.port %>）</dd>
+      <dt>服務記憶體</dt><dd><%= fmt.bytes(health.app.rssBytes) %></dd>
+      <dt>反向代理設定</dt><dd><%= health.app.trustProxy %></dd>
+      <dt>Microsoft 365 登入</dt><dd><%= health.app.m365 ? '已啟用' : '未啟用' %></dd>
+    </dl>
+  </div>
+
+  <div class="card">
+    <h2>主機</h2>
+    <dl class="kv-list">
+      <dt>主機名稱</dt><dd><%= health.system.hostname %></dd>
+      <dt>作業系統</dt><dd><%= health.system.platform %></dd>
+      <dt>開機時間</dt><dd><%= fmt.duration(health.system.uptimeSec) %></dd>
+      <dt>CPU 負載（1/5/15 分）</dt><dd><%= health.system.load.map(l => l.toFixed(2)).join(' / ') %>（<%= health.system.cpus %> 核心）</dd>
+      <dt>記憶體</dt><dd>可用 <%= fmt.bytes(health.system.freeMem) %> / 共 <%= fmt.bytes(health.system.totalMem) %></dd>
+    </dl>
+  </div>
+
+  <div class="card">
+    <h2>儲存空間</h2>
+    <dl class="kv-list">
+      <dt>資料庫</dt><dd><%= fmt.bytes(health.storage.dbBytes) %>（WAL <%= fmt.bytes(health.storage.walBytes) %>）</dd>
+      <dt>巡檢截圖</dt><dd><%= fmt.bytes(health.storage.uploadsBytes) %></dd>
+      <dt>備份檔</dt><dd><%= health.storage.backupCount %> 份，共 <%= fmt.bytes(health.storage.backupBytes) %></dd>
+      <% if (health.storage.dataDisk) { %>
+        <dt>資料磁碟</dt><dd>剩餘 <%= fmt.bytes(health.storage.dataDisk.free) %> / <%= fmt.bytes(health.storage.dataDisk.total) %></dd>
+      <% } %>
+      <% if (health.storage.backupDisk) { %>
+        <dt>備份磁碟</dt><dd>剩餘 <%= fmt.bytes(health.storage.backupDisk.free) %> / <%= fmt.bytes(health.storage.backupDisk.total) %></dd>
+      <% } %>
+    </dl>
+  </div>
+
+  <div class="card">
+    <h2>資料筆數</h2>
+    <dl class="kv-list">
+      <dt>使用者</dt><dd><%= health.counts.users ?? '-' %></dd>
+      <dt>資產</dt><dd><%= health.counts.assets ?? '-' %></dd>
+      <dt>巡檢批次</dt><dd><%= health.counts.batches ?? '-' %></dd>
+      <dt>檢查紀錄</dt><dd><%= health.counts.items ?? '-' %></dd>
+      <dt>截圖</dt><dd><%= health.counts.photos ?? '-' %></dd>
+    </dl>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

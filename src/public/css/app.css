@@ -453,3 +453,29 @@ p { margin: 0 0 var(--space-4) 0; }
 .stat-card { text-align: center; }
 .stat-card__value { font-size: var(--text-display-md); font-weight: 700; color: var(--color-primary); }
 .stat-card__label { color: var(--color-text-muted); font-size: var(--text-sm); }
+
+.form-success {
+  background: var(--color-status-normal-bg);
+  color: var(--color-status-normal);
+  border: 1px solid var(--color-status-normal);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  margin-bottom: var(--space-6);
+  font-size: var(--text-sm);
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--space-4);
+}
+
+.kv-list {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-2) var(--space-6);
+  margin: 0;
+  font-size: var(--text-sm);
+}
+.kv-list dt { color: var(--color-text-muted); }
+.kv-list dd { margin: 0; word-break: break-word; }

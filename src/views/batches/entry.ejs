@@ -66,7 +66,7 @@
               <div class="photo-thumb-list">
                 <% row.photos.forEach(photo => { %>
                   <div class="photo-thumb-list__item">
-                    <a href="/uploads/<%= batch.id %>/<%= photo.filename %>" target="_blank">
+                    <a href="/uploads/<%= batch.id %>/<%= photo.filename %>" target="_blank" rel="noopener">
                       <img class="screenshot-thumb" src="/uploads/<%= batch.id %>/<%= photo.filename %>" alt="已上傳截圖">
                     </a>
                     <button type="submit" form="photo-delete-<%= photo.id %>" class="photo-thumb-list__delete" title="刪除這張截圖">刪除</button>

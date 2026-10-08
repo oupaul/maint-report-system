@@ -65,7 +65,8 @@ router.get('/uploads/:batchId/:filename', requireLogin, (req, res) => {
   const uploadsRoot = path.resolve(config.UPLOADS_DIR);
   const resolved = path.resolve(filePath);
 
-  if (!resolved.startsWith(uploadsRoot)) {
+  // 要比對到目錄分隔符：只用 startsWith 的話，「uploads-evil」這種前綴相同的兄弟目錄也會通過
+  if (!resolved.startsWith(uploadsRoot + path.sep)) {
     return res.status(400).send('無效的檔案路徑');
   }
 
@@ -73,6 +74,10 @@ router.get('/uploads/:batchId/:filename', requireLogin, (req, res) => {
     return res.status(404).send('找不到檔案');
   }
 
+  // 檔名裡含 photo id，內容不會被原地改寫，可以讓瀏覽器快取（private：不給共用代理快取，
+  // 因為這些是需要登入才能看的截圖）；inline：在瀏覽器裡直接顯示，不當成下載
+  res.setHeader('Cache-Control', 'private, max-age=3600');
+  res.setHeader('Content-Disposition', 'inline');
   res.sendFile(resolved);
 });
 

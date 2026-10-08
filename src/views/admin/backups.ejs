@@ -1,0 +1,109 @@
+<%- include('../layout', { title: '備份管理' }) %>
+
+<div class="page-header">
+  <h1>備份管理</h1>
+  <div class="page-actions">
+    <form method="POST" action="/admin/backups/run" style="display:inline;">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button type="submit" class="btn btn--primary btn--md" <%= running ? 'disabled' : '' %>><%= running ? '備份進行中…' : '立即備份' %></button>
+    </form>
+  </div>
+</div>
+
+<% if (ok) { %><div class="form-success"><%= ok %></div><% } %>
+<% if (error) { %><div class="form-error"><%= error %></div><% } %>
+
+<div class="card">
+  <h2>最近一次備份</h2>
+  <% if (!settings.last_status) { %>
+    <div class="empty-state">尚未執行過備份。</div>
+  <% } else { %>
+    <dl class="kv-list">
+      <dt>結果</dt>
+      <dd>
+        <% if (settings.last_status === 'success') { %><span class="status-badge status-badge--normal">成功</span>
+        <% } else if (settings.last_status === 'running') { %><span class="status-badge status-badge--warning">進行中</span>
+        <% } else { %><span class="status-badge status-badge--critical">失敗</span><% } %>
+      </dd>
+      <dt>時間</dt><dd><%= settings.last_run_at || '-' %>（台北時間）</dd>
+      <dt>方式</dt><dd><%= settings.last_trigger === 'schedule' ? '排程自動備份' : '手動備份' %></dd>
+      <dt>說明</dt><dd><%= settings.last_message || '-' %></dd>
+    </dl>
+  <% } %>
+</div>
+
+<div class="card">
+  <h2>自動備份排程</h2>
+  <p class="form-hint">目前設定：<strong><%= nextSlotLabel %></strong>，保留 <%= settings.retention_days %> 天。服務在備份時間剛好停機或重新啟動時，啟動後會自動補跑。</p>
+  <form method="POST" action="/admin/backups/settings">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <div class="form-group">
+      <label class="form-checkbox-row">
+        <input type="checkbox" name="enabled" value="on" <%= settings.enabled ? 'checked' : '' %>>
+        <span>啟用自動備份</span>
+      </label>
+    </div>
+    <div class="checklist-row__grid">
+      <div class="form-group">
+        <label class="form-label" for="frequency">頻率</label>
+        <select class="form-select" id="frequency" name="frequency">
+          <option value="daily" <%= settings.frequency === 'daily' ? 'selected' : '' %>>每天</option>
+          <option value="weekly" <%= settings.frequency === 'weekly' ? 'selected' : '' %>>每週</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="weekday">星期（每週才適用）</label>
+        <select class="form-select" id="weekday" name="weekday">
+          <% ['日','一','二','三','四','五','六'].forEach((d, i) => { %>
+            <option value="<%= i %>" <%= Number(settings.weekday) === i ? 'selected' : '' %>>星期<%= d %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="run_time">備份時間（台北時間）</label>
+        <input class="form-input" type="time" id="run_time" name="run_time" value="<%= settings.run_time %>" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="retention_days">保留天數</label>
+        <input class="form-input" type="number" id="retention_days" name="retention_days" min="1" max="365" value="<%= settings.retention_days %>" required>
+      </div>
+    </div>
+    <p class="form-hint">超過保留天數的舊備份會在每次備份成功後自動清除；最新的一份無論多舊都會保留。</p>
+    <button type="submit" class="btn btn--primary btn--md" style="margin-top: var(--space-4);">儲存設定</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>備份檔案（<%= backups.length %> 份）</h2>
+  <p class="form-hint">存放位置：<code><%= backupDir %></code><% if (freeBytes !== null) { %>・磁碟剩餘 <%= fmt.bytes(freeBytes) %><% } %></p>
+  <% if (backups.length === 0) { %>
+    <div class="empty-state">還沒有備份檔。</div>
+  <% } else { %>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>檔名</th><th>時間（台北時間）</th><th>大小</th><th></th></tr></thead>
+        <tbody>
+          <% backups.forEach(b => { %>
+            <tr>
+              <td><%= b.name %></td>
+              <td><%= fmt.time(b.mtimeMs) %></td>
+              <td><%= fmt.bytes(b.size) %></td>
+              <td>
+                <div class="page-actions">
+                  <a class="btn btn--secondary btn--sm" href="/admin/backups/<%= b.name %>/download">下載</a>
+                  <form method="POST" action="/admin/backups/<%= b.name %>/delete" data-confirm="確定要刪除備份檔 <%= b.name %> 嗎？刪除後無法復原。">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button type="submit" class="btn btn--secondary btn--sm">刪除</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+  <p class="form-hint">備份檔內含完整資料庫（含帳號密碼雜湊）與所有巡檢截圖，下載後請妥善保管。<strong>還原</strong>不開放在網頁上（會覆蓋正在使用的資料庫），請在主機上執行 <code>restore.sh</code>。建議定期把備份檔另存到別台主機或 NAS。</p>
+</div>
+
+<%- include('../partials/footer') %>
