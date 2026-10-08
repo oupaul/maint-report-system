@@ -479,3 +479,26 @@ p { margin: 0 0 var(--space-4) 0; }
 }
 .kv-list dt { color: var(--color-text-muted); }
 .kv-list dd { margin: 0; word-break: break-word; }
+
+.icon-preview {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  flex-wrap: wrap;
+  margin: var(--space-6) 0;
+}
+.icon-preview__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: var(--color-bg-soft);
+  font-size: var(--text-sm);
+}
+.icon-preview__big {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: repeating-conic-gradient(#e5e7eb 0% 25%, #fff 0% 50%) 0 0 / 16px 16px;
+}

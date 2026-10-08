@@ -1,5 +1,6 @@
 const fs = require('fs');
 const express = require('express');
+const multer = require('multer');
 const router = express.Router();
 
 const config = require('../config');
@@ -8,6 +9,7 @@ const User = require('../models/User');
 const BackupService = require('../services/BackupService');
 const HealthService = require('../services/HealthService');
 const ActivityTracker = require('../services/ActivityTracker');
+const BrandingService = require('../services/BrandingService');
 const fmt = require('../utils/format');
 
 // 系統狀態、備份管理只有管理員能看：備份檔裡有完整資料庫（含密碼雜湊）與所有截圖
@@ -146,6 +148,68 @@ router.post('/backups/:name/delete', async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+// ---- 外觀設定（瀏覽器分頁圖示）----
+
+const ICON_MIMETYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+const ICON_MAX_BYTES = 2 * 1024 * 1024;
+// 圖示只接受點陣圖：SVG 可能夾帶腳本或外部資源參照，而且這裡要在伺服器端解碼它，風險不值得
+const iconUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: ICON_MAX_BYTES, files: 1 },
+  fileFilter(req, file, cb) {
+    if (ICON_MIMETYPES.includes(file.mimetype)) return cb(null, true);
+    const err = new Error('圖示只接受 PNG / JPEG / WebP / GIF 圖片（不支援 SVG 與 ICO），建議使用 256×256 以上的正方形 PNG');
+    err.userFacing = true;
+    cb(err);
+  },
+});
+
+const BRANDING_FLASH = {
+  saved: '分頁圖示已更新。瀏覽器會在下次載入頁面時換成新圖示（已開啟的分頁重新整理即可，有些瀏覽器要稍等一下才會更新分頁上的小圖示）',
+  reset: '已還原成預設圖示',
+};
+
+function renderBranding(req, res, { error = null, status = 200 } = {}) {
+  res.status(status).render('admin/branding', {
+    info: BrandingService.info(),
+    maxMb: ICON_MAX_BYTES / 1024 / 1024,
+    ok: BRANDING_FLASH[req.query.ok] || null,
+    error,
+  });
+}
+
+router.get('/branding', (req, res) => renderBranding(req, res));
+
+router.post('/branding/favicon', (req, res, next) => {
+  iconUpload.single('favicon')(req, res, async (uploadErr) => {
+    try {
+      if (uploadErr) {
+        const message = uploadErr.code === 'LIMIT_FILE_SIZE'
+          ? `檔案超過 ${ICON_MAX_BYTES / 1024 / 1024}MB 上限`
+          : uploadErr.userFacing ? uploadErr.message : '上傳失敗，請重新嘗試';
+        return renderBranding(req, res, { error: message, status: 400 });
+      }
+      if (!req.file) return renderBranding(req, res, { error: '請先選擇要上傳的圖片', status: 400 });
+      try {
+        await BrandingService.setFromUpload(req.file.buffer, require('../middleware/upload').decodeFilename(req.file.originalname));
+      } catch (err) {
+        if (err.userFacing) return renderBranding(req, res, { error: err.message, status: 400 });
+        throw err;
+      }
+      console.log(`[外觀] ${req.user.username} 更新了分頁圖示`);
+      res.redirect('/admin/branding?ok=saved');
+    } catch (err) {
+      next(err);
+    }
+  });
+});
+
+router.post('/branding/favicon/reset', (req, res) => {
+  BrandingService.reset();
+  console.log(`[外觀] ${req.user.username} 還原了預設分頁圖示`);
+  res.redirect('/admin/branding?ok=reset');
 });
 
 module.exports = router;

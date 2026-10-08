@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <% if (typeof refreshSeconds !== 'undefined' && refreshSeconds) { %><meta http-equiv="refresh" content="<%= refreshSeconds %>"><% } %>
   <title><%= typeof title !== 'undefined' ? title + ' - ' : '' %><%= siteName %></title>
+  <%- include('partials/head-icons') %>
   <link rel="stylesheet" href="/css/tokens.css">
   <link rel="stylesheet" href="/css/components.css">
   <link rel="stylesheet" href="/css/app.css">
@@ -21,6 +22,7 @@
         <a href="/users" class="<%= currentPath && currentPath.startsWith('/users') ? 'is-active' : '' %>">使用者管理</a>
         <a href="/admin/status" class="<%= currentPath && currentPath.startsWith('/admin/status') ? 'is-active' : '' %>">系統狀態</a>
         <a href="/admin/backups" class="<%= currentPath && currentPath.startsWith('/admin/backups') ? 'is-active' : '' %>">備份管理</a>
+        <a href="/admin/branding" class="<%= currentPath && currentPath.startsWith('/admin/branding') ? 'is-active' : '' %>">外觀設定</a>
       <% } %>
     </div>
     <div class="app-nav__user">

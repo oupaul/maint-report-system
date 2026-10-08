@@ -1,0 +1,47 @@
+<%- include('../layout', { title: '外觀設定' }) %>
+
+<div class="page-header">
+  <h1>外觀設定</h1>
+</div>
+
+<% if (ok) { %><div class="form-success"><%= ok %></div><% } %>
+<% if (error) { %><div class="form-error"><%= error %></div><% } %>
+
+<div class="card">
+  <h2>瀏覽器分頁圖示（Favicon）</h2>
+  <p class="form-hint">顯示在瀏覽器分頁、書籤與手機主畫面捷徑上的小圖示。上傳後系統會自動轉成各種需要的尺寸並套用到所有頁面（包含登入頁）。</p>
+
+  <div class="icon-preview">
+    <div class="icon-preview__tab">
+      <img src="/branding/icon-32.png?v=<%= faviconVersion %>" width="16" height="16" alt="">
+      <span>維護巡檢報告系統</span>
+    </div>
+    <img class="icon-preview__big" src="/branding/icon-256.png?v=<%= faviconVersion %>" width="96" height="96" alt="目前的分頁圖示">
+    <div>
+      <% if (info.custom) { %>
+        <strong>目前使用：自訂圖示</strong>
+        <div class="form-hint"><%= info.originalName || '' %><% if (info.updatedAt) { %>・更新於 <%= info.updatedAt %>（台北時間）<% } %></div>
+      <% } else { %>
+        <strong>目前使用：系統預設圖示</strong>
+      <% } %>
+    </div>
+  </div>
+
+  <form method="POST" action="/admin/branding/favicon?_csrf=<%= csrfToken %>" enctype="multipart/form-data">
+    <div class="form-group">
+      <label class="form-label" for="favicon">選擇圖片</label>
+      <input class="form-input" type="file" id="favicon" name="favicon" accept="image/png,image/jpeg,image/webp,image/gif" required>
+      <p class="form-hint">支援 PNG / JPEG / WebP / GIF，檔案上限 <%= maxMb %>MB，建議使用 256×256 以上、背景透明的正方形 PNG。非正方形的圖會完整保留並在空白處補透明，不會被裁切。</p>
+    </div>
+    <button type="submit" class="btn btn--primary btn--md">上傳並套用</button>
+  </form>
+
+  <% if (info.custom) { %>
+    <form method="POST" action="/admin/branding/favicon/reset" data-confirm="確定要還原成系統預設圖示嗎？" style="margin-top: var(--space-4);">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button type="submit" class="btn btn--secondary btn--sm">還原成預設圖示</button>
+    </form>
+  <% } %>
+</div>
+
+<%- include('../partials/footer') %>

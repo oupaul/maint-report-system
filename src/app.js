@@ -12,6 +12,7 @@ const User = require('./models/User');
 const ActivityTracker = require('./services/ActivityTracker');
 const BackupService = require('./services/BackupService');
 const HealthService = require('./services/HealthService');
+const BrandingService = require('./services/BrandingService');
 const { securityHeaders } = require('./middleware/securityHeaders');
 const { csrfProtection } = require('./middleware/csrf');
 
@@ -33,6 +34,13 @@ app.get('/healthz', (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   const ok = HealthService.liveness();
   res.status(ok ? 200 : 503).json({ status: ok ? 'ok' : 'error' });
+});
+
+// 分頁圖示（公開、不建立 session），以及所有頁面 <head> 用的圖示版本字串
+app.use(require('./routes/branding'));
+app.use((req, res, next) => {
+  res.locals.faviconVersion = BrandingService.version();
+  next();
 });
 
 // 靜態檔案放在 session 前面：載入 css/js 不需要（也不該）建立或更新 session

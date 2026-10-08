@@ -19,6 +19,7 @@ const MIGRATIONS = [
   'migrate_0004_m365_sso',
   'migrate_0005_password_policy',
   'migrate_0006_backup_and_activity',
+  'migrate_0007_branding',
 ];
 
 async function run() {
