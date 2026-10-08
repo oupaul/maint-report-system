@@ -3,7 +3,7 @@
 <div class="page-header">
   <h1>資產管理</h1>
   <div class="page-actions">
-    <% if (currentUser && currentUser.role === 'admin') { %>
+    <% if (can('assets.manage')) { %>
       <a href="/assets/new" class="btn btn--primary btn--md">新增資產</a>
     <% } %>
   </div>
@@ -22,7 +22,7 @@
             <th>位置</th>
             <th>識別碼</th>
             <th>狀態</th>
-            <% if (currentUser && currentUser.role === 'admin') { %><th></th><% } %>
+            <% if (can('assets.manage')) { %><th></th><% } %>
           </tr>
         </thead>
         <tbody>
@@ -39,7 +39,7 @@
                   <span class="status-badge status-badge--critical">停用</span>
                 <% } %>
               </td>
-              <% if (currentUser && currentUser.role === 'admin') { %>
+              <% if (can('assets.manage')) { %>
                 <td><a href="/assets/<%= a.id %>/edit">編輯</a></td>
               <% } %>
             </tr>

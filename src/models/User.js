@@ -17,22 +17,31 @@ const User = {
   },
 
   findAll() {
-    return db.prepare('SELECT * FROM users ORDER BY created_at ASC').all();
+    return db.prepare(
+      `SELECT u.*, g.name AS group_name FROM users u
+       LEFT JOIN permission_groups g ON g.id = u.group_id
+       ORDER BY u.created_at ASC`
+    ).all();
+  },
+
+  // 目前還啟用中的管理員人數（系統一定要保留至少一位，不然沒有人能管理使用者與系統設定）
+  countActiveAdmins() {
+    return db.prepare("SELECT COUNT(*) AS n FROM users WHERE role = 'admin' AND is_active = 1").get().n;
   },
 
   // 管理員代建的帳號，密碼是管理員設定的、本人不是自己選的，第一次登入強制改密碼
-  create({ username, password_hash, display_name, role, m365_email }) {
+  create({ username, password_hash, display_name, role, m365_email, group_id }) {
     const result = db.prepare(
-      `INSERT INTO users (username, password_hash, display_name, role, m365_email, is_active, must_change_password, created_at)
-       VALUES (?, ?, ?, ?, ?, 1, 1, ?)`
-    ).run(username, password_hash, display_name || null, role, (m365_email || '').trim() || null, nowTaipei());
+      `INSERT INTO users (username, password_hash, display_name, role, m365_email, group_id, is_active, must_change_password, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, 1, 1, ?)`
+    ).run(username, password_hash, display_name || null, role, (m365_email || '').trim() || null, group_id || null, nowTaipei());
     return User.findById(result.lastInsertRowid);
   },
 
-  update(id, { display_name, role, is_active, m365_email }) {
+  update(id, { display_name, role, is_active, m365_email, group_id }) {
     db.prepare(
-      `UPDATE users SET display_name = ?, role = ?, is_active = ?, m365_email = ? WHERE id = ?`
-    ).run(display_name || null, role, is_active ? 1 : 0, (m365_email || '').trim() || null, id);
+      `UPDATE users SET display_name = ?, role = ?, is_active = ?, m365_email = ?, group_id = ? WHERE id = ?`
+    ).run(display_name || null, role, is_active ? 1 : 0, (m365_email || '').trim() || null, group_id || null, id);
     return User.findById(id);
   },
 

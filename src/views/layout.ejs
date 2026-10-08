@@ -18,16 +18,20 @@
       <a href="/" class="<%= currentPath === '/' ? 'is-active' : '' %>">儀表板</a>
       <a href="/batches" class="<%= currentPath && currentPath.startsWith('/batches') ? 'is-active' : '' %>">巡檢批次</a>
       <a href="/assets" class="<%= currentPath && currentPath.startsWith('/assets') ? 'is-active' : '' %>">資產管理</a>
-      <% if (currentUser && currentUser.role === 'admin') {
+      <% if (currentUser) {
+        const isAdmin = currentUser.role === 'admin';
+        // 每個項目只在使用者真的有權限進去時才列出（管理員全部都有；技術人員看所屬群組的權限）
         const adminLinks = [
-          ['/users', '使用者管理'],
-          ['/admin/categories', '設備類型'],
-          ['/admin/status', '系統狀態'],
-          ['/admin/backups', '備份管理'],
-          ['/admin/branding', '外觀設定'],
-        ];
+          ['/users', '使用者管理', isAdmin],
+          ['/admin/groups', '權限群組', isAdmin],
+          ['/admin/categories', '設備類型', can('categories.manage')],
+          ['/admin/status', '系統狀態', isAdmin],
+          ['/admin/backups', '備份管理', isAdmin],
+          ['/admin/branding', '外觀設定', isAdmin],
+        ].filter(([, , visible]) => visible);
         const adminActive = adminLinks.some(([href]) => currentPath && currentPath.startsWith(href));
       %>
+        <% if (adminLinks.length > 0) { %>
         <%# 管理功能收進「系統管理」選單（純 HTML <details>，不需要 JavaScript 就能開合；nav-menu.js 只負責點外面/按 Esc 時收起來） %>
         <details class="nav-menu">
           <summary class="<%= adminActive ? 'is-active' : '' %>">系統管理</summary>
@@ -37,6 +41,7 @@
             <% }) %>
           </div>
         </details>
+        <% } %>
       <% } %>
     </div>
     <div class="app-nav__user">

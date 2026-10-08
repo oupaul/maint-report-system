@@ -21,6 +21,7 @@ const MIGRATIONS = [
   'migrate_0006_backup_and_activity',
   'migrate_0007_branding',
   'migrate_0008_asset_categories',
+  'migrate_0009_permission_groups',
 ];
 
 async function run() {

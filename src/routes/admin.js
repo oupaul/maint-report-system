@@ -4,7 +4,7 @@ const multer = require('multer');
 const router = express.Router();
 
 const config = require('../config');
-const { requireRole } = require('../middleware/auth');
+const { requireRole, requirePermission } = require('../middleware/auth');
 const User = require('../models/User');
 const BackupService = require('../services/BackupService');
 const HealthService = require('../services/HealthService');
@@ -13,14 +13,19 @@ const BrandingService = require('../services/BrandingService');
 const fmt = require('../utils/format');
 
 // 系統狀態、備份管理只有管理員能看：備份檔裡有完整資料庫（含密碼雜湊）與所有截圖
-router.use(requireRole('admin'));
 router.use((req, res, next) => {
   res.locals.fmt = fmt;
   next();
 });
 
-// 設備類型與檢查項目管理
-router.use('/categories', require('./adminCategories'));
+// 設備類型與檢查項目：管理員，或所屬權限群組有「管理設備類型」權限的人
+router.use('/categories', requirePermission('categories.manage'), require('./adminCategories'));
+
+// 以下全部只有管理員能進（備份檔含完整資料庫與密碼雜湊，群組權限也只有管理員能改）
+router.use(requireRole('admin'));
+
+// 權限群組
+router.use('/groups', require('./adminGroups'));
 
 // 網址只帶固定代碼、不帶任何文字，避免有人做出一個網址讓管理員頁面顯示任意內容
 const FLASH = {

@@ -10,6 +10,8 @@ const SqliteSessionStore = require('./services/SqliteSessionStore');
 const db = require('./models/db');
 const User = require('./models/User');
 const ActivityTracker = require('./services/ActivityTracker');
+const PermissionGroup = require('./models/PermissionGroup');
+const { can } = require('./utils/permissions');
 const BackupService = require('./services/BackupService');
 const HealthService = require('./services/HealthService');
 const BrandingService = require('./services/BrandingService');
@@ -99,10 +101,12 @@ app.use((req, res, next) => {
       if (JSON.stringify(current) !== JSON.stringify(sessionUser)) {
         req.session.user = current;
       }
-      req.user = current;
+      // permissions 每個請求都依資料庫重算、不存進 session：管理員調整群組或權限後立即生效
+      req.user = { ...current, permissions: PermissionGroup.permissionsForUser(fresh) };
     }
   }
   res.locals.currentUser = req.user || null;
+  res.locals.can = (permission) => can(req.user, permission);
   res.locals.currentPath = req.path;
   res.locals.siteName = '維護巡檢報告系統';
   // 全域設定，login.ejs 每個 render 路徑（包含各種錯誤訊息）都要用到，

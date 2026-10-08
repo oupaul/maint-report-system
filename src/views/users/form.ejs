@@ -46,6 +46,16 @@
         <% }) %>
       </select>
     </div>
+    <div class="form-group">
+      <label class="form-label" for="group_id">權限群組（選填）</label>
+      <select class="form-select" id="group_id" name="group_id">
+        <option value="">不屬於任何群組</option>
+        <% groups.forEach(g => { %>
+          <option value="<%= g.id %>" <%= targetUser && Number(targetUser.group_id) === g.id ? 'selected' : '' %>><%= g.name %></option>
+        <% }) %>
+      </select>
+      <p class="form-hint">群組用來替<strong>技術人員</strong>額外開放功能（例如管理設備類型）。管理員本來就擁有所有權限，不需要加入群組。群組在「系統管理 → 權限群組」建立。</p>
+    </div>
     <% if (targetUser && targetUser.id) { %>
       <div class="form-group form-checkbox-row">
         <input type="checkbox" id="is_active" name="is_active" <%= targetUser.is_active ? 'checked' : '' %>>

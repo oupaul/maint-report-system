@@ -15,6 +15,7 @@
           <th>帳號</th>
           <th>顯示名稱</th>
           <th>角色</th>
+          <th>權限群組</th>
           <th>狀態</th>
           <th></th>
         </tr>
@@ -31,6 +32,7 @@
                 <span class="badge">技術人員</span>
               <% } %>
             </td>
+            <td><%= u.role === 'admin' ? '（全部權限）' : (u.group_name || '-') %></td>
             <td>
               <% if (u.is_active) { %>
                 <span class="status-badge status-badge--normal">啟用</span>

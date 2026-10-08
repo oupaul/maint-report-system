@@ -589,3 +589,5 @@ a.is-viewing { font-weight: 600; }
 
 .inline-edit { display: flex; gap: var(--space-2); align-items: center; }
 .inline-edit .form-input { min-width: 12rem; }
+
+.plain-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }

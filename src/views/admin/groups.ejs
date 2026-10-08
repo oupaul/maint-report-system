@@ -1,0 +1,47 @@
+<%- include('../layout', { title: '權限群組' }) %>
+
+<div class="page-header">
+  <h1>權限群組</h1>
+  <div class="page-actions">
+    <a href="/admin/groups/new" class="btn btn--primary btn--md">新增群組</a>
+  </div>
+</div>
+
+<% if (ok) { %><div class="form-success"><%= ok %></div><% } %>
+<% if (error) { %><div class="form-error"><%= error %></div><% } %>
+
+<div class="card">
+  <p class="form-hint">群組用來替<strong>技術人員</strong>額外開放功能：建立群組、勾選它擁有的權限，再到「使用者管理」把人加進群組。<strong>管理員永遠擁有所有權限</strong>，不需要加入群組。權限調整後立即生效，不用重新登入。</p>
+  <% if (groups.length === 0) { %>
+    <div class="empty-state">還沒有任何群組。</div>
+  <% } else { %>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>群組</th><th>權限</th><th>成員</th><th></th></tr></thead>
+        <tbody>
+          <% groups.forEach(g => { %>
+            <tr>
+              <td>
+                <a href="/admin/groups/<%= g.id %>"><strong><%= g.name %></strong></a>
+                <% if (g.description) { %><div class="form-hint"><%= g.description %></div><% } %>
+              </td>
+              <td>
+                <% if (g.permissions.length === 0) { %>
+                  <span class="form-hint">（沒有任何權限）</span>
+                <% } else { %>
+                  <% g.permissions.forEach(key => { const p = permissions.find(x => x.key === key); %>
+                    <span class="badge"><%= p ? p.label : key %></span>
+                  <% }) %>
+                <% } %>
+              </td>
+              <td><%= g.member_count %> 人</td>
+              <td><a class="btn btn--secondary btn--sm" href="/admin/groups/<%= g.id %>">編輯</a></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>
+
+<%- include('../partials/footer') %>

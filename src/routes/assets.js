@@ -13,7 +13,7 @@ function formData(asset, error) {
   };
 }
 
-const { requireLogin, requireRole } = require('../middleware/auth');
+const { requireLogin, requirePermission } = require('../middleware/auth');
 const Asset = require('../models/Asset');
 const AssetCategory = require('../models/AssetCategory');
 
@@ -22,11 +22,11 @@ router.get('/', requireLogin, (req, res) => {
   res.render('assets/list', { assets, categoryLabels: AssetCategory.labelMap() });
 });
 
-router.get('/new', requireRole('admin'), (req, res) => {
+router.get('/new', requirePermission('assets.manage'), (req, res) => {
   res.render('assets/form', formData(null, null));
 });
 
-router.post('/', requireRole('admin'), (req, res) => {
+router.post('/', requirePermission('assets.manage'), (req, res) => {
   const { name, category, location, identifier, notes } = req.body;
 
   if (!name || !AssetCategory.isSelectable(category)) {
@@ -37,7 +37,7 @@ router.post('/', requireRole('admin'), (req, res) => {
   res.redirect(`/assets/${asset.id}/edit`);
 });
 
-router.get('/:id/edit', requireRole('admin'), (req, res) => {
+router.get('/:id/edit', requirePermission('assets.manage'), (req, res) => {
   const asset = Asset.findById(req.params.id);
   if (!asset) {
     return res.status(404).render('error', { title: '找不到資產', message: '找不到指定的資產' });
@@ -45,7 +45,7 @@ router.get('/:id/edit', requireRole('admin'), (req, res) => {
   res.render('assets/form', formData(asset, null));
 });
 
-router.post('/:id/edit', requireRole('admin'), (req, res) => {
+router.post('/:id/edit', requirePermission('assets.manage'), (req, res) => {
   const asset = Asset.findById(req.params.id);
   if (!asset) {
     return res.status(404).render('error', { title: '找不到資產', message: '找不到指定的資產' });
