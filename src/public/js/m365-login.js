@@ -15,6 +15,18 @@
     });
   }
 
+  // 上次登入如果中途被放棄（關掉分頁、按上一頁、callback 頁沒跑完），MSAL 留在
+  // sessionStorage 的「登入進行中」旗標不會被清掉，之後每次重試都會被 MSAL 自己擋下來
+  // （interaction_in_progress）。開始新的登入、或這一輪登入失敗時，先把這類旗標清掉，
+  // 確保使用者永遠有辦法重新嘗試。
+  function clearStaleInteraction() {
+    try {
+      Object.keys(window.sessionStorage).forEach(function (key) {
+        if (key.indexOf('interaction.status') !== -1) window.sessionStorage.removeItem(key);
+      });
+    } catch (e) { /* sessionStorage 不可用就算了 */ }
+  }
+
   function showError(el, message) {
     el.textContent = message;
     el.hidden = false;
@@ -31,6 +43,7 @@
         return;
       }
       btn.disabled = true;
+      clearStaleInteraction();
       try {
         const app = newClient(loginBox);
         await app.initialize();
@@ -48,6 +61,7 @@
     const errBox = document.getElementById('m365-callback-error');
     const back = document.getElementById('m365-back');
     function fail(message) {
+      clearStaleInteraction();
       status.hidden = true;
       showError(errBox, message);
       back.hidden = false;
