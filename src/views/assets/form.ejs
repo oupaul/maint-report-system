@@ -16,11 +16,20 @@
     </div>
     <div class="form-group">
       <label class="form-label" for="category">類別</label>
+      <% if (categoryLocked) { %>
+        <%# 已有檢查紀錄的設備不能改類型（disabled 的欄位不會送出，所以另外帶一個隱藏欄位） %>
+        <input type="hidden" name="category" value="<%= asset.category %>">
+        <select class="form-select" id="category" disabled>
+          <option><%= categoryLabels[asset.category] || asset.category %></option>
+        </select>
+        <p class="form-hint">這個設備已經有檢查紀錄，不能變更類型（舊紀錄對應的是原本類型的檢查項目）。</p>
+      <% } else { %>
       <select class="form-select" id="category" name="category" required>
         <% categories.forEach(c => { %>
           <option value="<%= c %>" <%= asset && asset.category === c ? 'selected' : '' %>><%= categoryLabels[c] %></option>
         <% }) %>
       </select>
+      <% } %>
     </div>
     <div class="form-group">
       <label class="form-label" for="location">位置</label>

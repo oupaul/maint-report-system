@@ -1,10 +1,5 @@
-const ASSET_CATEGORIES = ['pc', 'server', 'nas', 'network_device'];
-const ASSET_CATEGORY_LABELS = {
-  pc: 'PC',
-  server: 'Server',
-  nas: 'NAS',
-  network_device: '網路設備',
-};
+// 設備類型（與各類型的檢查項目）已改由管理員在「系統管理 → 設備類型」自訂，存在資料庫的
+// asset_categories / checklist_items，不再寫死在這裡（見 models/AssetCategory.js）。
 const ITEM_STATUSES = ['normal', 'warning', 'critical'];
 const USER_ROLES = ['admin', 'technician'];
 const SIGNATURE_ROLES = ['engineer', 'supervisor'];
@@ -12,10 +7,6 @@ const SIGNATURE_ROLE_LABELS = {
   engineer: '工程師',
   supervisor: '主管',
 };
-
-function isValidCategory(category) {
-  return ASSET_CATEGORIES.includes(category);
-}
 
 function isValidStatus(status) {
   return ITEM_STATUSES.includes(status);
@@ -30,13 +21,10 @@ function isValidSignatureRole(role) {
 }
 
 module.exports = {
-  ASSET_CATEGORIES,
-  ASSET_CATEGORY_LABELS,
   ITEM_STATUSES,
   USER_ROLES,
   SIGNATURE_ROLES,
   SIGNATURE_ROLE_LABELS,
-  isValidCategory,
   isValidStatus,
   isValidRole,
   isValidSignatureRole,

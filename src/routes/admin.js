@@ -19,6 +19,9 @@ router.use((req, res, next) => {
   next();
 });
 
+// 設備類型與檢查項目管理
+router.use('/categories', require('./adminCategories'));
+
 // 網址只帶固定代碼、不帶任何文字，避免有人做出一個網址讓管理員頁面顯示任意內容
 const FLASH = {
   ok: {

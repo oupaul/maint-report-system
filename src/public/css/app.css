@@ -548,3 +548,44 @@ p { margin: 0 0 var(--space-4) 0; }
 }
 .photo-thumb-list__item a.is-viewing .screenshot-thumb { outline: 2px solid var(--color-primary); outline-offset: 1px; }
 a.is-viewing { font-weight: 600; }
+
+/* 導覽列「系統管理」選單 */
+.nav-menu { position: relative; }
+.nav-menu > summary {
+  list-style: none;
+  cursor: pointer;
+  color: #F1F5F9;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  opacity: 0.85;
+  user-select: none;
+}
+.nav-menu > summary::-webkit-details-marker { display: none; }
+.nav-menu > summary::after { content: ' ▾'; font-size: 0.8em; }
+.nav-menu[open] > summary,
+.nav-menu > summary:hover,
+.nav-menu > summary.is-active { opacity: 1; color: var(--color-primary); }
+.nav-menu__panel {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  left: 0;
+  z-index: 20;
+  min-width: 10rem;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-text);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+.nav-menu__panel a { padding: var(--space-2) var(--space-4); border-radius: var(--radius-sm); white-space: nowrap; }
+.nav-menu__panel a:hover { background: rgba(255, 255, 255, 0.1); }
+
+@media (max-width: 768px) {
+  /* 手機寬度：選單展開時直接把連結推開排在下面，不用浮動面板（避免超出畫面） */
+  .nav-menu__panel { position: static; box-shadow: none; border: none; padding: var(--space-2) 0 0; background: transparent; }
+}
+
+.inline-edit { display: flex; gap: var(--space-2); align-items: center; }
+.inline-edit .form-input { min-width: 12rem; }

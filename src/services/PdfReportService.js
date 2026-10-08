@@ -7,7 +7,8 @@ const dayjs = require('dayjs');
 const { nowTaipei } = require('../utils/time');
 
 const statusColors = require('../utils/statusColors');
-const { ASSET_CATEGORY_LABELS, SIGNATURE_ROLES, SIGNATURE_ROLE_LABELS } = require('../utils/validators');
+const { SIGNATURE_ROLES, SIGNATURE_ROLE_LABELS } = require('../utils/validators');
+const AssetCategory = require('../models/AssetCategory');
 
 const SIGNATURE_SECTION_HEIGHT = 100; // 標題 + 兩欄簽名（含圖片、簽署人、時間）實際需要的高度上限
 const SIGNATURE_IMG_MAX_HEIGHT = 40;
@@ -332,6 +333,8 @@ function drawSignatureSection(doc, signaturesByRole, fonts) {
  * @param {import('stream').Writable} outputStream 目標輸出串流（例如 Express res）
  */
 async function generateBatchReport({ batch, assets, itemsByAssetId, signaturesByRole }, outputStream) {
+  // 含已停用的類型：舊報告仍要顯示得出類型名稱
+  const categoryLabels = AssetCategory.labelMap();
   const doc = new PDFDocument({ size: 'A4', margin: 50, bufferPages: true });
   doc.pipe(outputStream);
 
@@ -365,7 +368,7 @@ async function generateBatchReport({ batch, assets, itemsByAssetId, signaturesBy
     doc.text(`${asset.name}`, doc.page.margins.left, doc.y);
     doc.font(fonts.regular).fontSize(9).fillColor('#64748B');
     doc.text(
-      `類別：${ASSET_CATEGORY_LABELS[asset.category] || asset.category}` +
+      `類別：${categoryLabels[asset.category] || asset.category}` +
       (asset.location ? `　位置：${asset.location}` : '') +
       (asset.identifier ? `　識別碼：${asset.identifier}` : '')
     );

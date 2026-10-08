@@ -1,6 +1,11 @@
 const db = require('./db');
 const { nowTaipei } = require('../utils/time');
 
+function currentLabel(checklistItemId) {
+  const ci = db.prepare('SELECT label FROM checklist_items WHERE id = ?').get(checklistItemId);
+  return ci ? ci.label : null;
+}
+
 const InspectionItem = {
   findById(id) {
     return db.prepare('SELECT * FROM inspection_items WHERE id = ?').get(id);
@@ -9,12 +14,15 @@ const InspectionItem = {
   findByBatch(batchId) {
     return db.prepare(
       `SELECT ii.*, a.name AS asset_name, a.category AS asset_category,
-              ci.code AS checklist_code, ci.label AS checklist_label, ci.sort_order
+              ci.code AS checklist_code,
+              -- 項目名稱用「記錄當下存下的快照」：管理員之後改名，不會回頭改掉已經寫好的報告
+              COALESCE(ii.item_label, ci.label) AS checklist_label, ci.sort_order
        FROM inspection_items ii
        JOIN assets a ON a.id = ii.asset_id
        JOIN checklist_items ci ON ci.id = ii.checklist_item_id
+       LEFT JOIN asset_categories ac ON ac.code = a.category
        WHERE ii.batch_id = ?
-       ORDER BY a.category ASC, a.name ASC, ci.sort_order ASC`
+       ORDER BY ac.sort_order ASC, a.category ASC, a.name ASC, ci.sort_order ASC`
     ).all(batchId);
   },
 
@@ -37,12 +45,14 @@ const InspectionItem = {
       db.prepare(
         `UPDATE inspection_items SET
            status = ?, value_text = ?, note = ?,
-           source = ?, source_ref = ?, recorded_by = ?, recorded_at = ?
+           source = ?, source_ref = ?, recorded_by = ?, recorded_at = ?,
+           item_label = ?
          WHERE id = ?`
       ).run(
         status, value_text || null, note || null,
         source || 'manual', source_ref || null, recorded_by || null,
         nowTaipei(),
+        currentLabel(checklist_item_id),
         existing.id
       );
       return InspectionItem.findById(existing.id);
@@ -51,11 +61,12 @@ const InspectionItem = {
     const result = db.prepare(
       `INSERT INTO inspection_items (
          batch_id, asset_id, checklist_item_id, status, value_text, note,
-         source, source_ref, recorded_by, recorded_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         source, source_ref, recorded_by, recorded_at, item_label
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       batch_id, asset_id, checklist_item_id, status, value_text || null, note || null,
-      source || 'manual', source_ref || null, recorded_by || null, nowTaipei()
+      source || 'manual', source_ref || null, recorded_by || null, nowTaipei(),
+      currentLabel(checklist_item_id)
     );
     return InspectionItem.findById(result.lastInsertRowid);
   },

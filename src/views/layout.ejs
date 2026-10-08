@@ -18,11 +18,25 @@
       <a href="/" class="<%= currentPath === '/' ? 'is-active' : '' %>">儀表板</a>
       <a href="/batches" class="<%= currentPath && currentPath.startsWith('/batches') ? 'is-active' : '' %>">巡檢批次</a>
       <a href="/assets" class="<%= currentPath && currentPath.startsWith('/assets') ? 'is-active' : '' %>">資產管理</a>
-      <% if (currentUser && currentUser.role === 'admin') { %>
-        <a href="/users" class="<%= currentPath && currentPath.startsWith('/users') ? 'is-active' : '' %>">使用者管理</a>
-        <a href="/admin/status" class="<%= currentPath && currentPath.startsWith('/admin/status') ? 'is-active' : '' %>">系統狀態</a>
-        <a href="/admin/backups" class="<%= currentPath && currentPath.startsWith('/admin/backups') ? 'is-active' : '' %>">備份管理</a>
-        <a href="/admin/branding" class="<%= currentPath && currentPath.startsWith('/admin/branding') ? 'is-active' : '' %>">外觀設定</a>
+      <% if (currentUser && currentUser.role === 'admin') {
+        const adminLinks = [
+          ['/users', '使用者管理'],
+          ['/admin/categories', '設備類型'],
+          ['/admin/status', '系統狀態'],
+          ['/admin/backups', '備份管理'],
+          ['/admin/branding', '外觀設定'],
+        ];
+        const adminActive = adminLinks.some(([href]) => currentPath && currentPath.startsWith(href));
+      %>
+        <%# 管理功能收進「系統管理」選單（純 HTML <details>，不需要 JavaScript 就能開合；nav-menu.js 只負責點外面/按 Esc 時收起來） %>
+        <details class="nav-menu">
+          <summary class="<%= adminActive ? 'is-active' : '' %>">系統管理</summary>
+          <div class="nav-menu__panel">
+            <% adminLinks.forEach(([href, label]) => { %>
+              <a href="<%= href %>" class="<%= currentPath && currentPath.startsWith(href) ? 'is-active' : '' %>"><%= label %></a>
+            <% }) %>
+          </div>
+        </details>
       <% } %>
     </div>
     <div class="app-nav__user">

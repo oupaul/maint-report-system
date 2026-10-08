@@ -40,8 +40,9 @@ const InspectionBatch = {
     return db.prepare(
       `SELECT a.* FROM inspection_batch_assets ba
        JOIN assets a ON a.id = ba.asset_id
+       LEFT JOIN asset_categories ac ON ac.code = a.category
        WHERE ba.batch_id = ?
-       ORDER BY a.category ASC, a.name ASC`
+       ORDER BY ac.sort_order ASC, a.category ASC, a.name ASC`
     ).all(batchId);
   },
 };

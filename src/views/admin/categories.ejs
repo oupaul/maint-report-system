@@ -1,0 +1,77 @@
+<%- include('../layout', { title: '設備類型' }) %>
+
+<div class="page-header">
+  <h1>設備類型</h1>
+</div>
+
+<% if (ok) { %><div class="form-success"><%= ok %></div><% } %>
+<% if (error) { %><div class="form-error"><%= error %></div><% } %>
+
+<div class="card">
+  <p class="form-hint">管理設備有哪些類型，以及每個類型建立巡檢時要檢查哪些項目。<strong>用過的類型與項目只能停用、不能刪除</strong>，停用後新增設備與填寫時不會再出現，但舊資料與舊報告照常顯示。</p>
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr><th>類型</th><th>檢查項目</th><th>設備數</th><th>狀態</th><th></th></tr>
+      </thead>
+      <tbody>
+        <% categories.forEach((c, i) => { %>
+          <tr>
+            <td><a href="/admin/categories/<%= c.id %>"><strong><%= c.label %></strong></a></td>
+            <td><%= c.usage.checklist %> 項<% if (c.usage.checklistAll > c.usage.checklist) { %> <span class="form-hint">（另有 <%= c.usage.checklistAll - c.usage.checklist %> 項已停用）</span><% } %></td>
+            <td><%= c.usage.assets %></td>
+            <td>
+              <% if (c.is_active) { %><span class="status-badge status-badge--normal">啟用中</span>
+              <% } else { %><span class="status-badge status-badge--warning">已停用</span><% } %>
+            </td>
+            <td>
+              <div class="page-actions">
+                <form method="POST" action="/admin/categories/<%= c.id %>/move">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <input type="hidden" name="dir" value="up">
+                  <button type="submit" class="btn btn--secondary btn--sm" <%= i === 0 ? 'disabled' : '' %> title="往上移">↑</button>
+                </form>
+                <form method="POST" action="/admin/categories/<%= c.id %>/move">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <input type="hidden" name="dir" value="down">
+                  <button type="submit" class="btn btn--secondary btn--sm" <%= i === categories.length - 1 ? 'disabled' : '' %> title="往下移">↓</button>
+                </form>
+                <a class="btn btn--secondary btn--sm" href="/admin/categories/<%= c.id %>">編輯</a>
+                <form method="POST" action="/admin/categories/<%= c.id %>/toggle" <% if (c.is_active) { %>data-confirm="停用「<%= c.label %>」後，新增設備時就不能再選這個類型（既有設備與舊報告不受影響）。確定要停用嗎？"<% } %>>
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <button type="submit" class="btn btn--secondary btn--sm"><%= c.is_active ? '停用' : '啟用' %></button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <h2>新增類型</h2>
+  <form method="POST" action="/admin/categories">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <div class="checklist-row__grid">
+      <div class="form-group">
+        <label class="form-label" for="label">類型名稱</label>
+        <input class="form-input" type="text" id="label" name="label" maxlength="<%= maxLabel %>" value="<%= formLabel %>" placeholder="例如：印表機、UPS、防火牆" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="copy_from">複製檢查項目自（選填）</label>
+        <select class="form-select" id="copy_from" name="copy_from">
+          <option value="">不複製，建立後再自己新增</option>
+          <% categories.forEach(c => { %>
+            <option value="<%= c.code %>"><%= c.label %>（<%= c.usage.checklist %> 項）</option>
+          <% }) %>
+        </select>
+      </div>
+    </div>
+    <button type="submit" class="btn btn--primary btn--md">新增類型</button>
+  </form>
+</div>
+
+<%- include('../partials/footer') %>

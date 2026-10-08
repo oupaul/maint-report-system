@@ -1,0 +1,124 @@
+<%- include('../layout', { title: '設備類型：' + category.label }) %>
+
+<div class="page-header">
+  <h1><%= category.label %></h1>
+  <div class="page-actions">
+    <a href="/admin/categories" class="btn btn--secondary btn--md">回到設備類型</a>
+  </div>
+</div>
+
+<% if (ok) { %><div class="form-success"><%= ok %></div><% } %>
+<% if (error) { %><div class="form-error"><%= error %></div><% } %>
+
+<div class="card">
+  <h2>類型名稱</h2>
+  <form method="POST" action="/admin/categories/<%= category.id %>/rename">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <div class="form-group">
+      <label class="form-label" for="label">名稱</label>
+      <input class="form-input" type="text" id="label" name="label" maxlength="<%= maxLabel %>" value="<%= form.label !== undefined ? form.label : category.label %>" required>
+      <p class="form-hint">目前有 <%= usage.assets %> 個設備使用這個類型。改名稱會同步反映在所有設備與報告上（類型名稱不做快照）。</p>
+    </div>
+    <button type="submit" class="btn btn--primary btn--sm">儲存名稱</button>
+  </form>
+  <% if (deletable) { %>
+    <form method="POST" action="/admin/categories/<%= category.id %>/delete" data-confirm="確定要刪除類型「<%= category.label %>」與它的所有檢查項目嗎？這個類型從未使用過，刪除後無法復原。" style="margin-top: var(--space-4);">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button type="submit" class="btn btn--secondary btn--sm">刪除這個類型</button>
+      <span class="form-hint">（沒有任何設備與檢查紀錄，才能刪除）</span>
+    </form>
+  <% } else { %>
+    <p class="form-hint" style="margin-top: var(--space-4);">這個類型已經有設備或檢查紀錄，不能刪除；不想再使用的話，請回上一頁「停用」。</p>
+  <% } %>
+</div>
+
+<div class="card">
+  <h2>檢查項目（<%= items.filter(i => i.is_active).length %> 項啟用中）</h2>
+  <p class="form-hint">建立巡檢批次時，每個這個類型的設備都會依序帶出這些項目。<strong>改名稱只影響之後的記錄</strong>：已經寫好的報告維持當時的項目名稱。已有檢查紀錄的項目只能停用，不能刪除。</p>
+  <% if (itemError) { %><div class="form-error"><%= itemError %></div><% } %>
+
+  <% if (items.length === 0) { %>
+    <div class="empty-state">這個類型還沒有檢查項目，請在下方新增。</div>
+  <% } else { %>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr><th>名稱</th><th>狀態</th><th>已記錄</th><th></th></tr>
+        </thead>
+        <tbody>
+          <% items.forEach((item, i) => { %>
+            <tr>
+              <td>
+                <form method="POST" action="/admin/categories/<%= category.id %>/items/<%= item.id %>/rename" class="inline-edit">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <input class="form-input" type="text" name="label" maxlength="<%= maxItemLabel %>" value="<%= item.label %>" required aria-label="檢查項目名稱">
+                  <button type="submit" class="btn btn--secondary btn--sm">儲存</button>
+                </form>
+              </td>
+              <td>
+                <% if (item.is_active) { %><span class="status-badge status-badge--normal">啟用中</span>
+                <% } else { %><span class="status-badge status-badge--warning">已停用</span><% } %>
+              </td>
+              <td><%= item.records %> 筆</td>
+              <td>
+                <div class="page-actions">
+                  <form method="POST" action="/admin/categories/<%= category.id %>/items/<%= item.id %>/move">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <input type="hidden" name="dir" value="up">
+                    <button type="submit" class="btn btn--secondary btn--sm" <%= i === 0 ? 'disabled' : '' %> title="往上移">↑</button>
+                  </form>
+                  <form method="POST" action="/admin/categories/<%= category.id %>/items/<%= item.id %>/move">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <input type="hidden" name="dir" value="down">
+                    <button type="submit" class="btn btn--secondary btn--sm" <%= i === items.length - 1 ? 'disabled' : '' %> title="往下移">↓</button>
+                  </form>
+                  <form method="POST" action="/admin/categories/<%= category.id %>/items/<%= item.id %>/toggle">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button type="submit" class="btn btn--secondary btn--sm"><%= item.is_active ? '停用' : '啟用' %></button>
+                  </form>
+                  <% if (item.records === 0) { %>
+                    <form method="POST" action="/admin/categories/<%= category.id %>/items/<%= item.id %>/delete" data-confirm="確定要刪除檢查項目「<%= item.label %>」嗎？這個項目從未被記錄過，刪除後無法復原。">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <button type="submit" class="btn btn--secondary btn--sm">刪除</button>
+                    </form>
+                  <% } %>
+                </div>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>
+
+<div class="card">
+  <h2>新增檢查項目</h2>
+  <form method="POST" action="/admin/categories/<%= category.id %>/items">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <div class="form-group">
+      <label class="form-label" for="item_label">項目名稱</label>
+      <input class="form-input" type="text" id="item_label" name="label" maxlength="<%= maxItemLabel %>" value="<%= form.itemLabel || '' %>" placeholder="例如：電源供應狀態、列印量、韌體版本" required>
+    </div>
+    <button type="submit" class="btn btn--primary btn--md">新增項目</button>
+  </form>
+
+  <% if (otherCategories.length > 0) { %>
+    <hr style="border: none; border-top: 1px solid var(--color-border); margin: var(--space-6) 0;">
+    <form method="POST" action="/admin/categories/<%= category.id %>/items/copy">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <div class="form-group">
+        <label class="form-label" for="copy_from">從其他類型複製檢查項目</label>
+        <select class="form-select" id="copy_from" name="copy_from">
+          <% otherCategories.forEach(c => { %>
+            <option value="<%= c.code %>"><%= c.label %></option>
+          <% }) %>
+        </select>
+        <p class="form-hint">只會複製對方「啟用中」的項目，這個類型已經有同名項目的會跳過。</p>
+      </div>
+      <button type="submit" class="btn btn--secondary btn--md">複製項目</button>
+    </form>
+  <% } %>
+</div>
+
+<%- include('../partials/footer') %>

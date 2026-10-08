@@ -20,6 +20,7 @@ const MIGRATIONS = [
   'migrate_0005_password_policy',
   'migrate_0006_backup_and_activity',
   'migrate_0007_branding',
+  'migrate_0008_asset_categories',
 ];
 
 async function run() {
@@ -56,6 +57,21 @@ async function run() {
     console.log('');
   }
 
+  // 升級既有資料庫之前先留一份快照（用 SQLite 線上備份 API，含尚未合併的 WAL 內容）。
+  // migration 萬一出問題或事後發現不對，可以直接把這個檔案放回 data/maint_report.db。
+  // 全新安裝（還沒有任何已執行的 migration）沒有資料可保護，不用留。只保留最近 5 份。
+  if (done.size > 0) {
+    const snapDir = path.join(DATA_DIR, 'pre-migrate-snapshots');
+    fs.mkdirSync(snapDir, { recursive: true, mode: 0o700 });
+    const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
+    const snapPath = path.join(snapDir, `maint_report_${stamp}.db`);
+    await db.backup(snapPath);
+    fs.chmodSync(snapPath, 0o600);
+    console.log(`已先備份資料庫：${snapPath}`);
+    const old = fs.readdirSync(snapDir).filter(f => /^maint_report_\d{14}\.db$/.test(f)).sort().reverse().slice(5);
+    old.forEach(f => fs.rmSync(path.join(snapDir, f), { force: true }));
+  }
+
   let success = 0;
   let failed = 0;
   const failedList = [];
@@ -78,6 +94,11 @@ async function run() {
     // 個別 migration 可能是 async（例如需要 argon2 hash 密碼），
     // better-sqlite3 的 db.transaction() 只支援同步 callback，
     // 因此這裡手動用 BEGIN/COMMIT/ROLLBACK 包裹，允許 fn 回傳 Promise。
+    // 需要「重建資料表」的 migration（SQLite 無法直接修改 CHECK 約束）要暫時關閉外鍵檢查，
+    // 而這個 PRAGMA 在交易內無效，所以必須在 BEGIN 之前設定（SQLite 官方建議的作法），
+    // migration 自己負責在 COMMIT 前用 PRAGMA foreign_key_check 確認沒有破壞關聯。
+    const needsFkOff = migration.disableForeignKeys === true;
+    if (needsFkOff) db.pragma('foreign_keys = OFF');
     db.exec('BEGIN');
     try {
       await fn(db);
@@ -90,6 +111,8 @@ async function run() {
       console.error(`[錯誤] ${name} 執行失敗: ${err.message}`);
       failed++;
       failedList.push(name);
+    } finally {
+      if (needsFkOff) db.pragma('foreign_keys = ON');
     }
   }
 

@@ -13,8 +13,9 @@ const ChecklistItem = require('../models/ChecklistItem');
 const Asset = require('../models/Asset');
 const ImageService = require('../services/ImageService');
 const statusColors = require('../utils/statusColors');
+const AssetCategory = require('../models/AssetCategory');
 const {
-  ASSET_CATEGORIES, ASSET_CATEGORY_LABELS, ITEM_STATUSES, isValidStatus, isValidCategory,
+  ITEM_STATUSES, isValidStatus,
   SIGNATURE_ROLES, SIGNATURE_ROLE_LABELS, isValidSignatureRole,
 } = require('../utils/validators');
 const config = require('../config');
@@ -28,8 +29,8 @@ router.get('/new', requireLogin, (req, res) => {
   const assets = Asset.findAll();
   res.render('batches/new', {
     assets,
-    categories: ASSET_CATEGORIES,
-    categoryLabels: ASSET_CATEGORY_LABELS,
+    categories: AssetCategory.selectableCodes(),
+    categoryLabels: AssetCategory.labelMap(),
     error: null,
     formValues: null,
   });
@@ -55,7 +56,7 @@ router.post('/new', requireLogin, (req, res) => {
   for (let i = 0; i < newNames.length; i++) {
     const name = (newNames[i] || '').trim();
     const category = newCategories[i];
-    if (!name || !isValidCategory(category)) continue; // 空白列直接跳過，不當成錯誤
+    if (!name || !AssetCategory.isSelectable(category)) continue; // 空白列直接跳過，不當成錯誤
     const asset = Asset.create({ name, category, location: (newLocations[i] || '').trim() });
     createdAssetIds.push(asset.id);
   }
@@ -66,8 +67,8 @@ router.post('/new', requireLogin, (req, res) => {
     const assets = Asset.findAll();
     return res.status(400).render('batches/new', {
       assets,
-      categories: ASSET_CATEGORIES,
-      categoryLabels: ASSET_CATEGORY_LABELS,
+      categories: AssetCategory.selectableCodes(),
+      categoryLabels: AssetCategory.labelMap(),
       error: '請輸入標題、日期，並至少新增或勾選一項設備',
       formValues: req.body,
     });
@@ -104,7 +105,9 @@ function buildEntryData(batchId) {
   }
 
   const assetSections = assets.map(asset => {
-    const checklistItems = ChecklistItem.findByCategory(asset.category);
+    // 啟用中的項目一定列出；已停用的項目只有「這個設備在這個批次已經有紀錄」時才列出（資料不能憑空消失）
+    const checklistItems = ChecklistItem.findByCategory(asset.category, { includeInactive: true })
+      .filter(ci => ci.is_active || itemsByAssetAndChecklist.has(`${asset.id}:${ci.id}`));
     const rows = checklistItems.map(ci => {
       const existing = itemsByAssetAndChecklist.get(`${asset.id}:${ci.id}`);
       const photos = existing ? (photosByItemId.get(existing.id) || []) : [];
@@ -129,8 +132,8 @@ router.get('/:id/entry', requireLogin, (req, res) => {
     batch: data.batch,
     assetSections: data.assetSections,
     availableAssets: data.availableAssets,
-    categories: ASSET_CATEGORIES,
-    categoryLabels: ASSET_CATEGORY_LABELS,
+    categories: AssetCategory.selectableCodes(),
+    categoryLabels: AssetCategory.labelMap(),
     statuses: ITEM_STATUSES,
     statusColors,
     addAssetError: null,
@@ -161,7 +164,7 @@ router.post('/:id/assets', requireLogin, (req, res) => {
   for (let i = 0; i < newNames.length; i++) {
     const name = (newNames[i] || '').trim();
     const category = newCategories[i];
-    if (!name || !isValidCategory(category)) continue;
+    if (!name || !AssetCategory.isSelectable(category)) continue;
     const asset = Asset.create({ name, category, location: (newLocations[i] || '').trim() });
     createdAssetIds.push(asset.id);
   }
@@ -174,8 +177,8 @@ router.post('/:id/assets', requireLogin, (req, res) => {
       batch: data.batch,
       assetSections: data.assetSections,
       availableAssets: data.availableAssets,
-      categories: ASSET_CATEGORIES,
-      categoryLabels: ASSET_CATEGORY_LABELS,
+      categories: AssetCategory.selectableCodes(),
+      categoryLabels: AssetCategory.labelMap(),
       statuses: ITEM_STATUSES,
       statusColors,
       addAssetError: '請至少新增或勾選一項設備',
@@ -310,7 +313,7 @@ router.get('/:id', requireLogin, (req, res) => {
     batch,
     assets,
     itemsByAssetId,
-    categoryLabels: ASSET_CATEGORY_LABELS,
+    categoryLabels: AssetCategory.labelMap(),
     statusColors,
     signatureRoles: SIGNATURE_ROLES,
     signatureRoleLabels: SIGNATURE_ROLE_LABELS,

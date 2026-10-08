@@ -6,11 +6,18 @@ const Asset = {
     return db.prepare('SELECT * FROM assets WHERE id = ?').get(id);
   },
 
+  // 依類型管理頁設定的排序顯示（類型排序 → 名稱）
   findAll({ includeInactive = false } = {}) {
-    if (includeInactive) {
-      return db.prepare('SELECT * FROM assets ORDER BY category ASC, name ASC').all();
-    }
-    return db.prepare('SELECT * FROM assets WHERE is_active = 1 ORDER BY category ASC, name ASC').all();
+    return db.prepare(
+      `SELECT a.* FROM assets a LEFT JOIN asset_categories ac ON ac.code = a.category
+       ${includeInactive ? '' : 'WHERE a.is_active = 1'}
+       ORDER BY ac.sort_order ASC, a.category ASC, a.name ASC`
+    ).all();
+  },
+
+  // 已經有檢查紀錄的資產不能改類型：舊紀錄是對應「原本類型」的檢查項目，改了類型就對不上
+  hasRecords(id) {
+    return !!db.prepare('SELECT 1 FROM inspection_items WHERE asset_id = ? LIMIT 1').get(id);
   },
 
   findByIds(ids) {
