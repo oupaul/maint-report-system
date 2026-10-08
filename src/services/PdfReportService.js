@@ -333,6 +333,7 @@ function drawApprovalSection(doc, approval, fonts) {
   let estimate = 40;
   for (const r of approval.records) estimate += 16 + (r.comment ? 14 : 0);
   if (doc.y + estimate > doc.page.height - doc.page.margins.bottom) doc.addPage();
+  else doc.moveDown(0.9); // 接在簽名區後面時留一點間距，不要緊貼著上方的簽署人姓名與時間
 
   doc.font(fonts.bold).fontSize(12).fillColor('#1E293B');
   doc.text('簽核紀錄', startX, doc.y);
