@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Microsoft 365 登入 - <%= siteName %></title>
+  <link rel="stylesheet" href="/css/tokens.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <div class="login-shell">
+    <div class="card login-card" style="text-align:center;">
+      <h1><%= siteName %></h1>
+      <p id="m365-status">Microsoft 365 登入處理中，請稍候…</p>
+      <div class="form-error" id="m365-callback-error" hidden></div>
+      <a href="/login" id="m365-back" class="btn btn--secondary btn--md" hidden>回到登入頁</a>
+    </div>
+  </div>
+  <div id="m365-callback" hidden
+       data-client-id="<%= m365.clientId %>"
+       data-tenant-id="<%= m365.tenantId %>"
+       data-redirect-uri="<%= m365.redirectUri %>"
+       data-csrf="<%= csrfToken %>"></div>
+  <script src="/vendor/msal-browser.min.js"></script>
+  <script src="/js/m365-login.js"></script>
+</body>
+</html>

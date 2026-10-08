@@ -146,20 +146,24 @@ sudo /srv/apps/maint-report-system/restore.sh
 
 登入頁可以顯示「使用 Microsoft 365 登入」按鈕，讓使用者用組織的 M365/Azure AD（Entra ID）帳號登入，不用額外記密碼。**帳號密碼登入永遠保留作為備用方式**，兩種方式並存。
 
+### 運作方式（不需要 Client Secret）
+
+與 expense-platform 相同：Azure 端登錄為「**單頁應用程式（SPA）**」，由**瀏覽器**上的 MSAL.js 以 Authorization Code + PKCE 登入，登入完成後把 Microsoft 核發的 ID token 交給伺服器；伺服器用 Microsoft 的公開金鑰驗證簽章，並檢查發行者（租戶）、受眾（Client ID）、有效期限（只收 10 分鐘內簽發的），同一張 token 只能使用一次。主機上沒有任何 M365 機密，Client ID／Tenant ID 也不是機密。
+
 ### 第 1 步：在 Azure Portal 建立 App Registration（需要 Azure/M365 系統管理員權限）
 
 1. 登入 [Azure Portal](https://portal.azure.com) → 搜尋「Microsoft Entra ID」→ 左側選單「App registrations」→「New registration」
 2. 名稱隨意（例如「維護巡檢報告系統」），「Supported account types」選你們組織內部使用即可（單一租戶：`Accounts in this organizational directory only`）
-3. 「Redirect URI」平台選 **Web**，填：`https://<網域>/auth/m365/callback`。Microsoft 只接受 `https://`，唯一的例外是 `http://localhost`，所以用 IP:port 直連（純 HTTP）的部署通常無法登錄，建議前面加反向代理（nginx/Caddy）並設定 HTTPS，同時依[安全機制摘要](#安全機制摘要)設定 `TRUST_PROXY`
+3. 「Redirect URI」平台選 **Single-page application（SPA）**，填：`https://<網域>/auth/m365/callback`。**必須是 HTTPS**（Microsoft 只接受 `https://`，唯一例外是 `http://localhost`；瀏覽器端的 MSAL.js 也只能在 HTTPS 或 localhost 下運作），用 IP:port 直連的純 HTTP 部署請先在前面加反向代理（nginx/Caddy）並設定 HTTPS，同時依[安全機制摘要](#安全機制摘要)設定 `TRUST_PROXY`
 4. 建立完成後，在「Overview」頁記下：
    - **Application (client) ID** → 對應 `M365_CLIENT_ID`
-   - **Directory (tenant) ID** → 對應 `M365_TENANT_ID`
-5. 左側選單「Authentication」→ 最下方「Advanced settings」→「Allow public client flows」切到 **Yes** → Save。**本系統不使用 Client Secret**（以公開用戶端 + PKCE 登入，主機上不必保管任何 M365 機密）；不需要建立 client secret，已經建過的請到「Certificates & secrets」刪除
+   - **Directory (tenant) ID** → 對應 `M365_TENANT_ID`（請填 GUID，不要填網域名稱）
+5. **不需要建立 client secret**，也不用調整「Allow public client flows」；已經建過 secret 的可以到「Certificates & secrets」刪除
 6. 左側選單「API permissions」，預設應該已經有 `User.Read`（Microsoft Graph, Delegated），不用額外設定；本系統只用來確認登入者身分，不會存取信箱、檔案等其他資料
 
 ### 第 2 步：在主機上填入設定值
 
-`deploy.sh` 會自動建立 `/etc/maint-report-system/m365.env`（權限鎖為 `600`，只有服務執行帳號能讀取）並讓 systemd unit 引用它，**不需要手動跑 `systemctl edit`**。這個檔案權限鎖死（`600`），設定值不會出現在所有本機帳號都能讀的 unit 檔案（`644`）裡；目前只有 Client ID／Tenant ID／Redirect URI 三個值，不含任何金鑰。
+`deploy.sh` 會自動建立 `/etc/maint-report-system/m365.env`（權限鎖為 `600`，只有服務執行帳號能讀取）並讓 systemd unit 引用它，**不需要手動跑 `systemctl edit`**。這個檔案權限鎖死（`600`），設定值不會出現在所有本機帳號都能讀的 unit 檔案（`644`）裡；只有 Client ID／Tenant ID／Redirect URI 三個值，不含任何金鑰。
 
 跑過一次 `setup.sh`／`deploy.sh`／`update.sh` 之後（沒設定 M365 也沒關係，這個檔案一律會建立），編輯這個檔案填入第 1 步記下的值：
 
@@ -168,7 +172,7 @@ sudo nano /etc/maint-report-system/m365.env
 ```
 
 把範本裡對應的三行取消註解並填值：
-（從舊版升級、檔案裡還有 `M365_CLIENT_SECRET=` 的，請刪掉那一行——現在會被忽略。另外務必完成上面第 5 步的「Allow public client flows」，否則 Microsoft 會因為沒帶 secret 而拒絕登入。）
+（從舊版升級、檔案裡還有 `M365_CLIENT_SECRET=` 的，請刪掉那一行——現在會被忽略。另外 Azure 的 Redirect URI 要登錄在 **SPA** 平台底下，不是 Web。）
 
 ```
 M365_CLIENT_ID=你的Client-ID

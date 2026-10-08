@@ -49,76 +49,60 @@ router.post('/login', async (req, res, next) => {
   }
 });
 
-// M365（Azure AD / Entra ID）SSO：帳號仍由管理員在「使用者管理」預先建立並
-// 設定 m365_email，這裡只負責「確認這是哪個 M365 使用者」，找不到對應帳號
-// 就拒絕登入，不會自動建立新帳號。
-router.get('/auth/m365/login', async (req, res) => {
+// M365（Azure AD / Entra ID）SSO：Azure 端登錄為 SPA，瀏覽器端的 MSAL.js 做 Authorization Code
+// + PKCE 登入（不需要 Client Secret），拿到 ID token 後 POST 到 /auth/m365/token，由伺服器驗證。
+// 帳號仍由管理員在「使用者管理」預先建立並設定 m365_email，找不到對應帳號就拒絕登入，
+// 不會自動建立新帳號。
+router.get('/auth/m365/callback', (req, res) => {
   if (!M365AuthService.isEnabled()) {
     return res.status(404).render('error', { title: '找不到頁面', message: '找不到頁面' });
   }
-
-  // state 存進 session，callback 時比對，防止 CSRF（避免有人偽造 callback 請求
-  // 幫別人登入自己準備好的帳號）；PKCE 的 code_verifier 同樣只放在這個 session 裡。
-  const state = crypto.randomBytes(16).toString('hex');
-  req.session.m365State = state;
-
-  try {
-    const { url, codeVerifier } = await M365AuthService.getAuthCodeUrl(state);
-    req.session.m365CodeVerifier = codeVerifier;
-    res.redirect(url);
-  } catch (err) {
-    console.error('[M365 SSO] 產生登入連結失敗:', err);
-    res.status(500).render('login', { error: 'Microsoft 365 登入設定有誤，請聯絡系統管理員' });
-  }
+  // Microsoft 導回來時授權碼放在網址 # 後面，不會送到伺服器，由頁面上的 MSAL.js 接手處理
+  res.render('m365-callback', { m365: M365AuthService.getPublicConfig() });
 });
 
-router.get('/auth/m365/callback', async (req, res, next) => {
+router.post('/auth/m365/token', async (req, res) => {
   if (!M365AuthService.isEnabled()) {
-    return res.status(404).render('error', { title: '找不到頁面', message: '找不到頁面' });
+    return res.status(404).json({ error: '尚未啟用 Microsoft 365 登入' });
   }
 
-  const { code, state, error, error_description: errorDescription } = req.query;
-
-  if (error) {
-    return res.status(401).render('login', {
-      error: `Microsoft 登入失敗：${errorDescription || error}`,
-    });
+  // 跟密碼登入共用限流（以來源 IP 計算失敗次數），避免有人拿偽造的 token 一直試
+  if (LoginRateLimit.isBlocked(req, '__m365__')) {
+    return res.status(429).json({ error: '登入失敗次數過多，請 15 分鐘後再試' });
   }
 
-  if (!code || !state || state !== req.session.m365State) {
-    return res.status(400).render('login', { error: '登入驗證失敗，請重新嘗試' });
-  }
-  const codeVerifier = req.session.m365CodeVerifier;
-  delete req.session.m365State;
-  delete req.session.m365CodeVerifier;
-  if (!codeVerifier) {
-    return res.status(400).render('login', { error: '登入驗證失敗，請重新嘗試' });
+  const idToken = req.body && req.body.idToken;
+  if (typeof idToken !== 'string' || !idToken) {
+    return res.status(400).json({ error: '登入驗證失敗，請重新嘗試' });
   }
 
   let profile;
   try {
-    profile = await M365AuthService.acquireTokenByCode(code, codeVerifier);
+    profile = await M365AuthService.verifyIdToken(idToken);
   } catch (err) {
-    console.error('[M365 SSO] 交換 token 失敗:', err);
-    return res.status(500).render('login', { error: 'Microsoft 365 登入失敗，請稍後再試或聯絡管理員' });
+    console.error('[M365 SSO] ID token 驗證失敗:', err.message);
+    LoginRateLimit.recordFailure(req, '__m365__');
+    return res.status(401).json({ error: 'Microsoft 登入驗證失敗，請重新嘗試' });
   }
 
   if (!profile.email) {
-    return res.status(401).render('login', { error: '無法從 Microsoft 帳號取得 email，請聯絡管理員' });
+    return res.status(401).json({ error: '無法從 Microsoft 帳號取得 email，請聯絡管理員' });
   }
 
   const user = User.findByM365Email(profile.email);
   if (!user || !user.is_active) {
-    return res.status(403).render('login', {
+    LoginRateLimit.recordFailure(req, '__m365__');
+    return res.status(403).json({
       error: `此 Microsoft 帳號（${profile.email}）尚未被加入系統，請聯絡管理員在「使用者管理」新增`,
     });
   }
 
   try {
     await establishSession(req, user, { viaSso: true });
-    res.redirect('/');
+    res.json({ redirect: '/' });
   } catch (err) {
-    next(err);
+    console.error('[M365 SSO] 建立 session 失敗:', err);
+    res.status(500).json({ error: '登入失敗，請稍後再試' });
   }
 });
 

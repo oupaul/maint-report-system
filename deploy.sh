@@ -302,11 +302,11 @@ if [ ! -f "$M365_ENV_FILE" ]; then
     cat > "$M365_ENV_FILE" <<'EOF'
 # Microsoft 365 SSO 設定（選用）——三個都填了才會在登入頁顯示「使用 Microsoft
 # 365 登入」按鈕，不填的話系統照常只用帳號密碼登入，不會出錯。
-# 不需要 Client Secret（使用公開用戶端 + PKCE）。
+# 不需要 Client Secret（Azure 登錄為 SPA，瀏覽器端 MSAL.js + 伺服器驗證 ID token）。
 # 申請/填寫步驟見 README.md「Microsoft 365 SSO」一節。
 # M365_CLIENT_ID=
 # M365_TENANT_ID=
-# M365_REDIRECT_URI=http://your-domain-or-ip:3000/auth/m365/callback
+# M365_REDIRECT_URI=https://your-domain/auth/m365/callback   # 必須是 https
 EOF
     chown "${CURRENT_USER}:${CURRENT_USER}" "$M365_ENV_FILE"
     chmod 600 "$M365_ENV_FILE"

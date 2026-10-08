@@ -16,7 +16,10 @@
         <div class="form-error"><%= error %></div>
       <% } %>
       <% if (m365Enabled) { %>
-        <a href="/auth/m365/login" class="btn btn--primary btn--lg login-m365-btn" style="width:100%;">使用 Microsoft 365 登入</a>
+        <div id="m365-login" data-client-id="<%= m365.clientId %>" data-tenant-id="<%= m365.tenantId %>" data-redirect-uri="<%= m365.redirectUri %>">
+          <button type="button" id="m365-login-btn" class="btn btn--primary btn--lg login-m365-btn" style="width:100%;">使用 Microsoft 365 登入</button>
+          <div class="form-error" id="m365-login-error" hidden></div>
+        </div>
         <div class="login-divider"><span>或使用帳號密碼</span></div>
       <% } %>
       <form method="POST" action="/login">
@@ -33,5 +36,9 @@
       </form>
     </div>
   </div>
+<% if (m365Enabled) { %>
+  <script src="/vendor/msal-browser.min.js"></script>
+  <script src="/js/m365-login.js"></script>
+<% } %>
 </body>
 </html>

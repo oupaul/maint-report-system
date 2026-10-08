@@ -26,6 +26,10 @@ app.use(securityHeaders);
 
 // 靜態檔案放在 session 前面：載入 css/js 不需要（也不該）建立或更新 session
 app.use(express.static(path.join(__dirname, 'public')));
+// M365 登入用的 MSAL.js（瀏覽器端函式庫）直接從 node_modules 提供，不依賴外部 CDN，CSP 也就不用開放外部腳本
+app.get('/vendor/msal-browser.min.js', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'node_modules', '@azure', 'msal-browser', 'lib', 'msal-browser.min.js'));
+});
 
 app.use(session({
   store: new SqliteSessionStore(db),
@@ -85,6 +89,7 @@ app.use((req, res, next) => {
   // 全域設定，login.ejs 每個 render 路徑（包含各種錯誤訊息）都要用到，
   // 不用每個 res.render('login', ...) 呼叫都各自記得傳一次。
   res.locals.m365Enabled = M365AuthService.isEnabled();
+  res.locals.m365 = res.locals.m365Enabled ? M365AuthService.getPublicConfig() : null;
   next();
 });
 

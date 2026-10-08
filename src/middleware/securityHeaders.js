@@ -5,6 +5,8 @@
 const CSP = [
   "default-src 'self'",
   "img-src 'self' data: blob:",
+  // MSAL.js 在瀏覽器端要直接向 Microsoft 登入端點取得 token（M365 SSO，未啟用時完全用不到）
+  "connect-src 'self' https://login.microsoftonline.com",
   "style-src 'self' 'unsafe-inline'",
   "script-src 'self'",
   "object-src 'none'",
