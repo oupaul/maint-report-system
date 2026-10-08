@@ -58,6 +58,7 @@ router.get('/auth/m365/callback', (req, res) => {
     return res.status(404).render('error', { title: '找不到頁面', message: '找不到頁面' });
   }
   // Microsoft 導回來時授權碼放在網址 # 後面，不會送到伺服器，由頁面上的 MSAL.js 接手處理
+  console.log(`[M365 SSO] callback 頁面被載入（來源 IP ${req.ip}、https=${req.secure}）`);
   res.render('m365-callback', { m365: M365AuthService.getPublicConfig() });
 });
 
@@ -71,6 +72,7 @@ router.post('/auth/m365/token', async (req, res) => {
     return res.status(429).json({ error: '登入失敗次數過多，請 15 分鐘後再試' });
   }
 
+  console.log(`[M365 SSO] 收到瀏覽器送來的 ID token（來源 IP ${req.ip}）`);
   const idToken = req.body && req.body.idToken;
   if (typeof idToken !== 'string' || !idToken) {
     return res.status(400).json({ error: '登入驗證失敗，請重新嘗試' });
@@ -91,6 +93,7 @@ router.post('/auth/m365/token', async (req, res) => {
 
   const user = User.findByM365Email(profile.email);
   if (!user || !user.is_active) {
+    console.warn(`[M365 SSO] 拒絕登入：${profile.email} 沒有對應的啟用帳號`);
     LoginRateLimit.recordFailure(req, '__m365__');
     return res.status(403).json({
       error: `此 Microsoft 帳號（${profile.email}）尚未被加入系統，請聯絡管理員在「使用者管理」新增`,
@@ -99,6 +102,7 @@ router.post('/auth/m365/token', async (req, res) => {
 
   try {
     await establishSession(req, user, { viaSso: true });
+    console.log(`[M365 SSO] 登入成功：${user.username}（${profile.email}）`);
     res.json({ redirect: '/' });
   } catch (err) {
     console.error('[M365 SSO] 建立 session 失敗:', err);

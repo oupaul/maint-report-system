@@ -45,7 +45,8 @@ sudo ./deploy.sh
 - 登入失敗限流：同一 IP 或同一帳號短時間內失敗過多次會暫時鎖定 15 分鐘
 - 所有 POST 表單都有 CSRF token；Cookie 為 `HttpOnly` + `SameSite=Lax`（HTTPS 時自動加 `Secure`）；Session 存在 SQLite，服務重啟不會被登出；帳號被停用、角色調整會立即生效
 - 瀏覽器端有 CSP 等安全標頭（不允許 inline script）
-- 若前面架了反向代理（nginx/Caddy 等）才需設定環境變數 `TRUST_PROXY`（例如 `1`），讓系統看得到真實用戶 IP；直接以 IP:port 存取請保持不設定，否則登入限流可被偽造的 `X-Forwarded-For` 繞過
+- 若前面架了反向代理（nginx/Caddy、**Cloudflare Tunnel** 等）才需設定環境變數 `TRUST_PROXY=1`，讓系統看得到真實用戶 IP 與 HTTPS 狀態（Cookie 才會加 `Secure`）；沒設的話所有人在系統眼中都來自 `127.0.0.1`，登入失敗限流會變成「全部使用者共用同一個額度」。設定方式：在 `/etc/maint-report-system/session.env` 加一行 `TRUST_PROXY=1` 後 `sudo systemctl restart maint-report-system`（這個檔案更新時不會被覆蓋）。直接以 IP:port 存取請保持不設定，否則登入限流可被偽造的 `X-Forwarded-For` 繞過
+- 經由 Cloudflare 時請確認：該網址沒有被快取（Cache Rules 不要涵蓋 `/login`、`/auth/*`），且沒有開啟 Rocket Loader（會改寫頁面上的 script 載入方式，可能讓登入頁的 MSAL.js 失效）
 
 ### 環境變數（進階，選填）
 
