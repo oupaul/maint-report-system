@@ -150,16 +150,16 @@ sudo /srv/apps/maint-report-system/restore.sh
 
 1. 登入 [Azure Portal](https://portal.azure.com) → 搜尋「Microsoft Entra ID」→ 左側選單「App registrations」→「New registration」
 2. 名稱隨意（例如「維護巡檢報告系統」），「Supported account types」選你們組織內部使用即可（單一租戶：`Accounts in this organizational directory only`）
-3. 「Redirect URI」選 **Web**，填：`http://<主機IP或網域>:<port>/auth/m365/callback`（例如 `http://192.0.2.10:3000/auth/m365/callback`；正式對外服務建議改用 HTTPS 網域）
+3. 「Redirect URI」平台選 **Web**，填：`https://<網域>/auth/m365/callback`。Microsoft 只接受 `https://`，唯一的例外是 `http://localhost`，所以用 IP:port 直連（純 HTTP）的部署通常無法登錄，建議前面加反向代理（nginx/Caddy）並設定 HTTPS，同時依[安全機制摘要](#安全機制摘要)設定 `TRUST_PROXY`
 4. 建立完成後，在「Overview」頁記下：
    - **Application (client) ID** → 對應 `M365_CLIENT_ID`
    - **Directory (tenant) ID** → 對應 `M365_TENANT_ID`
-5. 左側選單「Certificates & secrets」→「New client secret」→ 建立後**立刻複製 Value 欄位**（離開頁面後就看不到了）→ 對應 `M365_CLIENT_SECRET`
+5. 左側選單「Authentication」→ 最下方「Advanced settings」→「Allow public client flows」切到 **Yes** → Save。**本系統不使用 Client Secret**（以公開用戶端 + PKCE 登入，主機上不必保管任何 M365 機密）；不需要建立 client secret，已經建過的請到「Certificates & secrets」刪除
 6. 左側選單「API permissions」，預設應該已經有 `User.Read`（Microsoft Graph, Delegated），不用額外設定；本系統只用來確認登入者身分，不會存取信箱、檔案等其他資料
 
 ### 第 2 步：在主機上填入設定值
 
-`deploy.sh` 會自動建立 `/etc/maint-report-system/m365.env`（權限鎖為 `600`，只有服務執行帳號能讀取）並讓 systemd unit 引用它，**不需要手動跑 `systemctl edit`、也不會把 Client Secret 寫進 unit 檔案本身**——unit 檔案在 `/etc/systemd/system/` 底下預設所有本機帳號都能讀（`644`），機密值只會留在這個獨立、權限鎖死的檔案裡。
+`deploy.sh` 會自動建立 `/etc/maint-report-system/m365.env`（權限鎖為 `600`，只有服務執行帳號能讀取）並讓 systemd unit 引用它，**不需要手動跑 `systemctl edit`**。這個檔案權限鎖死（`600`），設定值不會出現在所有本機帳號都能讀的 unit 檔案（`644`）裡；目前只有 Client ID／Tenant ID／Redirect URI 三個值，不含任何金鑰。
 
 跑過一次 `setup.sh`／`deploy.sh`／`update.sh` 之後（沒設定 M365 也沒關係，這個檔案一律會建立），編輯這個檔案填入第 1 步記下的值：
 
@@ -167,13 +167,13 @@ sudo /srv/apps/maint-report-system/restore.sh
 sudo nano /etc/maint-report-system/m365.env
 ```
 
-把範本裡對應的四行取消註解並填值：
+把範本裡對應的三行取消註解並填值：
+（從舊版升級、檔案裡還有 `M365_CLIENT_SECRET=` 的，請刪掉那一行——現在會被忽略。另外務必完成上面第 5 步的「Allow public client flows」，否則 Microsoft 會因為沒帶 secret 而拒絕登入。）
 
 ```
 M365_CLIENT_ID=你的Client-ID
-M365_CLIENT_SECRET=你的Client-Secret
 M365_TENANT_ID=你的Tenant-ID
-M365_REDIRECT_URI=http://<主機IP或網域>:<port>/auth/m365/callback
+M365_REDIRECT_URI=https://<網域>/auth/m365/callback
 ```
 
 存檔後重啟服務：

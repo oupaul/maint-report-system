@@ -289,7 +289,7 @@ if [ -z "$NODE_PATH" ]; then
     error "找不到 Node.js 執行檔"
 fi
 
-# M365 SSO 是選用功能，設定值（含 Client Secret）不能寫進 systemd unit 本身
+# M365 SSO 是選用功能，設定值不能寫進 systemd unit 本身
 # ——unit 檔案在 /etc/systemd/system/ 底下預設是所有人可讀（644），任何一個
 # 能登入這台主機的帳號都看得到。改成一個權限鎖死（600，只有服務執行帳號能讀）
 # 的獨立檔案，unit 只用 EnvironmentFile 引用路徑。這裡只在檔案不存在時建立
@@ -300,11 +300,11 @@ M365_ENV_FILE="${M365_ENV_DIR}/m365.env"
 if [ ! -f "$M365_ENV_FILE" ]; then
     mkdir -p "$M365_ENV_DIR"
     cat > "$M365_ENV_FILE" <<'EOF'
-# Microsoft 365 SSO 設定（選用）——四個都填了才會在登入頁顯示「使用 Microsoft
+# Microsoft 365 SSO 設定（選用）——三個都填了才會在登入頁顯示「使用 Microsoft
 # 365 登入」按鈕，不填的話系統照常只用帳號密碼登入，不會出錯。
+# 不需要 Client Secret（使用公開用戶端 + PKCE）。
 # 申請/填寫步驟見 README.md「Microsoft 365 SSO」一節。
 # M365_CLIENT_ID=
-# M365_CLIENT_SECRET=
 # M365_TENANT_ID=
 # M365_REDIRECT_URI=http://your-domain-or-ip:3000/auth/m365/callback
 EOF

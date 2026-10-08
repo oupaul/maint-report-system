@@ -58,12 +58,13 @@ router.get('/auth/m365/login', async (req, res) => {
   }
 
   // state 存進 session，callback 時比對，防止 CSRF（避免有人偽造 callback 請求
-  // 幫別人登入自己準備好的帳號）。
+  // 幫別人登入自己準備好的帳號）；PKCE 的 code_verifier 同樣只放在這個 session 裡。
   const state = crypto.randomBytes(16).toString('hex');
   req.session.m365State = state;
 
   try {
-    const url = await M365AuthService.getAuthCodeUrl(state);
+    const { url, codeVerifier } = await M365AuthService.getAuthCodeUrl(state);
+    req.session.m365CodeVerifier = codeVerifier;
     res.redirect(url);
   } catch (err) {
     console.error('[M365 SSO] 產生登入連結失敗:', err);
@@ -87,11 +88,16 @@ router.get('/auth/m365/callback', async (req, res, next) => {
   if (!code || !state || state !== req.session.m365State) {
     return res.status(400).render('login', { error: '登入驗證失敗，請重新嘗試' });
   }
+  const codeVerifier = req.session.m365CodeVerifier;
   delete req.session.m365State;
+  delete req.session.m365CodeVerifier;
+  if (!codeVerifier) {
+    return res.status(400).render('login', { error: '登入驗證失敗，請重新嘗試' });
+  }
 
   let profile;
   try {
-    profile = await M365AuthService.acquireTokenByCode(code);
+    profile = await M365AuthService.acquireTokenByCode(code, codeVerifier);
   } catch (err) {
     console.error('[M365 SSO] 交換 token 失敗:', err);
     return res.status(500).render('login', { error: 'Microsoft 365 登入失敗，請稍後再試或聯絡管理員' });

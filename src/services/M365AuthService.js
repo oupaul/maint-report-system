@@ -5,32 +5,41 @@ const config = require('../config');
 // 其他資料，所以只要求最小的 openid/profile/email 系列 scope。
 const SCOPES = ['user.read'];
 
-let cca = null;
+// 公開用戶端（Public Client）+ PKCE：不使用 Client Secret。每次登入產生一組一次性的
+// code_verifier（只存在該使用者的 session），授權碼被攔截也無法在沒有 verifier 的情況下換成 token。
+// Azure 端需開啟「Allow public client flows」，見 README「Microsoft 365 SSO」。
+let pca = null;
+const cryptoProvider = new msal.CryptoProvider();
 if (config.M365_ENABLED) {
-  cca = new msal.ConfidentialClientApplication({
+  pca = new msal.PublicClientApplication({
     auth: {
       clientId: config.M365_CLIENT_ID,
       authority: `https://login.microsoftonline.com/${config.M365_TENANT_ID}`,
-      clientSecret: config.M365_CLIENT_SECRET,
     },
   });
 }
 
 function isEnabled() {
-  return !!cca;
+  return !!pca;
 }
 
-function getAuthCodeUrl(state) {
-  return cca.getAuthCodeUrl({
+// 回傳 { url, codeVerifier }：呼叫端要把 codeVerifier 存進 session，callback 時再帶回來。
+async function getAuthCodeUrl(state) {
+  const { verifier, challenge } = await cryptoProvider.generatePkceCodes();
+  const url = await pca.getAuthCodeUrl({
     scopes: SCOPES,
     redirectUri: config.M365_REDIRECT_URI,
     state,
+    codeChallenge: challenge,
+    codeChallengeMethod: 'S256',
   });
+  return { url, codeVerifier: verifier };
 }
 
-async function acquireTokenByCode(code) {
-  const result = await cca.acquireTokenByCode({
+async function acquireTokenByCode(code, codeVerifier) {
+  const result = await pca.acquireTokenByCode({
     code,
+    codeVerifier,
     scopes: SCOPES,
     redirectUri: config.M365_REDIRECT_URI,
   });

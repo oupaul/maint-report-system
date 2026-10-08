@@ -23,13 +23,14 @@ function parseTrustProxy(raw) {
 }
 const TRUST_PROXY = parseTrustProxy(process.env.TRUST_PROXY);
 
-// M365（Azure AD / Entra ID）SSO 是選用功能：四個環境變數都設定了才啟用，
+// M365（Azure AD / Entra ID）SSO 是選用功能：三個環境變數都設定了才啟用。
+// 不使用 Client Secret：以「公開用戶端 + PKCE」授權碼流程驗證，主機上不需要保管任何 M365 機密，
+// 舊的 m365.env 若還留著 M365_CLIENT_SECRET 會被直接忽略，建議刪除並到 Azure 把該 secret 移除。
 // 沒設定的話登入頁就只顯示原本的帳號密碼表單，不會報錯。
 const M365_CLIENT_ID = process.env.M365_CLIENT_ID || null;
-const M365_CLIENT_SECRET = process.env.M365_CLIENT_SECRET || null;
 const M365_TENANT_ID = process.env.M365_TENANT_ID || null;
 const M365_REDIRECT_URI = process.env.M365_REDIRECT_URI || null;
-const M365_ENABLED = !!(M365_CLIENT_ID && M365_CLIENT_SECRET && M365_TENANT_ID && M365_REDIRECT_URI);
+const M365_ENABLED = !!(M365_CLIENT_ID && M365_TENANT_ID && M365_REDIRECT_URI);
 
 module.exports = {
   PROJECT_ROOT,
@@ -41,7 +42,6 @@ module.exports = {
   DB_PATH: path.join(PROJECT_ROOT, 'data', 'maint_report.db'),
   UPLOADS_DIR: path.join(PROJECT_ROOT, 'uploads'),
   M365_CLIENT_ID,
-  M365_CLIENT_SECRET,
   M365_TENANT_ID,
   M365_REDIRECT_URI,
   M365_ENABLED,
