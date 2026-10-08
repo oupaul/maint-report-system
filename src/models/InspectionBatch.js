@@ -25,7 +25,9 @@ const InspectionBatch = {
 
   complete(id) {
     db.prepare(
-      `UPDATE inspection_batches SET status = 'completed', completed_at = ? WHERE id = ?`
+      `UPDATE inspection_batches SET status = 'completed', completed_at = ?,
+         approval_status = CASE WHEN approval_status = 'returned' THEN 'none' ELSE approval_status END
+       WHERE id = ?`
     ).run(nowTaipei(), id);
     return InspectionBatch.findById(id);
   },

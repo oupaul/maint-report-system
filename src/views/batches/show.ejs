@@ -3,16 +3,97 @@
 <div class="page-header">
   <h1><%= batch.title %></h1>
   <div class="page-actions">
-    <a href="/batches/<%= batch.id %>/entry" class="btn btn--secondary btn--md"><%= batch.status === 'draft' ? '繼續填寫' : '編輯內容' %></a>
+    <% if (!approval.locked) { %>
+      <a href="/batches/<%= batch.id %>/entry" class="btn btn--secondary btn--md"><%= batch.status === 'draft' ? '繼續填寫' : '編輯內容' %></a>
+    <% } %>
     <a href="/batches/<%= batch.id %>/report.pdf" class="btn btn--primary btn--md" target="_blank">下載 PDF 報告</a>
   </div>
 </div>
 
+<% if (approval.flash) { %><div class="form-success"><%= approval.flash %></div><% } %>
+<% if (approval.notice) { %><div class="form-error"><%= approval.notice %></div><% } %>
+
 <p class="form-hint">
   巡檢日期：<%= batch.batch_date %>
-  ・狀態：<%= batch.status === 'completed' ? '已完成' : '草稿' %>
+  ・狀態：<% if (approval.status.tone === 'draft') { %><%= approval.status.text %><% } else { %><span class="status-badge status-badge--<%= approval.status.tone %>"><%= approval.status.text %></span><% } %>
   <% if (batch.notes) { %>・備註：<%= batch.notes %><% } %>
 </p>
+
+<% if (approval.show) { %>
+<section class="card card--accent">
+  <h2>簽核流程</h2>
+
+  <% if (approval.current) { %>
+    <p>目前輪到「<strong><%= approval.current.record.stage_label %></strong>」關卡簽核（由 <%= approval.submittedByName || '-' %> 於 <%= (batch.submitted_at || '').slice(0, 16) %> 送出）。</p>
+    <% if (approval.current.approverNames.length > 0) { %>
+      <p class="form-hint">可以簽核的人：<%= approval.current.approverNames.join('、') %>（管理員也可以處理）</p>
+    <% } else { %>
+      <p class="form-hint" style="color: var(--color-status-warning);">目前沒有其他可以簽核的人（送審的人不能簽核自己送的批次）。請管理員處理，或請送審的人撤回後調整設定。</p>
+    <% } %>
+  <% } %>
+
+  <% if (approval.canSubmit) { %>
+    <form method="POST" action="/batches/<%= batch.id %>/submit" class="approval-actions" data-confirm="確定要送出審核嗎？送出後這個批次會鎖定，審核通過或被退回前不能編輯。">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <div class="form-group" style="margin:0;">
+        <label class="form-label" for="submit-comment">給簽核人的說明（選填）</label>
+        <textarea class="form-input" id="submit-comment" name="comment" maxlength="<%= approval.maxComment %>"></textarea>
+      </div>
+      <div><button type="submit" class="btn btn--primary btn--md">送出審核</button></div>
+    </form>
+  <% } %>
+
+  <% if (approval.current && approval.current.canAct) { %>
+    <form method="POST" action="/batches/<%= batch.id %>/approve" class="approval-actions">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <div class="form-group" style="margin:0;">
+        <label class="form-label" for="decision-comment">意見（核准時選填；<strong>退回時必填</strong>）</label>
+        <textarea class="form-input" id="decision-comment" name="comment" maxlength="<%= approval.maxComment %>"></textarea>
+      </div>
+      <div class="page-actions">
+        <button type="submit" class="btn btn--primary btn--md">核准「<%= approval.current.record.stage_label %>」</button>
+        <button type="submit" formaction="/batches/<%= batch.id %>/return" class="btn btn--secondary btn--md">退回修改</button>
+      </div>
+    </form>
+  <% } %>
+
+  <% if (approval.canWithdraw) { %>
+    <form method="POST" action="/batches/<%= batch.id %>/withdraw" data-confirm="確定要撤回審核嗎？批次會解除鎖定，可以重新編輯，之後需要再送出審核。" class="approval-actions">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <div><button type="submit" class="btn btn--secondary btn--md">撤回審核</button></div>
+    </form>
+  <% } %>
+
+  <% if (approval.canReopen) { %>
+    <form method="POST" action="/batches/<%= batch.id %>/reopen" data-confirm="確定要重新開啟這個已核准的批次嗎？批次會解除鎖定，修改後需要重新送出審核，這個動作會記錄在簽核紀錄裡。" class="approval-actions">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <div class="form-group" style="margin:0;">
+        <label class="form-label" for="reopen-comment">重新開啟的原因（必填）</label>
+        <textarea class="form-input" id="reopen-comment" name="comment" maxlength="<%= approval.maxComment %>" required></textarea>
+      </div>
+      <div><button type="submit" class="btn btn--secondary btn--md">重新開啟</button></div>
+    </form>
+  <% } %>
+
+  <% if (approval.history.length > 0) { %>
+    <h3 style="margin-top: var(--space-6);">簽核紀錄</h3>
+    <ul class="approval-timeline">
+      <% const multiRound = new Set(approval.history.map(h => h.round)).size > 1; let lastRound = null; %>
+      <% approval.history.forEach(h => { %>
+        <% if (multiRound && h.round !== lastRound) { lastRound = h.round; %><li class="round-heading">第 <%= h.round %> 輪送審</li><% } %>
+        <li class="is-<%= h.kind === 'approved' ? 'approved' : (h.kind === 'returned' || h.kind === 'withdrawn' ? 'returned' : (h.kind === 'waiting' ? 'waiting' : 'other')) %>">
+          <strong><%= h.text %></strong>
+          <% if (h.who) { %>・<%= h.who %><% } %>
+          <% if (h.at) { %><time><%= h.at.slice(0, 16) %></time><% } %>
+          <% if (h.comment) { %><span class="comment"><%= h.comment %></span><% } %>
+        </li>
+      <% }) %>
+    </ul>
+  <% } else if (!approval.canSubmit) { %>
+    <p class="form-hint">還沒有簽核紀錄。</p>
+  <% } %>
+</section>
+<% } %>
 
 <% assets.forEach(asset => {
   const items = itemsByAssetId.get(asset.id) || [];

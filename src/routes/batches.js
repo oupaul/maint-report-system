@@ -9,9 +9,11 @@ const InspectionBatch = require('../models/InspectionBatch');
 const InspectionItem = require('../models/InspectionItem');
 const InspectionItemPhoto = require('../models/InspectionItemPhoto');
 const BatchSignature = require('../models/BatchSignature');
+const User = require('../models/User');
 const ChecklistItem = require('../models/ChecklistItem');
 const Asset = require('../models/Asset');
 const ImageService = require('../services/ImageService');
+const ApprovalService = require('../services/ApprovalService');
 const statusColors = require('../utils/statusColors');
 const AssetCategory = require('../models/AssetCategory');
 const {
@@ -20,8 +22,26 @@ const {
 } = require('../utils/validators');
 const config = require('../config');
 
+// 簽核流程開關（entry/list 頁面要用來決定顯示「標記為已完成」還是「送出審核」）
+router.use((req, res, next) => {
+  res.locals.approvalEnabled = ApprovalService.isEnabled();
+  next();
+});
+
+// 審核中與已核准的批次鎖定：伺服器端一律擋下（不只是把按鈕藏起來）
+function rejectIfLocked(res, batch) {
+  if (!ApprovalService.isLocked(batch)) return false;
+  res.status(409).render('error', {
+    title: '批次已鎖定',
+    message: batch.approval_status === 'pending'
+      ? '這個批次正在審核中，不能編輯。如需修改，請由送審的人或管理員先「撤回審核」。'
+      : '這個批次已經核准，不能編輯。如需修改，請由管理員「重新開啟」。',
+  });
+  return true;
+}
+
 router.get('/', requireLogin, (req, res) => {
-  const batches = InspectionBatch.findAll();
+  const batches = InspectionBatch.findAll().map(b => ({ ...b, statusInfo: ApprovalService.statusInfo(b), locked: ApprovalService.isLocked(b) }));
   res.render('batches/list', { batches });
 });
 
@@ -124,6 +144,8 @@ function buildEntryData(batchId) {
 }
 
 router.get('/:id/entry', requireLogin, (req, res) => {
+  const pre = InspectionBatch.findById(req.params.id);
+  if (pre && ApprovalService.isLocked(pre)) return res.redirect(`/batches/${pre.id}?msg=locked`);
   const data = buildEntryData(req.params.id);
   if (!data) {
     return res.status(404).render('error', { title: '找不到批次', message: '找不到指定的巡檢批次' });
@@ -137,6 +159,7 @@ router.get('/:id/entry', requireLogin, (req, res) => {
     statuses: ITEM_STATUSES,
     statusColors,
     addAssetError: null,
+    returnNote: ApprovalService.lastReturnNote(data.batch),
   });
 });
 
@@ -148,6 +171,7 @@ router.post('/:id/assets', requireLogin, (req, res) => {
   if (!batch) {
     return res.status(404).render('error', { title: '找不到批次', message: '找不到指定的巡檢批次' });
   }
+  if (rejectIfLocked(res, batch)) return;
 
   let assetIds = req.body.asset_ids || [];
   if (!Array.isArray(assetIds)) assetIds = [assetIds];
@@ -198,6 +222,7 @@ router.post('/:id/items/:checklistItemId', requireLogin, upload.array('screensho
     if (!batch) {
       return res.status(404).render('error', { title: '找不到批次', message: '找不到指定的巡檢批次' });
     }
+    if (rejectIfLocked(res, batch)) return;
 
     const checklistItem = ChecklistItem.findById(req.params.checklistItemId);
     if (!checklistItem) {
@@ -262,6 +287,7 @@ router.post('/:id/photos/:photoId/delete', requireLogin, (req, res) => {
   if (!batch) {
     return res.status(404).render('error', { title: '找不到批次', message: '找不到指定的巡檢批次' });
   }
+  if (rejectIfLocked(res, batch)) return;
 
   const photo = InspectionItemPhoto.findById(req.params.photoId);
   if (photo && photo.path) {
@@ -281,9 +307,67 @@ router.post('/:id/complete', requireLogin, (req, res) => {
   if (!batch) {
     return res.status(404).render('error', { title: '找不到批次', message: '找不到指定的巡檢批次' });
   }
+  // 啟用簽核流程後，批次只能「送出審核」並經核准才算完成，不能自己直接標記完成
+  if (ApprovalService.isEnabled()) {
+    return res.status(400).render('error', {
+      title: '請改用送出審核',
+      message: '已啟用簽核流程，批次要「送出審核」並通過簽核才算完成。',
+    });
+  }
+  if (rejectIfLocked(res, batch)) return;
   InspectionBatch.complete(batch.id);
   res.redirect(`/batches/${batch.id}`);
 });
+
+// ---- 簽核動作 ----
+
+function approvalFailure(res, result) {
+  return res.status(result.status || 400).render('error', { title: '無法完成這個動作', message: result.error });
+}
+
+router.post('/:id/submit', requireLogin, (req, res) => {
+  const result = ApprovalService.submit(parseInt(req.params.id, 10), req.user, req.body.comment);
+  if (!result.ok) return approvalFailure(res, result);
+  console.log(`[簽核] ${req.user.username} 送出批次 #${req.params.id} 審核`);
+  res.redirect(`/batches/${req.params.id}?ok=submitted`);
+});
+
+router.post('/:id/approve', requireLogin, (req, res) => {
+  const result = ApprovalService.approve(parseInt(req.params.id, 10), req.user, req.body.comment);
+  if (!result.ok) return approvalFailure(res, result);
+  console.log(`[簽核] ${req.user.username} 核准批次 #${req.params.id}（${result.outcome}）`);
+  res.redirect(`/batches/${req.params.id}?ok=${result.outcome === 'approved' ? 'approved' : 'next'}`);
+});
+
+router.post('/:id/return', requireLogin, (req, res) => {
+  const result = ApprovalService.returnBatch(parseInt(req.params.id, 10), req.user, req.body.comment);
+  if (!result.ok) return approvalFailure(res, result);
+  console.log(`[簽核] ${req.user.username} 退回批次 #${req.params.id}`);
+  res.redirect(`/batches/${req.params.id}?ok=returned`);
+});
+
+router.post('/:id/withdraw', requireLogin, (req, res) => {
+  const result = ApprovalService.withdraw(parseInt(req.params.id, 10), req.user);
+  if (!result.ok) return approvalFailure(res, result);
+  console.log(`[簽核] ${req.user.username} 撤回批次 #${req.params.id} 的審核`);
+  res.redirect(`/batches/${req.params.id}?ok=withdrawn`);
+});
+
+router.post('/:id/reopen', requireLogin, (req, res) => {
+  const result = ApprovalService.reopen(parseInt(req.params.id, 10), req.user, req.body.comment);
+  if (!result.ok) return approvalFailure(res, result);
+  console.log(`[簽核] ${req.user.username} 重新開啟批次 #${req.params.id}`);
+  res.redirect(`/batches/${req.params.id}?ok=reopened`);
+});
+
+const APPROVAL_FLASH = {
+  submitted: '已送出審核，批次已鎖定，等待簽核。',
+  next: '已核准這一關，已通知下一關的簽核人。',
+  approved: '已核准，批次完成，所有簽核關卡都已通過。',
+  returned: '已退回，並通知送審的人修改。',
+  withdrawn: '已撤回審核，批次可以重新編輯。',
+  reopened: '已重新開啟，批次可以重新編輯，修改後需要重新送出審核。',
+};
 
 router.get('/:id', requireLogin, (req, res) => {
   const batch = InspectionBatch.findById(req.params.id);
@@ -309,7 +393,29 @@ router.get('/:id', requireLogin, (req, res) => {
     signaturesByRole[sig.role] = { ...sig, filename: path.basename(sig.signature_path) };
   }
 
+  const record = ApprovalService.currentRecord(batch);
+  const showApproval = ApprovalService.isEnabled() || batch.approval_status !== 'none';
+  const approval = {
+    show: showApproval,
+    status: ApprovalService.statusInfo(batch),
+    locked: ApprovalService.isLocked(batch),
+    history: ApprovalService.history(batch),
+    canSubmit: ApprovalService.canSubmit(batch),
+    canWithdraw: ApprovalService.canWithdraw(req.user, batch),
+    canReopen: ApprovalService.canReopen(req.user, batch),
+    current: record ? {
+      record,
+      canAct: ApprovalService.canAct(req.user, batch, record),
+      approverNames: ApprovalService.approversOf(record, batch).map(u => u.display_name || u.username),
+    } : null,
+    submittedByName: batch.submitted_by ? ((User.findById(batch.submitted_by) || {}).display_name || (User.findById(batch.submitted_by) || {}).username) : null,
+    flash: APPROVAL_FLASH[req.query.ok] || null,
+    notice: req.query.msg === 'locked' ? '審核中或已核准的批次不能編輯。如需修改，請先撤回審核（送審的人或管理員），或由管理員重新開啟。' : null,
+    maxComment: ApprovalService.MAX_COMMENT,
+  };
+
   res.render('batches/show', {
+    approval,
     batch,
     assets,
     itemsByAssetId,
@@ -327,6 +433,10 @@ router.post('/:id/signatures/:role', requireLogin, (req, res) => {
   const batch = InspectionBatch.findById(req.params.id);
   if (!batch) {
     return res.status(404).render('error', { title: '找不到批次', message: '找不到指定的巡檢批次' });
+  }
+
+  if (batch.approval_status === 'approved') {
+    return res.status(409).render('error', { title: '批次已鎖定', message: '這個批次已經核准，不能再修改簽名。如需修改，請由管理員「重新開啟」。' });
   }
 
   const role = req.params.role;

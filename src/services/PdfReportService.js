@@ -322,6 +322,43 @@ function drawSignatureSection(doc, signaturesByRole, fonts) {
   doc.y = rowTop + 13 + SIGNATURE_IMG_MAX_HEIGHT + 4 + 4 + 12;
 }
 
+// 簽核紀錄（有走簽核流程的批次才會有）：每個關卡一行——關卡、結果、簽核人、時間，有意見就接在下一行。
+// 放在簽名區後面；放不下才換頁，跟簽名區一樣不獨佔一整頁。
+function drawApprovalSection(doc, approval, fonts) {
+  if (!approval || !approval.records || approval.records.length === 0) return;
+  const startX = doc.page.margins.left;
+  const contentWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  const STATUS_TEXT = { approved: '核准', returned: '退回', waiting: '待簽核' };
+
+  let estimate = 40;
+  for (const r of approval.records) estimate += 16 + (r.comment ? 14 : 0);
+  if (doc.y + estimate > doc.page.height - doc.page.margins.bottom) doc.addPage();
+
+  doc.font(fonts.bold).fontSize(12).fillColor('#1E293B');
+  doc.text('簽核紀錄', startX, doc.y);
+  doc.moveDown(0.3);
+  if (approval.submittedBy) {
+    doc.font(fonts.regular).fontSize(8).fillColor('#94A3B8');
+    doc.text(`送審：${approval.submittedBy}${approval.submittedAt ? `　${dayjs(approval.submittedAt).format('YYYY-MM-DD HH:mm')}` : ''}`, startX, doc.y, { width: contentWidth });
+    doc.moveDown(0.3);
+  }
+
+  for (const r of approval.records) {
+    const who = r.status === 'waiting' ? '' : (r.approver_name || r.approver_username || '');
+    const when = r.acted_at ? dayjs(r.acted_at).format('YYYY-MM-DD HH:mm') : '';
+    const color = r.status === 'approved' ? '#16A34A' : (r.status === 'returned' ? '#DC2626' : '#D97706');
+    doc.font(fonts.regular).fontSize(9).fillColor('#1E293B');
+    doc.text(`${r.stage_label}`, startX, doc.y, { continued: true, width: contentWidth });
+    doc.fillColor(color).text(`　${STATUS_TEXT[r.status] || r.status}`, { continued: true });
+    doc.fillColor('#64748B').text(`${who ? `　${who}` : ''}${when ? `　${when}` : ''}${r.acted_as_admin ? '（管理員代為處理）' : ''}`);
+    if (r.comment) {
+      doc.font(fonts.regular).fontSize(8).fillColor('#64748B');
+      doc.text(`意見：${r.comment}`, startX + 12, doc.y, { width: contentWidth - 12 });
+    }
+  }
+  doc.moveDown(0.5);
+}
+
 /**
  * 產生單一 inspection_batches 的巡檢報告 PDF，依資產分組，每個 inspection_item
  * 視為不可分頁區塊（先估算高度、必要時主動換頁，再畫）。
@@ -332,7 +369,7 @@ function drawSignatureSection(doc, signaturesByRole, fonts) {
  * @param {Map<number, Array<object>>} params.itemsByAssetId asset_id -> inspection_items（含 join 欄位）
  * @param {import('stream').Writable} outputStream 目標輸出串流（例如 Express res）
  */
-async function generateBatchReport({ batch, assets, itemsByAssetId, signaturesByRole }, outputStream) {
+async function generateBatchReport({ batch, assets, itemsByAssetId, signaturesByRole, approval }, outputStream) {
   // 含已停用的類型：舊報告仍要顯示得出類型名稱
   const categoryLabels = AssetCategory.labelMap();
   const doc = new PDFDocument({ size: 'A4', margin: 50, bufferPages: true });
@@ -403,6 +440,7 @@ async function generateBatchReport({ batch, assets, itemsByAssetId, signaturesBy
   }
 
   drawSignatureSection(doc, signaturesByRole || {}, fonts);
+  drawApprovalSection(doc, approval, fonts);
 
   doc.end();
 

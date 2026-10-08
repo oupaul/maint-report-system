@@ -591,3 +591,79 @@ a.is-viewing { font-weight: 600; }
 .inline-edit .form-input { min-width: 12rem; }
 
 .plain-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+
+/* 通知鈴鐺 */
+.notif-menu { position: relative; }
+.notif-menu > summary {
+  list-style: none;
+  cursor: pointer;
+  color: #CBD5E1;
+  font-size: var(--text-sm);
+  user-select: none;
+}
+.notif-menu > summary::-webkit-details-marker { display: none; }
+.notif-menu[open] > summary, .notif-menu > summary:hover { color: #fff; }
+.notif-badge {
+  display: inline-block;
+  min-width: 1.25rem;
+  margin-left: var(--space-2);
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.25rem;
+  text-align: center;
+}
+.notif-badge[hidden] { display: none; }
+.notif-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + var(--space-2));
+  z-index: 30;
+  width: 22rem;
+  max-width: 90vw;
+  background: #fff;
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+.notif-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: #fff;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-4);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.notif-item:hover { background: var(--color-bg-soft); }
+.notif-item.is-unread { background: var(--color-primary-soft-bg); }
+.notif-item strong { display: block; font-size: var(--text-sm); }
+.notif-item span { display: block; font-size: var(--text-sm); color: var(--color-text-muted); margin-top: 2px; }
+.notif-item time { display: block; font-size: 0.75rem; color: var(--color-text-muted); margin-top: 4px; }
+.notif-empty { padding: var(--space-6); text-align: center; color: var(--color-text-muted); font-size: var(--text-sm); }
+.notif-footer { display: flex; justify-content: space-between; align-items: center; padding: var(--space-2) var(--space-4); font-size: var(--text-sm); }
+.notif-link { background: none; border: none; color: var(--color-primary); cursor: pointer; font: inherit; padding: 0; }
+@media (max-width: 768px) {
+  .notif-panel { position: fixed; left: var(--space-4); right: var(--space-4); top: 4rem; width: auto; max-width: none; }
+}
+
+/* 簽核流程 */
+.approval-timeline { list-style: none; margin: var(--space-4) 0 0; padding: 0; display: grid; gap: var(--space-2); }
+.approval-timeline li { padding: var(--space-2) var(--space-4); border-left: 3px solid var(--color-border); font-size: var(--text-sm); }
+.approval-timeline li.is-approved { border-left-color: var(--color-status-normal); }
+.approval-timeline li.is-returned { border-left-color: var(--color-status-critical); }
+.approval-timeline li.is-waiting { border-left-color: var(--color-status-warning); color: var(--color-text-muted); }
+.approval-timeline time { color: var(--color-text-muted); font-size: 0.8rem; margin-left: var(--space-2); }
+.approval-timeline .comment { display: block; color: var(--color-text-muted); margin-top: 2px; white-space: pre-wrap; }
+.approval-actions { display: grid; gap: var(--space-4); margin-top: var(--space-6); }
+.approval-actions textarea { width: 100%; min-height: 4rem; }
+
+.approval-timeline li.round-heading { border-left: none; padding-left: 0; font-weight: 700; color: var(--color-text-muted); margin-top: var(--space-2); }

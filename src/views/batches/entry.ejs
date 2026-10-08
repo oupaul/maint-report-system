@@ -5,13 +5,26 @@
   <div class="page-actions">
     <a href="/batches/<%= batch.id %>" class="btn btn--secondary btn--md">查看摘要</a>
     <% if (batch.status === 'draft') { %>
-      <form method="POST" action="/batches/<%= batch.id %>/complete" data-confirm="確定要將此批次標記為已完成嗎？完成後仍可查看與產生報告。" style="display:inline;">
-        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <button type="submit" class="btn btn--primary btn--md">標記為已完成</button>
-      </form>
+      <% if (approvalEnabled) { %>
+        <form method="POST" action="/batches/<%= batch.id %>/submit" data-confirm="確定要送出審核嗎？送出後這個批次會鎖定，審核通過或被退回前不能編輯。" style="display:inline;">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button type="submit" class="btn btn--primary btn--md">送出審核</button>
+        </form>
+      <% } else { %>
+        <form method="POST" action="/batches/<%= batch.id %>/complete" data-confirm="確定要將此批次標記為已完成嗎？完成後仍可查看與產生報告。" style="display:inline;">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button type="submit" class="btn btn--primary btn--md">標記為已完成</button>
+        </form>
+      <% } %>
     <% } %>
   </div>
 </div>
+
+<% if (typeof returnNote !== 'undefined' && returnNote) { %>
+  <div class="form-error">
+    這個批次被<%= returnNote.kind === 'returned' ? '退回' : (returnNote.kind === 'withdrawn' ? '撤回' : '重新開啟') %>了（<%= returnNote.text %>，<%= returnNote.who %>）。<% if (returnNote.comment) { %><br>意見：<%= returnNote.comment %><% } %><br>修改完成後，請再按「送出審核」。
+  </div>
+<% } %>
 
 <p class="form-hint">巡檢日期：<%= batch.batch_date %><% if (batch.status === 'completed') { %> ・ <strong style="color: var(--color-status-normal);">已完成</strong><% } %></p>
 

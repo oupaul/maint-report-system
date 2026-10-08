@@ -22,6 +22,7 @@ const MIGRATIONS = [
   'migrate_0007_branding',
   'migrate_0008_asset_categories',
   'migrate_0009_permission_groups',
+  'migrate_0010_approval_workflow',
 ];
 
 async function run() {

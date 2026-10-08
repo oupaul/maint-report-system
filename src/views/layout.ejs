@@ -24,6 +24,7 @@
         const adminLinks = [
           ['/users', '使用者管理', isAdmin],
           ['/admin/groups', '權限群組', isAdmin],
+          ['/admin/approval', '簽核流程', isAdmin],
           ['/admin/categories', '設備類型', can('categories.manage')],
           ['/admin/status', '系統狀態', isAdmin],
           ['/admin/backups', '備份管理', isAdmin],
@@ -46,6 +47,34 @@
     </div>
     <div class="app-nav__user">
       <% if (currentUser) { %>
+        <details class="notif-menu">
+          <summary>通知<span class="notif-badge" id="notif-badge" <%= unreadNotifications > 0 ? '' : 'hidden' %>><%= unreadNotifications %></span></summary>
+          <div class="notif-panel">
+            <% if (recentNotifications.length === 0) { %>
+              <div class="notif-empty">目前沒有通知</div>
+            <% } else { %>
+              <% recentNotifications.forEach(n => { %>
+                <form method="POST" action="/notifications/<%= n.id %>/open">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <button type="submit" class="notif-item <%= n.is_read ? '' : 'is-unread' %>">
+                    <strong><%= n.title %></strong>
+                    <span><%= n.message.length > 70 ? n.message.slice(0, 70) + '…' : n.message %></span>
+                    <time><%= n.created_at.slice(0, 16) %></time>
+                  </button>
+                </form>
+              <% }) %>
+            <% } %>
+            <div class="notif-footer">
+              <a href="/notifications">全部通知</a>
+              <% if (unreadNotifications > 0) { %>
+                <form method="POST" action="/notifications/read-all" style="margin:0;">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <button type="submit" class="notif-link">全部標為已讀</button>
+                </form>
+              <% } %>
+            </div>
+          </div>
+        </details>
         <span><%= currentUser.display_name || currentUser.username %>（<%= currentUser.role === 'admin' ? '管理員' : '技術人員' %>）</span>
         <a href="/account/password" class="app-nav__user-link">變更密碼</a>
         <form method="POST" action="/logout" style="margin:0;">

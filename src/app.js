@@ -10,6 +10,7 @@ const SqliteSessionStore = require('./services/SqliteSessionStore');
 const db = require('./models/db');
 const User = require('./models/User');
 const ActivityTracker = require('./services/ActivityTracker');
+const Notification = require('./models/Notification');
 const PermissionGroup = require('./models/PermissionGroup');
 const { can } = require('./utils/permissions');
 const BackupService = require('./services/BackupService');
@@ -102,11 +103,18 @@ app.use((req, res, next) => {
         req.session.user = current;
       }
       // permissions 每個請求都依資料庫重算、不存進 session：管理員調整群組或權限後立即生效
-      req.user = { ...current, permissions: PermissionGroup.permissionsForUser(fresh) };
+      // group_id 與 permissions 都依資料庫即時帶入、不存進 session（群組被調整後立即生效；簽核關卡也靠 group_id 判斷誰能簽）
+      req.user = { ...current, group_id: fresh.group_id || null, permissions: PermissionGroup.permissionsForUser(fresh) };
     }
   }
   res.locals.currentUser = req.user || null;
   res.locals.can = (permission) => can(req.user, permission);
+  // 導覽列的通知鈴鐺：用 getter 延遲查詢，只有真的要 render 畫面時才會查資料庫
+  if (req.user) {
+    const uid = req.user.id;
+    Object.defineProperty(res.locals, 'unreadNotifications', { get: () => Notification.unreadCount(uid), enumerable: true, configurable: true });
+    Object.defineProperty(res.locals, 'recentNotifications', { get: () => Notification.listRecent(uid, 8), enumerable: true, configurable: true });
+  }
   res.locals.currentPath = req.path;
   res.locals.siteName = '維護巡檢報告系統';
   // 全域設定，login.ejs 每個 render 路徑（包含各種錯誤訊息）都要用到，
@@ -138,6 +146,7 @@ try {
   const reportRoutes = require('./routes/reports');
   const accountRoutes = require('./routes/account');
   const adminRoutes = require('./routes/admin');
+  const notificationRoutes = require('./routes/notifications');
   console.log('[啟動] ✓ 路由模組載入完成');
 
   const { requireLogin } = require('./middleware/auth');
@@ -151,6 +160,7 @@ try {
   app.use('/users', userRoutes);
   app.use('/account', accountRoutes);
   app.use('/admin', adminRoutes);
+  app.use('/notifications', notificationRoutes);
   app.use('/batches', batchRoutes);
   app.use('/', reportRoutes); // 內部各路由自行掛 requireLogin（含 /batches/:id/report.pdf 與 /uploads/:batchId/:filename）
 
@@ -215,6 +225,9 @@ const server = app.listen(config.PORT, () => {
   console.log(`   運行於 http://localhost:${config.PORT}`);
   console.log(`   環境: ${config.NODE_ENV}\n`);
   BackupService.startScheduler();
+  // 已讀超過 90 天的通知定期清掉（啟動時一次，之後每天一次）
+  try { Notification.prune(); } catch (e) { /* 清不掉不影響服務 */ }
+  setInterval(() => { try { Notification.prune(); } catch (e) { /* ignore */ } }, 24 * 60 * 60 * 1000).unref();
 });
 
 server.on('error', (err) => {

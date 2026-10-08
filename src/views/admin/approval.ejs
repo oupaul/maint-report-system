@@ -1,0 +1,114 @@
+<%- include('../layout', { title: '簽核流程' }) %>
+
+<div class="page-header">
+  <h1>簽核流程</h1>
+</div>
+
+<% if (ok) { %><div class="form-success"><%= ok %></div><% } %>
+<% if (error) { %><div class="form-error"><%= error %></div><% } %>
+
+<div class="card">
+  <h2>基本設定</h2>
+  <p class="form-hint">啟用後，巡檢批次要「送出審核」並依序通過下面設定的關卡才算完成；審核中與已核准的批次會鎖定、不能編輯。<strong>關閉時維持原本的「標記為已完成」</strong>，舊的批次不受影響。</p>
+  <form method="POST" action="/admin/approval/settings">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <div class="form-group">
+      <label class="form-checkbox-row">
+        <input type="checkbox" name="enabled" value="on" <%= settings.enabled ? 'checked' : '' %>>
+        <span><strong>啟用簽核流程</strong></span>
+      </label>
+    </div>
+    <div class="form-group">
+      <label class="form-checkbox-row">
+        <input type="checkbox" name="block_self_approval" value="on" <%= settings.block_self_approval ? 'checked' : '' %>>
+        <span><strong>送審的人不能簽核自己送出的批次</strong><br><span class="form-hint">建議開啟。如果系統只有一位管理員，這個選項會讓他無法核准自己送的批次，可以暫時關閉。</span></span>
+      </label>
+    </div>
+    <button type="submit" class="btn btn--primary btn--md">儲存設定</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>簽核關卡</h2>
+  <p class="form-hint">依序由上到下簽核。每一關可以指定負責的<strong>權限群組</strong>（該群組的成員可以簽核）；選「只有管理員」則由管理員簽核。<strong>管理員隨時都可以處理任何一關。</strong>修改關卡只影響之後送出的審核，已經在審核中的批次維持送出當時的關卡。</p>
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead><tr><th>順序</th><th>關卡名稱與負責群組</th><th>狀態</th><th></th></tr></thead>
+      <tbody>
+        <% stages.forEach((s, i) => { %>
+          <tr>
+            <td><%= i + 1 %></td>
+            <td>
+              <form method="POST" action="/admin/approval/stages/<%= s.id %>" class="inline-edit">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <input class="form-input" type="text" name="label" maxlength="<%= maxLabel %>" value="<%= s.label %>" required aria-label="關卡名稱">
+                <select class="form-select" name="group_id" aria-label="負責群組">
+                  <option value="">只有管理員</option>
+                  <% groups.forEach(g => { %>
+                    <option value="<%= g.id %>" <%= s.group_id === g.id ? 'selected' : '' %>><%= g.name %></option>
+                  <% }) %>
+                </select>
+                <button type="submit" class="btn btn--secondary btn--sm">儲存</button>
+              </form>
+            </td>
+            <td>
+              <% if (s.is_active) { %><span class="status-badge status-badge--normal">啟用中</span>
+              <% } else { %><span class="status-badge status-badge--warning">已停用</span><% } %>
+            </td>
+            <td>
+              <div class="page-actions">
+                <form method="POST" action="/admin/approval/stages/<%= s.id %>/move">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <input type="hidden" name="dir" value="up">
+                  <button type="submit" class="btn btn--secondary btn--sm" <%= i === 0 ? 'disabled' : '' %> title="往上移">↑</button>
+                </form>
+                <form method="POST" action="/admin/approval/stages/<%= s.id %>/move">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <input type="hidden" name="dir" value="down">
+                  <button type="submit" class="btn btn--secondary btn--sm" <%= i === stages.length - 1 ? 'disabled' : '' %> title="往下移">↓</button>
+                </form>
+                <form method="POST" action="/admin/approval/stages/<%= s.id %>/toggle">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <button type="submit" class="btn btn--secondary btn--sm"><%= s.is_active ? '停用' : '啟用' %></button>
+                </form>
+                <% if (!s.used) { %>
+                  <form method="POST" action="/admin/approval/stages/<%= s.id %>/delete" data-confirm="確定要刪除關卡「<%= s.label %>」嗎？這個關卡從未被使用過，刪除後無法復原。">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button type="submit" class="btn btn--secondary btn--sm">刪除</button>
+                  </form>
+                <% } %>
+              </div>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <h2>新增關卡</h2>
+  <form method="POST" action="/admin/approval/stages">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <div class="checklist-row__grid">
+      <div class="form-group">
+        <label class="form-label" for="label">關卡名稱</label>
+        <input class="form-input" type="text" id="label" name="label" maxlength="<%= maxLabel %>" value="<%= form.label || '' %>" placeholder="例如：部門主管、資訊長" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="group_id">負責群組</label>
+        <select class="form-select" id="group_id" name="group_id">
+          <option value="">只有管理員</option>
+          <% groups.forEach(g => { %>
+            <option value="<%= g.id %>" <%= String(form.group_id) === String(g.id) ? 'selected' : '' %>><%= g.name %></option>
+          <% }) %>
+        </select>
+      </div>
+    </div>
+    <button type="submit" class="btn btn--primary btn--md">新增關卡</button>
+    <span class="form-hint">新增的關卡排在最後，可再用上下箭頭調整順序。</span>
+  </form>
+</div>
+
+<%- include('../partials/footer') %>

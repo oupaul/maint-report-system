@@ -18,6 +18,28 @@
   </div>
 </div>
 
+<% if (pendingApprovals.length > 0) { %>
+  <div class="card card--accent">
+    <h2>待我簽核（<%= pendingApprovals.length %>）</h2>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>批次</th><th>日期</th><th>目前關卡</th><th>送審時間</th><th></th></tr></thead>
+        <tbody>
+          <% pendingApprovals.forEach(p => { %>
+            <tr>
+              <td><%= p.batch.title %></td>
+              <td><%= p.batch.batch_date %></td>
+              <td><%= p.record.stage_label %></td>
+              <td><%= (p.batch.submitted_at || '').slice(0, 16) %></td>
+              <td><a class="btn btn--primary btn--sm" href="/batches/<%= p.batch.id %>">前往簽核</a></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% } %>
+
 <div class="card">
   <h2>近期巡檢批次</h2>
   <% if (batches.length === 0) { %>

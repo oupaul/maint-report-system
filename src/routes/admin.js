@@ -27,6 +27,9 @@ router.use(requireRole('admin'));
 // 權限群組
 router.use('/groups', require('./adminGroups'));
 
+// 簽核流程設定
+router.use('/approval', require('./adminApproval'));
+
 // 網址只帶固定代碼、不帶任何文字，避免有人做出一個網址讓管理員頁面顯示任意內容
 const FLASH = {
   ok: {

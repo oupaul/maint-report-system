@@ -9,6 +9,7 @@ const InspectionItem = require('../models/InspectionItem');
 const InspectionItemPhoto = require('../models/InspectionItemPhoto');
 const BatchSignature = require('../models/BatchSignature');
 const PdfReportService = require('../services/PdfReportService');
+const ApprovalService = require('../services/ApprovalService');
 const config = require('../config');
 
 router.get('/batches/:id/report.pdf', requireLogin, async (req, res) => {
@@ -38,7 +39,7 @@ router.get('/batches/:id/report.pdf', requireLogin, async (req, res) => {
   res.setHeader('Content-Disposition', `inline; filename="batch-${batch.id}-report.pdf"`);
 
   try {
-    await PdfReportService.generateBatchReport({ batch, assets, itemsByAssetId, signaturesByRole }, res);
+    await PdfReportService.generateBatchReport({ batch, assets, itemsByAssetId, signaturesByRole, approval: ApprovalService.approvalSummary(batch) }, res);
   } catch (err) {
     console.error('[reports] PDF 產生失敗:', err);
     if (!res.headersSent) {

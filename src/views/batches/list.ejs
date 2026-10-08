@@ -28,16 +28,16 @@
               <td><%= b.title %></td>
               <td><%= b.batch_date %></td>
               <td>
-                <% if (b.status === 'completed') { %>
-                  <span class="badge">已完成</span>
+                <% if (b.statusInfo.tone === 'draft') { %>
+                  <span class="badge" style="color: var(--color-primary); border-color: var(--color-primary);"><%= b.statusInfo.text %></span>
                 <% } else { %>
-                  <span class="badge" style="color: var(--color-primary); border-color: var(--color-primary);">草稿</span>
+                  <span class="status-badge status-badge--<%= b.statusInfo.tone %>"><%= b.statusInfo.text %></span>
                 <% } %>
               </td>
               <td><%= b.created_by_name || b.created_by_username %></td>
               <td>
                 <a href="/batches/<%= b.id %>">查看</a>
-                <% if (b.status === 'draft') { %>
+                <% if (b.status === 'draft' && !b.locked) { %>
                   &nbsp;|&nbsp;<a href="/batches/<%= b.id %>/entry">填寫</a>
                 <% } %>
               </td>
