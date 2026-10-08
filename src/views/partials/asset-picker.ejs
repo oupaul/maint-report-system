@@ -1,0 +1,77 @@
+<%#
+  設備挑選器（建立批次、填寫頁「新增設備到本次巡檢」共用）。設備很多時不再是一整面勾選牆：
+  搜尋、類型／位置篩選、依類型分組可摺疊、全選目前顯示的、只看已勾選，建立批次時還能「帶入某次巡檢的設備」。
+  需要的變數：pickerAssets（設備陣列）、categoryLabels；選用：pickerBatches（可沿用的舊批次）、pickerSelected（要預先勾選的設備 id）。
+  行為在 public/js/asset-picker.js；沒有 JavaScript 時退回成一份完整的勾選清單（群組預設展開）。
+%>
+<%
+  const selectedSet = new Set((typeof pickerSelected !== 'undefined' && pickerSelected ? pickerSelected : []).map(String));
+  const batchesForPicker = typeof pickerBatches !== 'undefined' && pickerBatches ? pickerBatches : [];
+  const groups = []; const gIndex = {};
+  pickerAssets.forEach(a => {
+    if (!(a.category in gIndex)) { gIndex[a.category] = groups.length; groups.push({ code: a.category, label: categoryLabels[a.category] || a.category, items: [] }); }
+    groups[gIndex[a.category]].items.push(a);
+  });
+  const locations = [...new Set(pickerAssets.map(a => (a.location || '').trim()).filter(Boolean))].sort((x, y) => x.localeCompare(y, 'zh-Hant'));
+%>
+<div class="form-group asset-picker" id="asset-picker" data-total="<%= pickerAssets.length %>" data-batches="<%= JSON.stringify(batchesForPicker) %>">
+  <label class="form-label">或從已建立的設備清單勾選（共 <%= pickerAssets.length %> 台）</label>
+
+  <% if (batchesForPicker.length > 0) { %>
+    <div class="ap-batch-row">
+      <select class="form-select ap-batch" aria-label="沿用某次巡檢的設備">
+        <% batchesForPicker.forEach((b, i) => { %>
+          <option value="<%= b.id %>"><%= i === 0 ? '最近一次：' : '' %><%= b.title %>（<%= b.date %>，<%= b.assets.length %> 台）</option>
+        <% }) %>
+      </select>
+      <button type="button" class="btn btn--secondary btn--sm ap-apply-batch">帶入這次巡檢的設備</button>
+      <span class="form-hint ap-batch-msg" aria-live="polite"></span>
+    </div>
+  <% } %>
+
+  <div class="ap-toolbar">
+    <input type="search" class="form-input ap-search" placeholder="搜尋名稱、位置、識別碼（IP／序號）" aria-label="搜尋設備" autocomplete="off">
+    <% if (locations.length > 1) { %>
+      <select class="form-select ap-location" aria-label="依位置篩選">
+        <option value="">全部位置</option>
+        <% locations.forEach(l => { %><option value="<%= l %>"><%= l %></option><% }) %>
+      </select>
+    <% } %>
+  </div>
+
+  <% if (groups.length > 1) { %>
+    <div class="ap-chips" role="group" aria-label="依類型篩選">
+      <button type="button" class="ap-chip is-active" data-cat="">全部（<%= pickerAssets.length %>）</button>
+      <% groups.forEach(g => { %><button type="button" class="ap-chip" data-cat="<%= g.code %>"><%= g.label %>（<%= g.items.length %>）</button><% }) %>
+    </div>
+  <% } %>
+
+  <div class="ap-actions">
+    <button type="button" class="btn btn--secondary btn--sm ap-select-visible">全選目前顯示的</button>
+    <button type="button" class="btn btn--secondary btn--sm ap-clear">清除所有勾選</button>
+    <label class="ap-only-selected"><input type="checkbox" class="ap-only"> 只看已勾選的</label>
+    <strong class="ap-count" aria-live="polite">已選 0 台</strong>
+  </div>
+
+  <% groups.forEach(g => { %>
+    <details class="ap-group" data-cat="<%= g.code %>" open>
+      <summary>
+        <span class="ap-group__title"><%= g.label %></span>
+        <span class="form-hint ap-group__count"><%= g.items.length %> 台</span>
+        <button type="button" class="btn btn--secondary btn--sm ap-group-select">全選這類</button>
+      </summary>
+      <div class="checkbox-grid">
+        <% g.items.forEach(a => { %>
+          <label class="checkbox-tile ap-tile" data-id="<%= a.id %>" data-cat="<%= a.category %>" data-loc="<%= (a.location || '').trim() %>" data-search="<%= [a.name, a.location, a.identifier, g.label].filter(Boolean).join(' ').toLowerCase() %>">
+            <input type="checkbox" name="asset_ids" value="<%= a.id %>" <%= selectedSet.has(String(a.id)) ? 'checked' : '' %>>
+            <span class="ap-tile__text">
+              <strong><%= a.name %></strong>
+              <% if (a.location || a.identifier) { %><small><%= [a.location, a.identifier].filter(Boolean).join('・') %></small><% } %>
+            </span>
+          </label>
+        <% }) %>
+      </div>
+    </details>
+  <% }) %>
+  <p class="form-hint ap-empty" hidden>沒有符合條件的設備，請換個關鍵字或清除篩選。</p>
+</div>

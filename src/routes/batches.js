@@ -45,9 +45,21 @@ router.get('/', requireLogin, (req, res) => {
   res.render('batches/list', { batches });
 });
 
+// 「帶入某次巡檢的設備」用：最近 20 個批次與各自的設備 id（例行巡檢大多是同一批設備）
+function recentBatchesForPicker() {
+  return InspectionBatch.findAll().slice(0, 20).map(b => ({
+    id: b.id,
+    title: b.title,
+    date: b.batch_date,
+    assets: InspectionBatch.getAssets(b.id).map(a => a.id),
+  })).filter(b => b.assets.length > 0);
+}
+
 router.get('/new', requireLogin, (req, res) => {
   const assets = Asset.findAll();
   res.render('batches/new', {
+    pickerBatches: recentBatchesForPicker(),
+    pickerSelected: [],
     assets,
     categories: AssetCategory.selectableCodes(),
     categoryLabels: AssetCategory.labelMap(),
@@ -86,6 +98,8 @@ router.post('/new', requireLogin, (req, res) => {
   if (!title || !batch_date || allAssetIds.length === 0) {
     const assets = Asset.findAll();
     return res.status(400).render('batches/new', {
+      pickerBatches: recentBatchesForPicker(),
+      pickerSelected: assetIds, // 驗證失敗重新顯示時，已勾選的設備不要不見
       assets,
       categories: AssetCategory.selectableCodes(),
       categoryLabels: AssetCategory.labelMap(),

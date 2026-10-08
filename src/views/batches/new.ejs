@@ -40,17 +40,7 @@
     </div>
 
     <% if (assets.length > 0) { %>
-      <div class="form-group">
-        <label class="form-label">或從已建立的設備清單勾選</label>
-        <div class="checkbox-grid">
-          <% assets.forEach(a => { %>
-            <label class="checkbox-tile">
-              <input type="checkbox" name="asset_ids" value="<%= a.id %>">
-              <span><%= a.name %>（<%= categoryLabels[a.category] || a.category %>）</span>
-            </label>
-          <% }) %>
-        </div>
-      </div>
+      <%- include('../partials/asset-picker', { pickerAssets: assets, pickerBatches: pickerBatches, pickerSelected: pickerSelected }) %>
     <% } %>
     <button type="submit" class="btn btn--primary btn--md">建立並開始填寫</button>
     <a href="/batches" class="btn btn--secondary btn--md">取消</a>
@@ -58,5 +48,6 @@
 </div>
 
 <script src="/js/asset-quick-add.js"></script>
+<script src="/js/asset-picker.js"></script>
 
 <%- include('../partials/footer') %>

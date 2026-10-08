@@ -129,17 +129,7 @@
     </div>
 
     <% if (availableAssets && availableAssets.length > 0) { %>
-      <div class="form-group">
-        <label class="form-label">或從已建立的設備清單勾選</label>
-        <div class="checkbox-grid">
-          <% availableAssets.forEach(a => { %>
-            <label class="checkbox-tile">
-              <input type="checkbox" name="asset_ids" value="<%= a.id %>">
-              <span><%= a.name %>（<%= categoryLabels[a.category] || a.category %>）</span>
-            </label>
-          <% }) %>
-        </div>
-      </div>
+      <%- include('../partials/asset-picker', { pickerAssets: availableAssets, pickerBatches: null, pickerSelected: null }) %>
     <% } %>
 
     <button type="submit" class="btn btn--primary btn--md">加入本次巡檢</button>
@@ -147,6 +137,7 @@
 </section>
 
 <script src="/js/asset-quick-add.js"></script>
+<script src="/js/asset-picker.js"></script>
 <script src="/js/photo-viewer.js"></script>
 
 <%- include('../partials/footer') %>
