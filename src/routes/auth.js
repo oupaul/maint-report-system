@@ -8,6 +8,7 @@ const M365AuthService = require('../services/M365AuthService');
 const LoginRateLimit = require('../middleware/loginRateLimit');
 const ActivityTracker = require('../services/ActivityTracker');
 const { establishSession } = require('../utils/session');
+const { safeReturnPath } = require('../utils/safeRedirect');
 
 // 帳號不存在時也跑一次 argon2 驗證（對一個不可能符合的雜湊），讓「帳號不存在」跟
 // 「密碼錯誤」回應時間差不多，避免從回應速度猜出哪些帳號存在。
@@ -43,8 +44,9 @@ router.post('/login', async (req, res, next) => {
     }
 
     LoginRateLimit.recordSuccess(req, username);
+    const returnTo = safeReturnPath(req.session && req.session.returnTo); // establishSession 會換新 session，要先取出來
     await establishSession(req, user);
-    res.redirect(user.must_change_password ? '/account/password' : '/');
+    res.redirect(user.must_change_password ? '/account/password' : (returnTo || '/'));
   } catch (err) {
     next(err);
   }
@@ -102,9 +104,10 @@ router.post('/auth/m365/token', async (req, res) => {
   }
 
   try {
+    const returnTo = safeReturnPath(req.session && req.session.returnTo);
     await establishSession(req, user, { viaSso: true });
     console.log(`[M365 SSO] 登入成功：${user.username}（${profile.email}）`);
-    res.json({ redirect: '/' });
+    res.json({ redirect: returnTo || '/' });
   } catch (err) {
     console.error('[M365 SSO] 建立 session 失敗:', err);
     res.status(500).json({ error: '登入失敗，請稍後再試' });

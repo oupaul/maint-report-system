@@ -1,5 +1,6 @@
 const db = require('../models/db');
 const Notification = require('../models/Notification');
+const MailService = require('./MailService');
 const { nowTaipei } = require('../utils/time');
 
 // 巡檢批次的簽核流程（比照 expense-platform）：
@@ -239,7 +240,10 @@ function approvalSummary(batch) {
 // ---------- 動作 ----------
 
 function notifyAll(users, batch, { type, title, message }) {
-  for (const u of users) Notification.create(u.id, { batchId: batch.id, type, title, message });
+  for (const u of users) {
+    const id = Notification.create(u.id, { batchId: batch.id, type, title, message });
+    MailService.queueNotificationEmail(id); // 站內通知先寫好，Email 在交易提交後背景寄出
+  }
 }
 
 function fresh(batchId) {

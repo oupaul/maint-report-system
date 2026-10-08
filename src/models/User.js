@@ -30,18 +30,18 @@ const User = {
   },
 
   // 管理員代建的帳號，密碼是管理員設定的、本人不是自己選的，第一次登入強制改密碼
-  create({ username, password_hash, display_name, role, m365_email, group_id }) {
+  create({ username, password_hash, display_name, role, m365_email, group_id, email }) {
     const result = db.prepare(
-      `INSERT INTO users (username, password_hash, display_name, role, m365_email, group_id, is_active, must_change_password, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, 1, 1, ?)`
-    ).run(username, password_hash, display_name || null, role, (m365_email || '').trim() || null, group_id || null, nowTaipei());
+      `INSERT INTO users (username, password_hash, display_name, role, m365_email, group_id, email, is_active, must_change_password, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1, ?)`
+    ).run(username, password_hash, display_name || null, role, (m365_email || '').trim() || null, group_id || null, (email || '').trim() || null, nowTaipei());
     return User.findById(result.lastInsertRowid);
   },
 
-  update(id, { display_name, role, is_active, m365_email, group_id }) {
+  update(id, { display_name, role, is_active, m365_email, group_id, email }) {
     db.prepare(
-      `UPDATE users SET display_name = ?, role = ?, is_active = ?, m365_email = ?, group_id = ? WHERE id = ?`
-    ).run(display_name || null, role, is_active ? 1 : 0, (m365_email || '').trim() || null, group_id || null, id);
+      `UPDATE users SET display_name = ?, role = ?, is_active = ?, m365_email = ?, group_id = ?, email = ? WHERE id = ?`
+    ).run(display_name || null, role, is_active ? 1 : 0, (m365_email || '').trim() || null, group_id || null, (email || '').trim() || null, id);
     return User.findById(id);
   },
 

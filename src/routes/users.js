@@ -4,6 +4,7 @@ const router = express.Router();
 const { requireRole } = require('../middleware/auth');
 const User = require('../models/User');
 const PermissionGroup = require('../models/PermissionGroup');
+const MailService = require('../services/MailService');
 const AuthService = require('../services/AuthService');
 const { USER_ROLES, isValidRole } = require('../utils/validators');
 const { validatePasswordStrength } = require('../utils/password');
@@ -26,7 +27,7 @@ router.get('/new', requireRole('admin'), (req, res) => {
 });
 
 router.post('/', requireRole('admin'), async (req, res) => {
-  const { username, password, display_name, role, m365_email } = req.body;
+  const { username, password, display_name, role, m365_email, email } = req.body;
   const group = parseGroup(req.body.group_id);
 
   if (!username || !password || !isValidRole(role)) {
@@ -35,6 +36,15 @@ router.post('/', requireRole('admin'), async (req, res) => {
       roles: USER_ROLES,
       groups: PermissionGroup.findAll(),
       error: '請輸入帳號、密碼並選擇有效的角色',
+    });
+  }
+
+  if (email && !MailService.isValidEmail(email)) {
+    return res.status(400).render('users/form', {
+      targetUser: req.body,
+      roles: USER_ROLES,
+      groups: PermissionGroup.findAll(),
+      error: '通知用的 Email 格式不正確',
     });
   }
 
@@ -76,7 +86,7 @@ router.post('/', requireRole('admin'), async (req, res) => {
   }
 
   const password_hash = await AuthService.hashPassword(password);
-  User.create({ username, password_hash, display_name, role, m365_email, group_id: group.id });
+  User.create({ username, password_hash, display_name, role, m365_email, group_id: group.id, email });
   res.redirect('/users');
 });
 
@@ -94,7 +104,7 @@ router.post('/:id/edit', requireRole('admin'), async (req, res) => {
     return res.status(404).render('error', { title: '找不到使用者', message: '找不到指定的使用者' });
   }
 
-  const { display_name, role, is_active, new_password, m365_email } = req.body;
+  const { display_name, role, is_active, new_password, m365_email, email } = req.body;
   const group = parseGroup(req.body.group_id);
   const willBeActive = is_active === 'on' || is_active === '1';
 
@@ -104,6 +114,15 @@ router.post('/:id/edit', requireRole('admin'), async (req, res) => {
       roles: USER_ROLES,
       groups: PermissionGroup.findAll(),
       error: '請選擇有效的角色',
+    });
+  }
+
+  if (email && !MailService.isValidEmail(email)) {
+    return res.status(400).render('users/form', {
+      targetUser: { ...targetUser, ...req.body },
+      roles: USER_ROLES,
+      groups: PermissionGroup.findAll(),
+      error: '通知用的 Email 格式不正確',
     });
   }
 
@@ -158,6 +177,7 @@ router.post('/:id/edit', requireRole('admin'), async (req, res) => {
     is_active: willBeActive,
     m365_email,
     group_id: group.id,
+    email,
   });
 
   if (wantsPasswordReset) {

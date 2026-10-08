@@ -1,10 +1,21 @@
 const { can } = require('../utils/permissions');
+const { safeReturnPath } = require('../utils/safeRedirect');
+
+// 沒登入就導去登入頁，順便記住原本要去的頁面（GET 才記），登入成功後回到那裡——
+// 例如從通知信的連結點進來，登入後直接看到那個批次。
+function redirectToLogin(req, res) {
+  if (req.method === 'GET' && req.session) {
+    const target = safeReturnPath(req.originalUrl);
+    if (target) req.session.returnTo = target;
+  }
+  return res.redirect('/login');
+}
 
 // req.user 由 app.js 每個請求依資料庫即時填好（含 permissions）；這裡優先用它，
 // 沒有才退回 session 裡的版本。
 function requireLogin(req, res, next) {
   if (!req.session || !req.session.user) {
-    return res.redirect('/login');
+    return redirectToLogin(req, res);
   }
   req.user = req.user || req.session.user;
   res.locals.currentUser = req.user;
@@ -14,7 +25,7 @@ function requireLogin(req, res, next) {
 function requireRole(role) {
   return (req, res, next) => {
     if (!req.session || !req.session.user) {
-      return res.redirect('/login');
+      return redirectToLogin(req, res);
     }
     const user = req.user || req.session.user;
     if (user.role !== role) {
@@ -34,7 +45,7 @@ function requireRole(role) {
 function requirePermission(permission) {
   return (req, res, next) => {
     if (!req.session || !req.session.user) {
-      return res.redirect('/login');
+      return redirectToLogin(req, res);
     }
     req.user = req.user || req.session.user;
     res.locals.currentUser = req.user;

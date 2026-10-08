@@ -1,0 +1,167 @@
+<%- include('../layout', { title: 'Email 通知' }) %>
+
+<div class="page-header">
+  <h1>Email 通知</h1>
+  <div class="page-actions">
+    <% if (settings.enabled && ready) { %><span class="status-badge status-badge--normal">已啟用</span>
+    <% } else if (settings.enabled) { %><span class="status-badge status-badge--warning">已啟用但設定不完整</span>
+    <% } else { %><span class="status-badge status-badge--warning">未啟用（只有站內通知）</span><% } %>
+  </div>
+</div>
+
+<% if (ok) { %><div class="form-success"><%= ok %></div><% } %>
+<% if (error) { %><div class="form-error"><%= error %></div><% } %>
+
+<form method="POST" action="/admin/mail/settings" autocomplete="off">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+  <div class="card">
+    <h2>基本設定</h2>
+    <p class="form-hint">簽核通知（待簽核、核准、退回、撤回…）和自動備份失敗，除了站內通知之外，也會寄 Email 給對方。Email 是額外的提醒：寄不出去不會影響站內通知，也不會影響簽核動作本身。收件人的 Email 在「使用者管理」設定。</p>
+    <div class="form-group">
+      <label class="form-checkbox-row">
+        <input type="checkbox" name="enabled" value="on" <%= settings.enabled ? 'checked' : '' %>>
+        <span><strong>啟用 Email 通知</strong></span>
+      </label>
+    </div>
+    <div class="form-group">
+      <label class="form-label">寄信方式</label>
+      <label class="form-checkbox-row"><input type="radio" name="method" value="smtp" <%= settings.method === 'smtp' ? 'checked' : '' %>><span>SMTP（郵件伺服器帳號密碼）</span></label>
+      <label class="form-checkbox-row"><input type="radio" name="method" value="m365" <%= settings.method === 'm365' ? 'checked' : '' %>><span>Microsoft 365（Graph API，應用程式權限）</span></label>
+      <p class="form-hint">只會使用上面選的那一種；兩種的設定可以都先填好、需要時再切換。</p>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="app_url">系統網址（選填）</label>
+      <input class="form-input" type="text" id="app_url" name="app_url" value="<%= settings.app_url %>" placeholder="https://maint.example.com">
+      <p class="form-hint">信件裡「前往查看」按鈕要用的網址（就是你平常打開這個系統的網址，不含最後的斜線）。沒填的話信件只有文字說明、沒有連結。收信的人點連結進來，登入後會直接回到那個批次。</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>SMTP 設定</h2>
+    <div class="checklist-row__grid">
+      <div class="form-group">
+        <label class="form-label" for="smtp_host">SMTP 主機</label>
+        <input class="form-input" type="text" id="smtp_host" name="smtp_host" value="<%= settings.smtp_host %>" placeholder="smtp.example.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="smtp_port">埠號</label>
+        <input class="form-input" type="number" id="smtp_port" name="smtp_port" min="1" max="65535" value="<%= settings.smtp_port %>">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-checkbox-row"><input type="checkbox" name="smtp_secure" value="on" <%= settings.smtp_secure ? 'checked' : '' %>><span>使用 SSL/TLS 直接加密連線（465 埠勾選；587 埠不要勾，會自動升級加密）</span></label>
+    </div>
+    <div class="checklist-row__grid">
+      <div class="form-group">
+        <label class="form-label" for="smtp_user">帳號（不需要驗證的內部中繼主機可留空）</label>
+        <input class="form-input" type="text" id="smtp_user" name="smtp_user" value="<%= settings.smtp_user %>" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="smtp_pass">密碼</label>
+        <input class="form-input" type="password" id="smtp_pass" name="smtp_pass" autocomplete="new-password" placeholder="<%= settings.hasSmtpPass && !settings.smtpPassUnreadable ? '已儲存（留空表示不變更）' : '' %>">
+        <% if (settings.smtpPassUnreadable) { %><p class="form-hint" style="color: var(--color-status-critical);">已儲存的密碼因為系統金鑰變動而無法解密，請重新輸入。</p><% } %>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="smtp_from">寄件人</label>
+      <input class="form-input" type="text" id="smtp_from" name="smtp_from" value="<%= settings.smtp_from %>" placeholder="維護系統 &lt;noreply@example.com&gt;">
+      <p class="form-hint">可以只填 email，或「顯示名稱 &lt;email&gt;」。很多郵件主機要求寄件人必須是該帳號擁有的信箱。</p>
+    </div>
+    <div class="form-group">
+      <label class="form-checkbox-row"><input type="checkbox" name="smtp_allow_self_signed" value="on" <%= settings.smtp_allow_self_signed ? 'checked' : '' %>><span>信任自我簽署／內部 CA 憑證（只有確定對方是自己的內部郵件主機才勾選，勾選後不再驗證憑證）</span></label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Microsoft 365（Graph）設定</h2>
+    <p class="form-hint">不需要 SMTP 帳密，改由應用程式用 Client Secret 向 Microsoft 換取權杖，再呼叫 Graph 的「寄信」API，以指定信箱的名義寄出。<strong>這個 Client Secret 只用在寄信，和 Microsoft 365 登入無關</strong>（登入仍然不需要任何 secret）；它會加密儲存，網頁不會再顯示。</p>
+    <details style="margin-bottom: var(--space-4);">
+      <summary style="cursor:pointer;"><strong>在 Azure 要怎麼設定？</strong></summary>
+      <ol class="form-hint" style="padding-left: 1.2rem;">
+        <li>Entra ID → App registrations → New registration，建立一個專門寄信用的應用程式（和登入用的分開比較好管理）。</li>
+        <li>API permissions → Add a permission → Microsoft Graph → <strong>Application permissions</strong> → 勾選 <strong>Mail.Send</strong> → 按「Grant admin consent」（需要租戶管理員）。</li>
+        <li>Certificates &amp; secrets → New client secret，複製「<strong>值</strong>」（不是「密碼識別碼」）貼到下面。</li>
+        <li>寄件信箱要是租戶裡有 Exchange Online 授權的信箱。建議在 Exchange 用「應用程式存取原則」把這個應用程式限制只能代表這一個信箱寄信。</li>
+      </ol>
+    </details>
+    <div class="checklist-row__grid">
+      <div class="form-group">
+        <label class="form-label" for="m365_tenant_id">Tenant ID</label>
+        <input class="form-input" type="text" id="m365_tenant_id" name="m365_tenant_id" value="<%= settings.m365_tenant_id %>" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="m365_client_id">Client ID</label>
+        <input class="form-input" type="text" id="m365_client_id" name="m365_client_id" value="<%= settings.m365_client_id %>" autocomplete="off">
+      </div>
+    </div>
+    <div class="checklist-row__grid">
+      <div class="form-group">
+        <label class="form-label" for="m365_client_secret">Client Secret（值）</label>
+        <input class="form-input" type="password" id="m365_client_secret" name="m365_client_secret" autocomplete="new-password" placeholder="<%= settings.hasM365Secret && !settings.m365SecretUnreadable ? '已儲存（留空表示不變更）' : '' %>">
+        <% if (settings.m365SecretUnreadable) { %><p class="form-hint" style="color: var(--color-status-critical);">已儲存的 Client Secret 因為系統金鑰變動而無法解密，請重新輸入。</p><% } %>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="m365_from_address">寄件信箱</label>
+        <input class="form-input" type="email" id="m365_from_address" name="m365_from_address" value="<%= settings.m365_from_address %>" placeholder="noreply@yourcompany.com">
+      </div>
+    </div>
+  </div>
+
+  <button type="submit" class="btn btn--primary btn--md">儲存設定</button>
+</form>
+
+<div class="card" style="margin-top: var(--space-6);">
+  <h2>測試寄信</h2>
+  <p class="form-hint">用目前<strong>已儲存</strong>的設定寄一封測試信（還沒打開「啟用」也可以測）。請先儲存設定再測試。</p>
+  <% if (testResult) { %>
+    <% if (testResult.status === 'sent') { %>
+      <div class="form-success">已寄出測試信到 <%= testResult.to %>，請到信箱確認有沒有收到（也看一下垃圾郵件匣）。</div>
+    <% } else { %>
+      <div class="form-error">測試寄信<%= testResult.status === 'skipped' ? '沒有執行' : '失敗' %>：<%= testResult.error %></div>
+    <% } %>
+  <% } %>
+  <form method="POST" action="/admin/mail/test" class="inline-edit">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <input class="form-input" type="email" name="to" value="<%= testResult ? testResult.to : adminEmail %>" placeholder="收件人 Email" required aria-label="測試收件人">
+    <button type="submit" class="btn btn--secondary btn--md">寄送測試信</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>寄送紀錄（最近 50 則通知）</h2>
+  <% if (log.length === 0) { %>
+    <div class="empty-state">還沒有任何通知。</div>
+  <% } else { %>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>時間</th><th>收件人</th><th>通知</th><th>Email</th><th></th></tr></thead>
+        <tbody>
+          <% log.forEach(n => { %>
+            <tr>
+              <td><%= n.created_at.slice(0, 16) %></td>
+              <td><%= n.display_name || n.username %><div class="form-hint"><%= n.to || '（沒有 Email）' %></div></td>
+              <td><%= n.title %></td>
+              <td>
+                <% if (n.email_status === 'sent') { %><span class="status-badge status-badge--normal">已寄出</span>
+                <% } else if (n.email_status === 'failed') { %><span class="status-badge status-badge--critical">失敗</span>
+                <% } else { %><span class="status-badge status-badge--warning">未寄送</span><% } %>
+                <% if (n.email_error) { %><div class="form-hint"><%= n.email_error %></div><% } %>
+              </td>
+              <td>
+                <% if (n.email_status !== 'sent' && n.to && ready) { %>
+                  <form method="POST" action="/admin/mail/resend/<%= n.id %>">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button type="submit" class="btn btn--secondary btn--sm">重寄</button>
+                  </form>
+                <% } %>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>
+
+<%- include('../partials/footer') %>

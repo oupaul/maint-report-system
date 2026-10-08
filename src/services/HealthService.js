@@ -5,6 +5,7 @@ const path = require('path');
 const config = require('../config');
 const db = require('../models/db');
 const BackupService = require('./BackupService');
+const MailService = require('./MailService');
 const pkg = require('../../package.json');
 
 // 檢查結果的等級：ok 正常、warn 需要留意、bad 需要處理
@@ -116,6 +117,19 @@ async function collect() {
     }
   }
   checks.push({ key: 'backup', label: '備份', status: backupStatus, detail: backupDetail });
+
+  // Email 通知：沒啟用就不評估；啟用後近 24 小時有寄送失敗就提醒（常見原因：密碼過期、Client Secret 到期）
+  const mail = MailService.settingsForView();
+  if (!mail.enabled) {
+    checks.push({ key: 'mail', label: 'Email 通知', status: 'ok', detail: '未啟用（只有站內通知）' });
+  } else {
+    const failed = MailService.recentFailures(24);
+    checks.push({
+      key: 'mail', label: 'Email 通知',
+      status: failed > 0 ? 'warn' : 'ok',
+      detail: failed > 0 ? `近 24 小時有 ${failed} 封通知信寄送失敗，請到「Email 通知」頁查看原因` : '已啟用，近 24 小時沒有寄送失敗',
+    });
+  }
 
   const totalMem = os.totalmem();
   const mem = availableMemory();

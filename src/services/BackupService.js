@@ -8,6 +8,8 @@ const Database = require('better-sqlite3');
 const config = require('../config');
 const db = require('../models/db');
 const { nowTaipei, taipeiParts } = require('../utils/time');
+const Notification = require('../models/Notification');
+const MailService = require('./MailService');
 
 const execFileAsync = promisify(execFile);
 
@@ -240,6 +242,21 @@ async function createBackup({ trigger = 'manual' } = {}) {
     const message = err.message || String(err);
     recordResult({ ok: false, trigger, file: null, message });
     console.error(`[備份] 失敗（${trigger}）：${message}`);
+    // 排程自動備份失敗沒有人在現場看，通知所有管理員（站內 + Email）；手動備份失敗按的人當場就看得到，不重複通知
+    if (trigger === 'schedule') {
+      try {
+        for (const admin of db.prepare("SELECT id FROM users WHERE role = 'admin' AND is_active = 1").all()) {
+          const id = Notification.create(admin.id, {
+            type: 'system',
+            title: '自動備份失敗',
+            message: `排程自動備份失敗：${message}。請到「系統管理 → 備份管理」查看並處理。`,
+          });
+          MailService.queueNotificationEmail(id);
+        }
+      } catch (notifyErr) {
+        console.error('[備份] 建立失敗通知時發生錯誤：', notifyErr.message);
+      }
+    }
     return { ok: false, message };
   } finally {
     // 暫存資料夾與半成品一律在這裡清乾淨（等清完才結束），不留下 .staging-* / .part 殘留
