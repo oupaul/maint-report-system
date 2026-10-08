@@ -32,10 +32,70 @@
     el.hidden = false;
   }
 
+  // Microsoft 導回來之後的共同處理：取得 ID token → 交給伺服器驗證 → 成功就進首頁。
+  // 登入頁與 /auth/m365/callback 都會呼叫，所以不論 Azure 登錄的 Redirect URI 是網站根目錄、
+  // /login 還是 /auth/m365/callback，導回來之後都能完成登入，而不是靜默地停在登入畫面。
+  // 回傳 false 代表這次載入不是 Microsoft 導回來的（沒有登入結果可處理）。
+  async function completeRedirectLogin(app, csrf, onError) {
+    let result;
+    try {
+      result = await app.handleRedirectPromise();
+    } catch (err) {
+      onError('Microsoft 登入失敗：' + (err.errorMessage || err.message || err));
+      return true;
+    }
+    if (!result || !result.idToken) return false;
+    try {
+      const resp = await fetch('/auth/m365/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrf },
+        body: JSON.stringify({ idToken: result.idToken }),
+      });
+      const data = await resp.json().catch(function () { return {}; });
+      if (!resp.ok) {
+        onError(data.error || 'Microsoft 登入驗證失敗，請重新嘗試。');
+        return true;
+      }
+      // token 與 MSAL 暫存在瀏覽器 sessionStorage 的資料已經用完，清掉
+      try { window.sessionStorage.clear(); } catch (e) { /* ignore */ }
+      window.location.replace(data.redirect || '/');
+    } catch (err) {
+      onError('無法連線到伺服器完成登入：' + (err.message || err));
+    }
+    return true;
+  }
+
   const loginBox = document.getElementById('m365-login');
   if (loginBox) {
     const btn = document.getElementById('m365-login-btn');
     const errBox = document.getElementById('m365-login-error');
+    let app = null;
+    async function getApp() {
+      if (!app) {
+        app = newClient(loginBox);
+        await app.initialize();
+      }
+      return app;
+    }
+
+    // 如果 Redirect URI 登錄成登入頁本身（或網站根目錄再轉到登入頁），Microsoft 導回來時
+    // 登入結果就在這一頁的網址 # 後面，要在這裡接手處理。
+    if (window.isSecureContext && /[#&](code|error)=/.test(window.location.hash)) {
+      btn.disabled = true;
+      getApp().then(function (a) {
+        return completeRedirectLogin(a, loginBox.dataset.csrf, function (message) {
+          clearStaleInteraction();
+          btn.disabled = false;
+          showError(errBox, message);
+        });
+      }).then(function (handled) {
+        if (handled === false) btn.disabled = false;
+      }).catch(function (err) {
+        btn.disabled = false;
+        showError(errBox, 'Microsoft 365 登入失敗：' + (err.message || err));
+      });
+    }
+
     btn.addEventListener('click', async function () {
       errBox.hidden = true;
       if (!window.isSecureContext) {
@@ -45,9 +105,7 @@
       btn.disabled = true;
       clearStaleInteraction();
       try {
-        const app = newClient(loginBox);
-        await app.initialize();
-        await app.loginRedirect({ scopes: ['openid', 'profile', 'email'] });
+        await (await getApp()).loginRedirect({ scopes: ['openid', 'profile', 'email'] });
       } catch (err) {
         btn.disabled = false;
         showError(errBox, 'Microsoft 365 登入啟動失敗：' + (err.message || err));
@@ -70,24 +128,8 @@
       try {
         const app = newClient(cb);
         await app.initialize();
-        const result = await app.handleRedirectPromise();
-        if (!result || !result.idToken) {
-          fail('沒有收到 Microsoft 的登入結果，請回到登入頁重新嘗試。');
-          return;
-        }
-        const resp = await fetch('/auth/m365/token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-csrf-token': cb.dataset.csrf },
-          body: JSON.stringify({ idToken: result.idToken }),
-        });
-        const data = await resp.json().catch(function () { return {}; });
-        if (!resp.ok) {
-          fail(data.error || 'Microsoft 登入驗證失敗，請重新嘗試。');
-          return;
-        }
-        // token 與 MSAL 暫存在瀏覽器 sessionStorage 的資料已經用完，清掉
-        try { window.sessionStorage.clear(); } catch (e) { /* ignore */ }
-        window.location.replace(data.redirect || '/');
+        const handled = await completeRedirectLogin(app, cb.dataset.csrf, fail);
+        if (!handled) fail('沒有收到 Microsoft 的登入結果，請回到登入頁重新嘗試。');
       } catch (err) {
         fail('Microsoft 登入失敗：' + (err.errorMessage || err.message || err));
       }
