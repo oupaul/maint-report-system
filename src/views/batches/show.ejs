@@ -45,12 +45,15 @@
                 <td><%= item.note || '-' %></td>
                 <td>
                   <% if (item.photos && item.photos.length > 0) { %>
-                    <% item.photos.forEach((photo, i) => { %><a href="/uploads/<%= batch.id %>/<%= photo.filename %>" target="_blank">查看<%= item.photos.length > 1 ? (i + 1) : '' %></a><%= i < item.photos.length - 1 ? '　' : '' %><% }) %>
+                    <% item.photos.forEach((photo, i) => { %><a href="/uploads/<%= batch.id %>/<%= photo.filename %>" data-viewer="viewer-<%= item.id %>" data-label="<%= asset.name %>・<%= item.checklist_label %>・截圖 <%= i + 1 %>">查看<%= item.photos.length > 1 ? (i + 1) : '' %></a><%= i < item.photos.length - 1 ? '　' : '' %><% }) %>
                   <% } else { %>
                     -
                   <% } %>
                 </td>
               </tr>
+              <% if (item.photos && item.photos.length > 0) { %>
+                <tr class="photo-viewer-row" hidden><td colspan="5"><div id="viewer-<%= item.id %>" class="photo-viewer-host" data-viewer-host></div></td></tr>
+              <% } %>
             <% }) %>
           </tbody>
         </table>
@@ -117,5 +120,6 @@
 </section>
 
 <script src="/js/signature-pad.js"></script>
+<script src="/js/photo-viewer.js"></script>
 
 <%- include('../partials/footer') %>

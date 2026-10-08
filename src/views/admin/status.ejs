@@ -44,11 +44,11 @@
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
     <button type="submit" class="btn btn--secondary btn--sm">執行資料庫完整性檢查</button>
     <% if (dbCheck) { %>
-      <span class="status-badge status-badge--<%= dbCheck.ok ? 'normal' : 'critical' %>" style="margin-left: var(--space-3);">
+      <span class="status-badge status-badge--<%= dbCheck.ok ? 'normal' : 'critical' %>" style="margin-left: var(--space-4);">
         <%= dbCheck.ok ? '完整性檢查通過' : '發現問題：' + dbCheck.result %>（<%= dbCheck.ms %> ms）
       </span>
     <% } else { %>
-      <span class="form-hint" style="margin-left: var(--space-3);">資料庫很大時會花一點時間，所以不會自動執行。</span>
+      <span class="form-hint" style="margin-left: var(--space-4);">資料庫很大時會花一點時間，所以不會自動執行。</span>
     <% } %>
   </form>
 </div>

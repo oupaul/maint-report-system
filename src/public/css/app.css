@@ -502,3 +502,49 @@ p { margin: 0 0 var(--space-4) 0; }
   border-radius: var(--radius-md);
   background: repeating-conic-gradient(#e5e7eb 0% 25%, #fff 0% 50%) 0 0 / 16px 16px;
 }
+
+/* 截圖就地檢視區（public/js/photo-viewer.js） */
+.photo-viewer-host { margin-top: var(--space-2); }
+.photo-viewer-row > td { padding: 0 var(--space-4) var(--space-4); border-top: none; }
+.photo-viewer {
+  background: var(--color-text);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+}
+.photo-viewer__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.photo-viewer__title { color: #fff; font-size: var(--text-sm); }
+.photo-viewer__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.photo-viewer__btn {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 0.25rem 0.6rem;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.photo-viewer__btn:hover { background: rgba(255, 255, 255, 0.26); }
+.photo-viewer__stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-height: 70vh;
+  min-height: 6rem;
+  overflow: auto;
+}
+.photo-viewer__msg { color: #CBD5E1; font-size: var(--text-sm); padding: var(--space-6); }
+.photo-viewer__img {
+  max-width: 100%;
+  max-height: 65vh;
+  object-fit: contain;
+  transition: transform 150ms ease;
+}
+.photo-thumb-list__item a.is-viewing .screenshot-thumb { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+a.is-viewing { font-weight: 600; }
