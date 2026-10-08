@@ -3,12 +3,14 @@
 #
 # 用法：
 #   公開 Repo:
-#     bash <(curl -fsSL https://raw.githubusercontent.com/oupaul/maint-report-system/main/setup.sh)
+#     curl -fsSL https://raw.githubusercontent.com/oupaul/maint-report-system/main/setup.sh -o /tmp/setup.sh && sudo bash /tmp/setup.sh
+#   （不要用 sudo bash <(curl ...)：/dev/fd 不會傳給 sudo；也不要 curl | sudo bash，部署有互動提問）
 #
 #   私有 Repo（curl 本身也需帶 token，支援 ghp_ 與 github_pat_ 格式）:
 #     export GH_TOKEN=github_pat_xxxxxxxxxxxx   # 或 ghp_xxxxxxxxxxxx
-#     bash <(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
-#       https://raw.githubusercontent.com/oupaul/maint-report-system/main/setup.sh)
+#     curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+#       https://raw.githubusercontent.com/oupaul/maint-report-system/main/setup.sh -o /tmp/setup.sh \
+#       && sudo --preserve-env=GH_TOKEN bash /tmp/setup.sh
 
 set -e
 
@@ -35,7 +37,7 @@ echo "============================================"
 echo ""
 
 if [ "$EUID" -ne 0 ]; then
-    error "請使用 sudo 執行：\n  sudo bash <(curl -fsSL ...)"
+    error "請使用 sudo 執行（先下載成檔案，不要用 sudo bash <(curl ...)）：\n  curl -fsSL https://raw.githubusercontent.com/oupaul/maint-report-system/main/setup.sh -o /tmp/setup.sh && sudo bash /tmp/setup.sh"
 fi
 
 if ! command -v git &>/dev/null; then
@@ -59,7 +61,7 @@ if ! git "${GIT_AUTH_ARGS[@]}" clone --depth=1 -b "$BRANCH" "$GIT_URL" "$CLONE_D
     error "下載失敗。可能原因：
   1. Repo 為私有 → 請設定 GH_TOKEN：
        export GH_TOKEN=ghp_xxxxxxxxxxxx
-       bash <(curl -fsSL ...)
+       並以 sudo --preserve-env=GH_TOKEN bash /tmp/setup.sh 重新執行
   2. Branch '${BRANCH}' 不存在 → 請確認 branch 名稱
   3. 網路問題 → 請確認伺服器可存取 github.com"
 fi

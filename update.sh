@@ -6,12 +6,13 @@
 #   sudo /srv/apps/maint-report-system/update.sh develop   # 指定 branch
 #
 # 或遠端一行指令（公開 Repo）：
-#   bash <(curl -fsSL https://raw.githubusercontent.com/oupaul/maint-report-system/main/update.sh)
+#   curl -fsSL https://raw.githubusercontent.com/oupaul/maint-report-system/main/update.sh -o /tmp/update.sh && sudo bash /tmp/update.sh
 #
 # 私有 Repo（curl 本身也需帶 token，支援 ghp_ 與 github_pat_ 格式）：
 #   export GH_TOKEN=github_pat_xxxxxxxxxxxx   # 或 ghp_xxxxxxxxxxxx
-#   bash <(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
-#     https://raw.githubusercontent.com/oupaul/maint-report-system/main/update.sh)
+#   curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+#     https://raw.githubusercontent.com/oupaul/maint-report-system/main/update.sh -o /tmp/update.sh \
+#     && sudo --preserve-env=GH_TOKEN bash /tmp/update.sh
 #
 # GH_TOKEN 只會以 git 單次呼叫的 extra header 傳遞，不會寫進暫存 clone
 # 的 .git/config，暫存目錄結束時一律清除（含失敗中止的情況）。
@@ -91,7 +92,7 @@ fi
 log "安裝目錄：${INSTALL_DIR}"
 
 if [ ! -d "$INSTALL_DIR" ]; then
-    error "安裝目錄不存在：${INSTALL_DIR}\n若尚未安裝，請先執行全新安裝：\n  bash <(curl -fsSL https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${BRANCH}/setup.sh)"
+    error "安裝目錄不存在：${INSTALL_DIR}\n若尚未安裝，請先執行全新安裝：\n  curl -fsSL https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${BRANCH}/setup.sh -o /tmp/setup.sh && sudo bash /tmp/setup.sh"
 fi
 if [ ! -f "${INSTALL_DIR}/package.json" ]; then
     error "${INSTALL_DIR} 不是有效的安裝目錄（找不到 package.json）"
