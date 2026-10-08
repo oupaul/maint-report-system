@@ -5,7 +5,8 @@
   <div class="page-actions">
     <a href="/batches/<%= batch.id %>" class="btn btn--secondary btn--md">查看摘要</a>
     <% if (batch.status === 'draft') { %>
-      <form method="POST" action="/batches/<%= batch.id %>/complete" onsubmit="return confirm('確定要將此批次標記為已完成嗎？完成後仍可查看與產生報告。');" style="display:inline;">
+      <form method="POST" action="/batches/<%= batch.id %>/complete" data-confirm="確定要將此批次標記為已完成嗎？完成後仍可查看與產生報告。" style="display:inline;">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <button type="submit" class="btn btn--primary btn--md">標記為已完成</button>
       </form>
     <% } %>
@@ -32,7 +33,7 @@
             <span class="status-badge status-badge--<%= st %>"><%= stLabel %></span>
           <% } %>
         </div>
-        <form method="POST" action="/batches/<%= batch.id %>/items/<%= row.checklistItem.id %>" enctype="multipart/form-data">
+        <form method="POST" action="/batches/<%= batch.id %>/items/<%= row.checklistItem.id %>?_csrf=<%= csrfToken %>" enctype="multipart/form-data">
           <input type="hidden" name="asset_id" value="<%= section.asset.id %>">
           <div class="checklist-row__grid">
             <div class="form-group" style="margin-bottom:0;">
@@ -68,15 +69,20 @@
                     <a href="/uploads/<%= batch.id %>/<%= photo.filename %>" target="_blank">
                       <img class="screenshot-thumb" src="/uploads/<%= batch.id %>/<%= photo.filename %>" alt="已上傳截圖">
                     </a>
-                    <form method="POST" action="/batches/<%= batch.id %>/photos/<%= photo.id %>/delete" onsubmit="return confirm('確定要刪除這張截圖嗎？');">
-                      <button type="submit" class="photo-thumb-list__delete" title="刪除這張截圖">刪除</button>
-                    </form>
+                    <button type="submit" form="photo-delete-<%= photo.id %>" class="photo-thumb-list__delete" title="刪除這張截圖">刪除</button>
                   </div>
                 <% }) %>
               </div>
             <% } %>
           </div>
         </form>
+        <%# HTML 不允許 <form> 巢狀，內層的 form 會被瀏覽器直接丟掉，「刪除」按鈕就會變成送出外層的儲存表單。
+            所以刪除用的表單放在儲存表單外面，按鈕用 form="..." 屬性指過來。 %>
+        <% (row.photos || []).forEach(photo => { %>
+          <form id="photo-delete-<%= photo.id %>" method="POST" action="/batches/<%= batch.id %>/photos/<%= photo.id %>/delete" data-confirm="確定要刪除這張截圖嗎？">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          </form>
+        <% }) %>
       </div>
     <% }) %>
   </section>
@@ -90,6 +96,7 @@
     <div class="form-error"><%= addAssetError %></div>
   <% } %>
   <form method="POST" action="/batches/<%= batch.id %>/assets">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
     <div class="form-group">
       <label class="form-label">新增設備</label>
       <p class="form-hint">巡檢途中發現漏掉的設備，直接在這裡加進本次批次，不用另外開新批次。</p>

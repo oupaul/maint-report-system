@@ -28,13 +28,21 @@ sudo ./deploy.sh
 
 首次安裝時互動式設定服務名稱、安裝目錄（預設 `/srv/apps/maint-report-system`）、port；後續執行自動增量遷移並重啟服務。
 
-### 預設帳號
+### 管理員初始帳號
 
-| 帳號    | 密碼       |
-|---------|------------|
-| `admin` | `admin123` |
+全新安裝時系統會建立管理員帳號 `admin`，**密碼是安裝當下隨機產生的**，不是固定值：`deploy.sh` 會把它印在終端機視窗（migration 當下顯示一次，部署結束時再顯示一次），請立刻抄下來。第一次登入後系統會強制要求改成自己的密碼，改完才能使用其他功能。
 
-**首次登入後請立即變更密碼。**
+- 忘記密碼、或沒抄到初始密碼：在主機上執行 `cd /srv/apps/maint-report-system && sudo -u <服務帳號> npm run reset-admin-password`，會產生新的隨機密碼並印出（指定其他帳號：`npm run reset-admin-password -- <帳號>`）
+- 自動化部署若想自行指定初始密碼，可在執行 `deploy.sh` 前設定環境變數 `INITIAL_ADMIN_PASSWORD`（此時不會印出隨機密碼）
+- 管理員在「使用者管理」新增或重設的密碼，該使用者第一次登入也必須自己再改一次；密碼至少 10 個字元、需含英文字母與數字、不可是常見密碼或包含帳號名稱
+- 從舊版升級：若 `admin` 仍在使用舊版預設密碼，更新時會被自動標記為下次登入強制改密碼
+
+### 安全機制摘要
+
+- 登入失敗限流：同一 IP 或同一帳號短時間內失敗過多次會暫時鎖定 15 分鐘
+- 所有 POST 表單都有 CSRF token；Cookie 為 `HttpOnly` + `SameSite=Lax`（HTTPS 時自動加 `Secure`）；Session 存在 SQLite，服務重啟不會被登出；帳號被停用、角色調整會立即生效
+- 瀏覽器端有 CSP 等安全標頭（不允許 inline script）
+- 若前面架了反向代理（nginx/Caddy 等）才需設定環境變數 `TRUST_PROXY`（例如 `1`），讓系統看得到真實用戶 IP；直接以 IP:port 存取請保持不設定，否則登入限流可被偽造的 `X-Forwarded-For` 繞過
 
 ### 環境變數（進階，選填）
 
@@ -64,7 +72,7 @@ bash <(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
 |---|---|---|
 | 執行環境 | `NODE_ENV=development` | `NODE_ENV=production`，寫進 systemd unit |
 | 資料 | 本機 `data/maint_report.db`，可隨時砍掉重建 | 真實巡檢資料，沒有 staging 環境 |
-| `SESSION_SECRET` | 未設定的話每次啟動都換一組 | 首次部署自動產生並固定寫入 systemd unit |
+| `SESSION_SECRET` | 未設定的話每次啟動都換一組 | 首次部署自動產生，存放於 `/etc/maint-report-system/session.env`（權限 600），systemd unit 以 `EnvironmentFile=` 引用 |
 | 啟動方式 | 手動 `npm run dev` | 透過 systemd 服務常駐、`Restart=always` |
 | 適合驗證什麼 | 功能邏輯、畫面、UI 互動、PDF 產生邏輯 | 部署腳本本身、systemd 整合、實際 port 設定是否正確 |
 

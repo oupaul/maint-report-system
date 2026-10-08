@@ -12,6 +12,17 @@ if (!sessionSecret) {
   console.warn('[安全警告] SESSION_SECRET 未設定！本次使用臨時隨機金鑰，重啟後所有 session 將失效。正式部署請確認 deploy.sh 已設定此環境變數。');
 }
 
+// 預設不信任任何 X-Forwarded-* 標頭：服務直接對外（例如 http://主機IP:3000）時，
+// 信任它們等於讓來訪者自己填 IP（登入限流會被繞過）。如果前面確實有一層反向代理
+// （nginx、Cloudflare...），部署時設 TRUST_PROXY=1（代理層數）才會讀取真實來源 IP，
+// 並讓 session cookie 在 HTTPS 下自動加上 Secure。
+function parseTrustProxy(raw) {
+  if (raw === undefined || raw === '' || raw === 'false' || raw === '0') return false;
+  if (/^\d+$/.test(raw)) return parseInt(raw, 10);
+  return raw; // 例如 "loopback" 或 CIDR，交給 express 解析
+}
+const TRUST_PROXY = parseTrustProxy(process.env.TRUST_PROXY);
+
 // M365（Azure AD / Entra ID）SSO 是選用功能：四個環境變數都設定了才啟用，
 // 沒設定的話登入頁就只顯示原本的帳號密碼表單，不會報錯。
 const M365_CLIENT_ID = process.env.M365_CLIENT_ID || null;
@@ -25,6 +36,7 @@ module.exports = {
   PORT,
   NODE_ENV,
   SESSION_SECRET: sessionSecret,
+  TRUST_PROXY,
   DATA_DIR: path.join(PROJECT_ROOT, 'data'),
   DB_PATH: path.join(PROJECT_ROOT, 'data', 'maint_report.db'),
   UPLOADS_DIR: path.join(PROJECT_ROOT, 'uploads'),

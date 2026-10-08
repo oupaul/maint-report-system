@@ -17,6 +17,7 @@ const MIGRATIONS = [
   'migrate_0002_multi_photos',
   'migrate_0003_batch_signatures',
   'migrate_0004_m365_sso',
+  'migrate_0005_password_policy',
 ];
 
 async function run() {

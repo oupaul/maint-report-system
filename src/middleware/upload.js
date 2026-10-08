@@ -9,7 +9,9 @@ const upload = multer({
     if (ALLOWED_MIMETYPES.includes(file.mimetype)) {
       return cb(null, true);
     }
-    cb(new Error('不支援的圖片格式，僅接受 JPEG / PNG / WebP / GIF'));
+    const err = new Error('不支援的圖片格式，僅接受 JPEG / PNG / WebP / GIF');
+    err.userFacing = true;
+    cb(err);
   },
 });
 

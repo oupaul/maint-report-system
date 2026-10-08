@@ -5,6 +5,7 @@ const { requireRole } = require('../middleware/auth');
 const User = require('../models/User');
 const AuthService = require('../services/AuthService');
 const { USER_ROLES, isValidRole } = require('../utils/validators');
+const { validatePasswordStrength } = require('../utils/password');
 
 router.get('/', requireRole('admin'), (req, res) => {
   const users = User.findAll();
@@ -23,6 +24,15 @@ router.post('/', requireRole('admin'), async (req, res) => {
       targetUser: req.body,
       roles: USER_ROLES,
       error: '請輸入帳號、密碼並選擇有效的角色',
+    });
+  }
+
+  const weakCreate = validatePasswordStrength(password, { username });
+  if (weakCreate) {
+    return res.status(400).render('users/form', {
+      targetUser: req.body,
+      roles: USER_ROLES,
+      error: weakCreate,
     });
   }
 
@@ -82,6 +92,18 @@ router.post('/:id/edit', requireRole('admin'), async (req, res) => {
     }
   }
 
+  const wantsPasswordReset = !!(new_password && new_password.trim().length > 0);
+  if (wantsPasswordReset) {
+    const weakReset = validatePasswordStrength(new_password.trim(), { username: targetUser.username });
+    if (weakReset) {
+      return res.status(400).render('users/form', {
+        targetUser: { ...targetUser, ...req.body },
+        roles: USER_ROLES,
+        error: weakReset,
+      });
+    }
+  }
+
   User.update(targetUser.id, {
     display_name,
     role,
@@ -89,9 +111,10 @@ router.post('/:id/edit', requireRole('admin'), async (req, res) => {
     m365_email,
   });
 
-  if (new_password && new_password.trim().length > 0) {
+  if (wantsPasswordReset) {
     const password_hash = await AuthService.hashPassword(new_password.trim());
-    User.updatePassword(targetUser.id, password_hash);
+    // 管理員幫別人重設的密碼，本人下次登入要自己再改一次
+    User.updatePassword(targetUser.id, password_hash, { mustChange: true });
   }
 
   res.redirect('/users');

@@ -2,6 +2,7 @@
 // inspection_batch_assets / inspection_items，並種子 checklist_items 與預設 admin 帳號。
 
 const argon2 = require('argon2');
+const { generateRandomPassword } = require('../src/utils/password');
 
 const CHECKLIST_SEED = [
   // category, code, label, sort_order
@@ -27,6 +28,7 @@ module.exports = async function migrate_0001_init(db) {
       display_name TEXT,
       role TEXT NOT NULL CHECK(role IN ('admin','technician')),
       is_active INTEGER NOT NULL DEFAULT 1,
+      must_change_password INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -95,10 +97,31 @@ module.exports = async function migrate_0001_init(db) {
     insertChecklist.run(...row);
   }
 
-  // 種子預設管理員帳號（admin / admin123）— 沿用 pbg-system 慣例，首次登入後應立即改密碼
-  const passwordHash = await argon2.hash('admin123');
+  // 種子管理員帳號：初始密碼每次安裝都是新產生的亂數，不再用固定的 admin123
+  // （repo 是公開的，固定密碼等於全世界都知道）。這個密碼只會在這裡印出一次，
+  // 並且標記 must_change_password=1，第一次登入就必須改掉。
+  // 自動化部署可以事先設 INITIAL_ADMIN_PASSWORD 指定，這種情況不印出來。
+  const provided = process.env.INITIAL_ADMIN_PASSWORD;
+  const initialPassword = provided || generateRandomPassword();
+  const passwordHash = await argon2.hash(initialPassword);
   db.prepare(
-    `INSERT INTO users (username, password_hash, display_name, role, is_active)
-     VALUES (?, ?, ?, ?, 1)`
+    `INSERT INTO users (username, password_hash, display_name, role, is_active, must_change_password)
+     VALUES (?, ?, ?, ?, 1, 1)`
   ).run('admin', passwordHash, '系統管理員', 'admin');
+
+  if (!provided) {
+    // BEGIN/END 標記給 deploy.sh 在整個部署流程最後再印一次用（避免這段訊息被後面
+    // 大量輸出洗掉），請不要改動這兩行的文字。
+    console.log('');
+    console.log('INITIAL_ADMIN_PASSWORD_BANNER_BEGIN');
+    console.log('============================================================');
+    console.log('  系統管理員初始帳號（只會顯示這一次，請立即抄下來）');
+    console.log('    帳號： admin');
+    console.log(`    密碼： ${initialPassword}`);
+    console.log('  首次登入後系統會要求你立刻改成自己的密碼。');
+    console.log('  忘記的話可在主機上執行 npm run reset-admin-password 重設。');
+    console.log('============================================================');
+    console.log('INITIAL_ADMIN_PASSWORD_BANNER_END');
+    console.log('');
+  }
 };

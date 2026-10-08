@@ -72,6 +72,15 @@ p { margin: 0 0 var(--space-4) 0; }
   color: #CBD5E1;
 }
 
+.app-nav__user-link {
+  color: #CBD5E1;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.app-nav__user-link:hover {
+  color: #F1F5F9;
+}
+
 .app-main {
   flex: 1;
   width: 100%;

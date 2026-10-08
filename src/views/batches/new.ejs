@@ -9,6 +9,7 @@
     <div class="form-error"><%= error %></div>
   <% } %>
   <form method="POST" action="/batches/new">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
     <div class="form-group">
       <label class="form-label" for="title">批次標題</label>
       <input class="form-input" type="text" id="title" name="title" placeholder="例如：2026年8月例行巡檢" value="<%= formValues ? (formValues.title || '') : '' %>" required>

@@ -26,7 +26,9 @@ Node.js + Express + SQLite（`better-sqlite3`）的 IT 例行維護巡檢紀錄�
 
 - `migrations/runner.js` 的 `MIGRATIONS` 陣列只能在尾端新增，不可插入或調整既有順序；新 migration 避免對既有欄位下死值 CHECK 約束清單
 - migration 檔（如 `migrate_0001_init.js`）可以是 async function（例如需要 `argon2.hash()`），`runner.js` 用手動 `BEGIN/COMMIT/ROLLBACK` 包裹每個 migration 以支援這種情況，而不是 `db.transaction()`（better-sqlite3 的 `db.transaction()` 只支援同步 callback）
-- 全新安裝的預設帳號是 `admin`/`admin123`（`migrations/migrate_0001_init.js`）；文件或範例中提到帳密時務必用假資料，不要把任何真實部署的憑證寫進 commit 或訊息
+- 全新安裝的 `admin` 初始密碼是 `migrations/migrate_0001_init.js` 當下產生的亂數（可用 `INITIAL_ADMIN_PASSWORD` 覆寫），`deploy.sh` 擷取 migration 輸出中 `INITIAL_ADMIN_PASSWORD_BANNER_BEGIN/END` 兩行標記之間的內容，在終端機顯示並於部署結尾再印一次（暫存檔權限 600、用完即刪）——改動 migration 的這段輸出時不要動這兩個標記，否則 `deploy.sh` 抓不到。不要把任何真實密碼寫進 commit、log 或回覆訊息；密碼強度規則在 `src/utils/password.js`，`must_change_password=1` 的帳號只能進 `/account/password` 與 `/logout`（`src/app.js`）
+- 所有非 GET 請求都經過 `src/middleware/csrf.js`：一般表單帶隱藏欄位 `_csrf`；multipart 表單（巡檢項目上傳）因為 multer 解析前 body 是空的，改把 token 放 action 網址 `?_csrf=`。新增 POST 表單（或 fetch）時記得帶 token。CSP 不允許 inline script／事件處理器，確認對話框用 `data-confirm` 屬性（`public/js/confirm.js`）。HTML 不允許 `<form>` 巢狀，表單內要放獨立動作按鈕時，把表單放在外面、按鈕用 `form="id"` 屬性
+- `src/app.js` 每個請求都會重新讀取登入者（停用／角色變更立即生效）；`TRUST_PROXY` 環境變數預設關閉，只在確定前面有反向代理時設定，否則 `X-Forwarded-For` 可偽造來繞過登入限流
 - `src/services/PdfReportService.js` 的換頁保護邏輯（估算高度 → 判斷是否 `doc.addPage()` → 才畫區塊）刻意把「估算」與「畫」分成兩步；修改任一步時要同步檢查另一步有沒有跟著失準（尤其是圖片顯示高度的估算依據是 DB 存的 `screenshot_width`/`screenshot_height`，跟畫的時候重新解碼出來的實際尺寸可能不完全一致）
 - pdfkit 不支援原生畫 WebP，`PdfReportService` 無論 `screenshot_format` 是什麼都會先用 `sharp` 重新解碼成 PNG buffer 再畫；改動截圖儲存格式邏輯（`src/services/ImageService.js`）時要記得這個假設沒變
 - `/uploads/:batchId/:filename` 是自訂的認證後靜態檔案服務路由（`src/routes/reports.js`），刻意不用 `express.static` 公開掛載，避免未登入使用者直接列出/存取截圖；新增檔案服務路由時比照這個模式做路徑穿越檢查

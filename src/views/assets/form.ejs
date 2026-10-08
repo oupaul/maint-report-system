@@ -9,6 +9,7 @@
     <div class="form-error"><%= error %></div>
   <% } %>
   <form method="POST" action="<%= asset && asset.id ? `/assets/${asset.id}/edit` : '/assets' %>">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
     <div class="form-group">
       <label class="form-label" for="name">資產名稱</label>
       <input class="form-input" type="text" id="name" name="name" value="<%= asset ? (asset.name || '') : '' %>" required>

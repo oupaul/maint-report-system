@@ -23,7 +23,9 @@
     <div class="app-nav__user">
       <% if (currentUser) { %>
         <span><%= currentUser.display_name || currentUser.username %>（<%= currentUser.role === 'admin' ? '管理員' : '技術人員' %>）</span>
+        <a href="/account/password" class="app-nav__user-link">變更密碼</a>
         <form method="POST" action="/logout" style="margin:0;">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
           <button type="submit" class="btn btn--sm btn--secondary" style="border-color: rgba(255,255,255,0.35); color:#F1F5F9;">登出</button>
         </form>
       <% } %>

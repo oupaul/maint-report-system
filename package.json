@@ -10,6 +10,7 @@
     "start": "node src/app.js",
     "dev": "nodemon src/app.js",
     "migrate": "node migrations/runner.js",
+    "reset-admin-password": "node scripts/reset-admin-password.js",
     "test": "jest --passWithNoTests"
   },
   "engines": {

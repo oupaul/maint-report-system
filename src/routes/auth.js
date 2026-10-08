@@ -5,6 +5,12 @@ const router = express.Router();
 const User = require('../models/User');
 const AuthService = require('../services/AuthService');
 const M365AuthService = require('../services/M365AuthService');
+const LoginRateLimit = require('../middleware/loginRateLimit');
+const { establishSession } = require('../utils/session');
+
+// 帳號不存在時也跑一次 argon2 驗證（對一個不可能符合的雜湊），讓「帳號不存在」跟
+// 「密碼錯誤」回應時間差不多，避免從回應速度猜出哪些帳號存在。
+const dummyHashPromise = AuthService.hashPassword(crypto.randomBytes(16).toString('hex'));
 
 router.get('/login', (req, res) => {
   if (req.session && req.session.user) {
@@ -13,31 +19,34 @@ router.get('/login', (req, res) => {
   res.render('login', { error: null });
 });
 
-router.post('/login', async (req, res) => {
-  const { username, password } = req.body;
+router.post('/login', async (req, res, next) => {
+  try {
+    const username = typeof req.body.username === 'string' ? req.body.username.trim() : '';
+    const password = typeof req.body.password === 'string' ? req.body.password : '';
 
-  if (!username || !password) {
-    return res.status(400).render('login', { error: '請輸入帳號與密碼' });
+    if (!username || !password) {
+      return res.status(400).render('login', { error: '請輸入帳號與密碼' });
+    }
+
+    if (LoginRateLimit.isBlocked(req, username)) {
+      return res.status(429).render('login', { error: '登入失敗次數過多，請 15 分鐘後再試' });
+    }
+
+    const user = User.findByUsername(username);
+    const hash = user ? user.password_hash : await dummyHashPromise;
+    const ok = await AuthService.verifyPassword(hash, password);
+
+    if (!user || !user.is_active || !ok) {
+      LoginRateLimit.recordFailure(req, username);
+      return res.status(401).render('login', { error: '帳號或密碼錯誤' });
+    }
+
+    LoginRateLimit.recordSuccess(req, username);
+    await establishSession(req, user);
+    res.redirect(user.must_change_password ? '/account/password' : '/');
+  } catch (err) {
+    next(err);
   }
-
-  const user = User.findByUsername(username);
-  if (!user || !user.is_active) {
-    return res.status(401).render('login', { error: '帳號或密碼錯誤' });
-  }
-
-  const ok = await AuthService.verifyPassword(user.password_hash, password);
-  if (!ok) {
-    return res.status(401).render('login', { error: '帳號或密碼錯誤' });
-  }
-
-  req.session.user = {
-    id: user.id,
-    username: user.username,
-    display_name: user.display_name,
-    role: user.role,
-  };
-
-  res.redirect('/');
 });
 
 // M365（Azure AD / Entra ID）SSO：帳號仍由管理員在「使用者管理」預先建立並
@@ -62,7 +71,7 @@ router.get('/auth/m365/login', async (req, res) => {
   }
 });
 
-router.get('/auth/m365/callback', async (req, res) => {
+router.get('/auth/m365/callback', async (req, res, next) => {
   if (!M365AuthService.isEnabled()) {
     return res.status(404).render('error', { title: '找不到頁面', message: '找不到頁面' });
   }
@@ -99,14 +108,12 @@ router.get('/auth/m365/callback', async (req, res) => {
     });
   }
 
-  req.session.user = {
-    id: user.id,
-    username: user.username,
-    display_name: user.display_name,
-    role: user.role,
-  };
-
-  res.redirect('/');
+  try {
+    await establishSession(req, user, { viaSso: true });
+    res.redirect('/');
+  } catch (err) {
+    next(err);
+  }
 });
 
 router.post('/logout', (req, res) => {

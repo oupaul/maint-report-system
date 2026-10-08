@@ -20,10 +20,11 @@ const User = {
     return db.prepare('SELECT * FROM users ORDER BY created_at ASC').all();
   },
 
+  // 管理員代建的帳號，密碼是管理員設定的、本人不是自己選的，第一次登入強制改密碼
   create({ username, password_hash, display_name, role, m365_email }) {
     const result = db.prepare(
-      `INSERT INTO users (username, password_hash, display_name, role, m365_email, is_active, created_at)
-       VALUES (?, ?, ?, ?, ?, 1, ?)`
+      `INSERT INTO users (username, password_hash, display_name, role, m365_email, is_active, must_change_password, created_at)
+       VALUES (?, ?, ?, ?, ?, 1, 1, ?)`
     ).run(username, password_hash, display_name || null, role, (m365_email || '').trim() || null, nowTaipei());
     return User.findById(result.lastInsertRowid);
   },
@@ -35,8 +36,10 @@ const User = {
     return User.findById(id);
   },
 
-  updatePassword(id, password_hash) {
-    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(password_hash, id);
+  // mustChange：本人自己改密碼 → false（清掉強制改密碼旗標）；管理員幫別人重設 → true
+  updatePassword(id, password_hash, { mustChange = false } = {}) {
+    db.prepare('UPDATE users SET password_hash = ?, must_change_password = ? WHERE id = ?')
+      .run(password_hash, mustChange ? 1 : 0, id);
   },
 };
 

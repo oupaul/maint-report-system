@@ -88,6 +88,7 @@
 
           <dialog id="signature-dialog-<%= role %>" class="signature-dialog">
             <form class="signature-form" method="POST" action="/batches/<%= batch.id %>/signatures/<%= role %>">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
               <h3 class="signature-dialog__title"><%= signatureRoleLabels[role] %>簽名</h3>
               <p class="form-hint">用滑鼠或筆電觸控板按住拖曳書寫，放開即完成這一筆。</p>
               <canvas class="signature-pad" width="500" height="220"></canvas>

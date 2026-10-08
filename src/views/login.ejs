@@ -20,6 +20,7 @@
         <div class="login-divider"><span>或使用帳號密碼</span></div>
       <% } %>
       <form method="POST" action="/login">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <div class="form-group">
           <label class="form-label" for="username">帳號</label>
           <input class="form-input" type="text" id="username" name="username" required autofocus>

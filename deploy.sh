@@ -248,11 +248,25 @@ fi
 
 # 步驟 3: 執行資料庫 migration（失敗即停止，不啟動服務）
 log "步驟 3/6: 執行資料庫 migration..."
-if ! node migrations/runner.js; then
+# 全新安裝時 migration 會產生管理員的亂數初始密碼並印在輸出裡。輸出同時存進一個
+# 只有 root 能讀的暫存檔，部署最後再印一次（避免被後面大量輸出洗掉）；用完立刻刪除。
+MIGRATE_OUT="$(umask 077; mktemp)"
+trap 'rm -f "$MIGRATE_OUT"' EXIT
+set -o pipefail
+if ! node migrations/runner.js 2>&1 | tee "$MIGRATE_OUT" | sed "/INITIAL_ADMIN_PASSWORD_BANNER_/d"; then
+    set +o pipefail
+    ADMIN_BANNER="$(sed -n '/INITIAL_ADMIN_PASSWORD_BANNER_BEGIN/,/INITIAL_ADMIN_PASSWORD_BANNER_END/p' "$MIGRATE_OUT" | sed '/INITIAL_ADMIN_PASSWORD_BANNER_/d')"
+    if [ -n "$ADMIN_BANNER" ]; then
+        warning "管理員初始密碼已在失敗前建立，請先抄下來（之後不會再顯示）："
+        echo "$ADMIN_BANNER"
+    fi
     error "Migration 執行失敗，部署已停止（不會啟動服務，避免帶著不完整的 schema 上線）。
   請檢查上方 migration 錯誤輸出並修正；已成功的 migration 已被記錄於 schema_migrations，
   修正後重新執行本腳本時只會重跑尚未成功的項目。"
 fi
+set +o pipefail
+ADMIN_BANNER="$(sed -n '/INITIAL_ADMIN_PASSWORD_BANNER_BEGIN/,/INITIAL_ADMIN_PASSWORD_BANNER_END/p' "$MIGRATE_OUT" | sed '/INITIAL_ADMIN_PASSWORD_BANNER_/d')"
+rm -f "$MIGRATE_OUT"
 log "✓ 資料庫 migration 完成"
 
 # 步驟 4: 檢查並更新 systemd 服務配置
@@ -447,10 +461,13 @@ if [ "$IS_FIRST_INSTALL" = true ]; then
     echo "  - 服務狀態: ${SERVICE_STATUS:-未知}"
     echo "  - 開機自動啟動: 已啟用"
     echo ""
-    echo "預設登入資訊："
-    echo "  - 帳號: admin"
-    echo "  - 密碼: admin123"
-    echo "  - 首次登入後請立即修改密碼！"
+    if [ -n "${ADMIN_BANNER:-}" ]; then
+        echo -e "${YELLOW}管理員初始登入資訊（只顯示這一次，請現在抄下來）：${NC}"
+        echo "$ADMIN_BANNER"
+    else
+        echo "管理員帳號: admin（初始密碼已由 INITIAL_ADMIN_PASSWORD 指定，或先前的安裝已建立過）"
+        echo "忘記密碼可在主機執行: cd ${PROJECT_DIR} && sudo -u ${CURRENT_USER} npm run reset-admin-password"
+    fi
 else
     echo "系統資訊："
     echo "  - 專案目錄: $PROJECT_DIR"

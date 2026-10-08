@@ -9,6 +9,7 @@
     <div class="form-error"><%= error %></div>
   <% } %>
   <form method="POST" action="<%= targetUser && targetUser.id ? `/users/${targetUser.id}/edit` : '/users' %>">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
     <div class="form-group">
       <label class="form-label" for="username">帳號</label>
       <% if (targetUser && targetUser.id) { %>
