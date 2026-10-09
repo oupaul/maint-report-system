@@ -408,8 +408,18 @@ async function generateBatchReport({ batch, assets, itemsByAssetId, signaturesBy
     doc.text(
       `類別：${categoryLabels[asset.category] || asset.category}` +
       (asset.location ? `　位置：${asset.location}` : '') +
-      (asset.identifier ? `　識別碼：${asset.identifier}` : '')
+      (asset.hostname ? `　主機名稱：${asset.hostname}` : '') +
+      (asset.ip_address ? `　IP：${asset.ip_address}` : '') +
+      (asset.mac_address ? `　MAC：${asset.mac_address}` : '')
     );
+    const brandModel = [asset.brand, asset.model].filter(Boolean).join(' ');
+    const line2 =
+      (brandModel ? `廠牌／型號：${brandModel}` : '') +
+      (asset.serial_number ? `　序號：${asset.serial_number}` : '') +
+      (asset.asset_tag ? `　財產編號：${asset.asset_tag}` : '') +
+      (asset.purchase_date ? `　購置日期：${asset.purchase_date}` : '') +
+      (asset.identifier ? `　識別碼：${asset.identifier}` : '');
+    if (line2.trim()) doc.text(line2.trim());
     doc.moveDown(0.4);
 
     // 底線

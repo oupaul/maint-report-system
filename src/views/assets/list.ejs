@@ -10,8 +10,24 @@
 </div>
 
 <div class="card">
-  <% if (assets.length === 0) { %>
+  <% if (total > 0) { %>
+    <form method="GET" action="/assets" class="asset-filter" role="search">
+      <input type="search" class="form-input" name="q" value="<%= q %>" placeholder="搜尋名稱、位置、IP、MAC、主機名稱、廠牌、型號、序號、財產編號（可輸入多個關鍵字）" aria-label="搜尋資產" autocomplete="off">
+      <select class="form-select" name="category" aria-label="依類別篩選">
+        <option value="">全部類別</option>
+        <% Object.keys(categoryLabels).forEach(code => { %>
+          <option value="<%= code %>" <%= category === code ? 'selected' : '' %>><%= categoryLabels[code] %></option>
+        <% }) %>
+      </select>
+      <button type="submit" class="btn btn--secondary btn--md">搜尋</button>
+      <% if (q || category) { %><a href="/assets" class="btn btn--secondary btn--md">清除</a><% } %>
+    </form>
+    <% if (q || category) { %><p class="form-hint">符合 <%= assets.length %> / <%= total %> 筆</p><% } %>
+  <% } %>
+  <% if (total === 0) { %>
     <div class="empty-state">尚無資產資料。</div>
+  <% } else if (assets.length === 0) { %>
+    <div class="empty-state">沒有符合條件的資產。</div>
   <% } else { %>
     <div class="table-wrap">
       <table class="data-table">
@@ -20,7 +36,12 @@
             <th>名稱</th>
             <th>類別</th>
             <th>位置</th>
-            <th>識別碼</th>
+            <th>IP / MAC</th>
+            <th>主機名稱</th>
+            <th>廠牌 / 型號</th>
+            <th>序號</th>
+            <th>財產編號</th>
+            <th>購置日期</th>
             <th>狀態</th>
             <% if (can('assets.manage')) { %><th></th><% } %>
           </tr>
@@ -31,7 +52,12 @@
               <td><%= a.name %></td>
               <td><%= categoryLabels[a.category] || a.category %></td>
               <td><%= a.location || '-' %></td>
-              <td><%= a.identifier || '-' %></td>
+              <td><%= a.ip_address || '-' %><% if (a.mac_address) { %><br><small class="form-hint"><%= a.mac_address %></small><% } %></td>
+              <td><%= a.hostname || '-' %></td>
+              <td><%= [a.brand, a.model].filter(Boolean).join(' ') || '-' %></td>
+              <td><%= a.serial_number || '-' %></td>
+              <td><%= a.asset_tag || '-' %><% if (a.identifier) { %> <span class="status-badge status-badge--warning" title="舊識別碼尚未整理：<%= a.identifier %>">待整理</span><% } %></td>
+              <td><%= a.purchase_date || '-' %></td>
               <td>
                 <% if (a.is_active) { %>
                   <span class="status-badge status-badge--normal">啟用</span>

@@ -9,17 +9,27 @@ function formData(asset, error) {
     categories: AssetCategory.selectableCodes(current),
     categoryLabels: AssetCategory.labelMap(),
     categoryLocked: !!(asset && asset.id && Asset.hasRecords(asset.id)),
+    // 格式問題與重複只提示、不擋存檔；編輯頁每次顯示都即時計算，所以日後別台設備改了也會反映
+    warnings: asset && asset.id ? assetFields.warningsFor(asset, Asset.findAll({ includeInactive: true })) : [],
+    saved: false,
     error,
   };
 }
 
 const { requireLogin, requirePermission } = require('../middleware/auth');
 const Asset = require('../models/Asset');
+const assetFields = require('../utils/assetFields');
 const AssetCategory = require('../models/AssetCategory');
 
 router.get('/', requireLogin, (req, res) => {
-  const assets = Asset.findAll({ includeInactive: true });
-  res.render('assets/list', { assets, categoryLabels: AssetCategory.labelMap() });
+  const q = String(req.query.q || '').slice(0, 100);
+  const category = String(req.query.category || '');
+  const assets = Asset.search({ q, category });
+  res.render('assets/list', {
+    assets, q, category,
+    total: Asset.findAll({ includeInactive: true }).length,
+    categoryLabels: AssetCategory.labelMap(),
+  });
 });
 
 router.get('/new', requirePermission('assets.manage'), (req, res) => {
@@ -27,14 +37,16 @@ router.get('/new', requirePermission('assets.manage'), (req, res) => {
 });
 
 router.post('/', requirePermission('assets.manage'), (req, res) => {
-  const { name, category, location, identifier, notes } = req.body;
+  const { name, category, location, notes } = req.body;
 
   if (!name || !AssetCategory.isSelectable(category)) {
     return res.status(400).render('assets/form', formData(req.body, '請輸入資產名稱並選擇有效的類別'));
   }
+  const fields = assetFields.normalize(req.body);
+  if (fields.error) return res.status(400).render('assets/form', formData(req.body, fields.error));
 
-  const asset = Asset.create({ name, category, location, identifier, notes });
-  res.redirect(`/assets/${asset.id}/edit`);
+  const asset = Asset.create({ name, category, location, notes, ...fields.values });
+  res.redirect(`/assets/${asset.id}/edit?saved=1`);
 });
 
 router.get('/:id/edit', requirePermission('assets.manage'), (req, res) => {
@@ -42,7 +54,7 @@ router.get('/:id/edit', requirePermission('assets.manage'), (req, res) => {
   if (!asset) {
     return res.status(404).render('error', { title: '找不到資產', message: '找不到指定的資產' });
   }
-  res.render('assets/form', formData(asset, null));
+  res.render('assets/form', { ...formData(asset, null), saved: req.query.saved === '1' });
 });
 
 router.post('/:id/edit', requirePermission('assets.manage'), (req, res) => {
@@ -51,7 +63,7 @@ router.post('/:id/edit', requirePermission('assets.manage'), (req, res) => {
     return res.status(404).render('error', { title: '找不到資產', message: '找不到指定的資產' });
   }
 
-  const { name, category, location, identifier, notes, is_active } = req.body;
+  const { name, category, location, notes, is_active } = req.body;
 
   // 已有檢查紀錄的資產不能改類型（舊紀錄對應的是原本類型的檢查項目）；
   // 沒改類型的話，即使這個類型已被停用也允許（只是不讓新設備選到它）
@@ -63,12 +75,18 @@ router.post('/:id/edit', requirePermission('assets.manage'), (req, res) => {
     return res.status(400).render('assets/form', formData({ ...asset, ...req.body }, '請輸入資產名稱並選擇有效的類別'));
   }
 
-  Asset.update(asset.id, {
-    name, category, location, identifier, notes,
+  const fields = assetFields.normalize(req.body);
+  if (fields.error) return res.status(400).render('assets/form', formData({ ...asset, ...req.body }, fields.error));
+
+  const saved = Asset.update(asset.id, {
+    name, category, location, notes, ...fields.values,
+    identifier: assetFields.legacyIdentifier(req.body, asset.identifier),
     is_active: is_active === 'on' || is_active === '1',
   });
 
-  res.redirect('/assets');
+  // 有格式問題或重複時留在編輯頁讓人看到提示（已經存好了），否則回列表
+  const warnings = assetFields.warningsFor(saved, Asset.findAll({ includeInactive: true }));
+  res.redirect(warnings.length > 0 ? `/assets/${asset.id}/edit?saved=1` : '/assets');
 });
 
 module.exports = router;

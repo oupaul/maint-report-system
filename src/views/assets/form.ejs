@@ -8,6 +8,17 @@
   <% if (error) { %>
     <div class="form-error"><%= error %></div>
   <% } %>
+  <% if (saved) { %>
+    <div class="form-success">已儲存。</div>
+  <% } %>
+  <% if (warnings && warnings.length > 0) { %>
+    <div class="form-warning" role="status">
+      <strong>請留意（不影響儲存）：</strong>
+      <ul>
+        <% warnings.forEach(w => { %><li><%= w %></li><% }) %>
+      </ul>
+    </div>
+  <% } %>
   <form method="POST" action="<%= asset && asset.id ? `/assets/${asset.id}/edit` : '/assets' %>">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
     <div class="form-group">
@@ -36,9 +47,46 @@
       <input class="form-input" type="text" id="location" name="location" value="<%= asset ? (asset.location || '') : '' %>">
     </div>
     <div class="form-group">
-      <label class="form-label" for="identifier">識別碼（IP / 序號等）</label>
-      <input class="form-input" type="text" id="identifier" name="identifier" value="<%= asset ? (asset.identifier || '') : '' %>">
+      <label class="form-label" for="ip_address">IP 位址</label>
+      <input class="form-input" type="text" id="ip_address" name="ip_address" maxlength="200" value="<%= asset ? (asset.ip_address || '') : '' %>" placeholder="例如 192.168.1.10">
+      <p class="form-hint">有多個 IP（例如多張網卡）請用逗號分隔。</p>
     </div>
+    <div class="form-group">
+      <label class="form-label" for="mac_address">MAC 位址</label>
+      <input class="form-input" type="text" id="mac_address" name="mac_address" maxlength="200" value="<%= asset ? (asset.mac_address || '') : '' %>" placeholder="例如 AA:BB:CC:DD:EE:FF">
+      <p class="form-hint">分隔符號用 <code>:</code>、<code>-</code> 或不加都可以，存檔時統一整理成大寫加冒號；多個請用逗號分隔。</p>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="hostname">主機名稱</label>
+      <input class="form-input" type="text" id="hostname" name="hostname" maxlength="100" value="<%= asset ? (asset.hostname || '') : '' %>">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="serial_number">序號</label>
+      <input class="form-input" type="text" id="serial_number" name="serial_number" maxlength="100" value="<%= asset ? (asset.serial_number || '') : '' %>">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="asset_tag">財產編號</label>
+      <input class="form-input" type="text" id="asset_tag" name="asset_tag" maxlength="100" value="<%= asset ? (asset.asset_tag || '') : '' %>">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="brand">廠牌</label>
+      <input class="form-input" type="text" id="brand" name="brand" maxlength="100" value="<%= asset ? (asset.brand || '') : '' %>" placeholder="例如 Dell、HPE、Synology">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="model">型號</label>
+      <input class="form-input" type="text" id="model" name="model" maxlength="100" value="<%= asset ? (asset.model || '') : '' %>">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="purchase_date">購置日期</label>
+      <input class="form-input" type="date" id="purchase_date" name="purchase_date" value="<%= asset ? (asset.purchase_date || '') : '' %>">
+    </div>
+    <% if (asset && asset.identifier) { %>
+      <div class="form-group">
+        <label class="form-label" for="identifier">舊識別碼（待整理）</label>
+        <input class="form-input" type="text" id="identifier" name="identifier" maxlength="200" value="<%= asset.identifier %>">
+        <p class="form-hint">這是舊版「識別碼」欄位留下的內容。請把它分到上面對應的欄位，再把這一欄清空；清空儲存後這一欄就不會再出現。</p>
+      </div>
+    <% } %>
     <div class="form-group">
       <label class="form-label" for="notes">備註</label>
       <textarea class="form-textarea" id="notes" name="notes"><%= asset ? (asset.notes || '') : '' %></textarea>
