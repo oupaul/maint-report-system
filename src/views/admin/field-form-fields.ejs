@@ -1,0 +1,39 @@
+<%#
+  新增／編輯自訂欄位共用的表單欄位。變數：form（label, type, options, categories, show_in_list）、categories、types、limits、typeLocked。
+%>
+<div class="form-group">
+  <label class="form-label" for="label">欄位名稱</label>
+  <input class="form-input" type="text" id="label" name="label" maxlength="<%= limits.label %>" value="<%= form.label %>" placeholder="例如：保固到期日、機櫃編號、負責部門" required>
+</div>
+<div class="form-group">
+  <label class="form-label" for="type">資料類型</label>
+  <select class="form-select" id="type" name="type" <%= typeLocked ? 'disabled' : '' %>>
+    <% Object.keys(types).forEach(t => { %><option value="<%= t %>" <%= form.type === t ? 'selected' : '' %>><%= types[t] %></option><% }) %>
+  </select>
+  <% if (typeLocked) { %>
+    <p class="form-hint">已經有設備填過這個欄位，不能再改資料類型。</p>
+  <% } else { %>
+    <p class="form-hint">文字（最多 200 字）、數字、日期、下拉選單（自己定義選項）、是／否。建立並填過資料後就不能改類型。</p>
+  <% } %>
+</div>
+<div class="form-group" id="options-group">
+  <label class="form-label" for="options">下拉選項（一行一個）</label>
+  <textarea class="form-textarea" id="options" name="options" rows="5" placeholder="例如：&#10;自有&#10;租賃&#10;借用"><%= form.options %></textarea>
+  <p class="form-hint">只有「下拉選單」類型需要。之後可以增減選項；拿掉的選項，已經選過它的設備仍會保留原本的值。</p>
+</div>
+<div class="form-group">
+  <span class="form-label">適用類別</span>
+  <div class="checkbox-grid">
+    <% categories.forEach(c => { %>
+      <label class="checkbox-tile">
+        <input type="checkbox" name="categories" value="<%= c.code %>" <%= form.categories.includes(c.code) ? 'checked' : '' %>>
+        <span><%= c.label %><%= c.is_active ? '' : '（已停用）' %></span>
+      </label>
+    <% }) %>
+  </div>
+  <p class="form-hint">不勾選（或全部勾選）＝ 所有類別都有這個欄位；只勾某幾類，其他類別的設備就不會看到它。</p>
+</div>
+<div class="form-group form-checkbox-row">
+  <input type="checkbox" id="show_in_list" name="show_in_list" <%= form.show_in_list ? 'checked' : '' %>>
+  <label class="form-label" for="show_in_list" style="margin:0;">顯示在資產管理的列表欄位（建議最多 3 個，欄位太多表格會很寬；沒勾選也一樣可以搜尋，也會出現在 PDF 報告裡）</label>
+</div>

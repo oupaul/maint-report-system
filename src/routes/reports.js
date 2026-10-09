@@ -4,6 +4,7 @@ const path = require('path');
 const router = express.Router();
 
 const { requireLogin } = require('../middleware/auth');
+const AssetField = require('../models/AssetField');
 const InspectionBatch = require('../models/InspectionBatch');
 const InspectionItem = require('../models/InspectionItem');
 const InspectionItemPhoto = require('../models/InspectionItemPhoto');
@@ -18,7 +19,7 @@ router.get('/batches/:id/report.pdf', requireLogin, async (req, res) => {
     return res.status(404).render('error', { title: '找不到批次', message: '找不到指定的巡檢批次' });
   }
 
-  const assets = InspectionBatch.getAssets(batch.id);
+  const assets = AssetField.attach(InspectionBatch.getAssets(batch.id)); // 補上自訂欄位的值（報告設備頁會印）
   const items = InspectionItem.findByBatch(batch.id);
   const photosByItemId = InspectionItemPhoto.findByItemIds(items.map(i => i.id));
 

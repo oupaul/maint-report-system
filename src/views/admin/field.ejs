@@ -1,0 +1,30 @@
+<%- include('../layout', { title: '資產欄位：' + field.label }) %>
+
+<div class="page-header">
+  <h1><%= field.label %></h1>
+  <div class="page-actions">
+    <a href="/admin/fields" class="btn btn--secondary btn--md">回到資產欄位</a>
+  </div>
+</div>
+
+<% if (ok) { %><div class="form-success"><%= ok %></div><% } %>
+<% if (error) { %><div class="form-error"><%= error %></div><% } %>
+
+<div class="card" style="max-width: 640px;">
+  <p class="form-hint">目前有 <%= count %> 台設備填過這個欄位。<%= field.is_active ? '' : '這個欄位已停用，不會顯示在設備編輯頁、列表與報告。' %></p>
+  <form method="POST" action="/admin/fields/<%= field.id %>">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <%- include('field-form-fields', { form, categories, types, limits, typeLocked: count > 0 }) %>
+    <button type="submit" class="btn btn--primary btn--md">儲存</button>
+  </form>
+  <% if (count === 0) { %>
+    <form method="POST" action="/admin/fields/<%= field.id %>/delete" data-confirm="確定要刪除欄位「<%= field.label %>」嗎？還沒有任何設備填過它，刪除後無法復原。" style="margin-top: var(--space-4);">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button type="submit" class="btn btn--secondary btn--sm">刪除這個欄位</button>
+      <span class="form-hint">（還沒有設備填過，才能刪除）</span>
+    </form>
+  <% } %>
+</div>
+
+<script src="/js/field-form.js"></script>
+<%- include('../partials/footer') %>

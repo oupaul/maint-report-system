@@ -20,6 +20,8 @@ router.use((req, res, next) => {
 
 // 設備類型與檢查項目：管理員，或所屬權限群組有「管理設備類型」權限的人
 router.use('/categories', requirePermission('categories.manage'), require('./adminCategories'));
+// 自訂資產欄位：同樣是「管理設備類型」權限
+router.use('/fields', requirePermission('categories.manage'), require('./adminFields'));
 
 // 以下全部只有管理員能進（備份檔含完整資料庫與密碼雜湊，群組權限也只有管理員能改）
 router.use(requireRole('admin'));

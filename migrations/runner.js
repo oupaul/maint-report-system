@@ -26,6 +26,7 @@ const MIGRATIONS = [
   'migrate_0011_email_notifications',
   'migrate_0012_announcements',
   'migrate_0013_asset_identity_fields',
+  'migrate_0014_asset_custom_fields',
 ];
 
 async function run() {

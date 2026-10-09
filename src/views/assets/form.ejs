@@ -87,6 +87,33 @@
         <p class="form-hint">這是舊版「識別碼」欄位留下的內容。請把它分到上面對應的欄位，再把這一欄清空；清空儲存後這一欄就不會再出現。</p>
       </div>
     <% } %>
+    <% customFields.forEach(f => {
+      // 已有檢查紀錄而鎖定類型時，不適用的欄位直接不顯示；可改類型時全部渲染，由 asset-form.js 依選的類別顯示或隱藏
+      if (categoryLocked && !f.applies) return;
+      const fid = 'cf_' + f.id; %>
+      <div class="form-group cf-field" data-cats="<%= f.categoryList ? f.categoryList.join(',') : '' %>" <%= f.applies ? '' : 'hidden' %>>
+        <label class="form-label" for="<%= fid %>"><%= f.label %></label>
+        <% if (f.type === 'number') { %>
+          <input class="form-input" type="number" step="any" id="<%= fid %>" name="<%= fid %>" value="<%= f.value %>">
+        <% } else if (f.type === 'date') { %>
+          <input class="form-input" type="date" id="<%= fid %>" name="<%= fid %>" value="<%= f.value %>">
+        <% } else if (f.type === 'select') { %>
+          <select class="form-select" id="<%= fid %>" name="<%= fid %>">
+            <option value="">（未填）</option>
+            <% f.optionList.forEach(o => { %><option value="<%= o %>" <%= f.value === o ? 'selected' : '' %>><%= o %></option><% }) %>
+            <% if (f.value && !f.optionList.includes(f.value)) { %><option value="<%= f.value %>" selected><%= f.value %>（已不在選項中）</option><% } %>
+          </select>
+        <% } else if (f.type === 'boolean') { %>
+          <select class="form-select" id="<%= fid %>" name="<%= fid %>">
+            <option value="">（未填）</option>
+            <option value="1" <%= f.value === '1' ? 'selected' : '' %>>是</option>
+            <option value="0" <%= f.value === '0' ? 'selected' : '' %>>否</option>
+          </select>
+        <% } else { %>
+          <input class="form-input" type="text" id="<%= fid %>" name="<%= fid %>" maxlength="200" value="<%= f.value %>">
+        <% } %>
+      </div>
+    <% }) %>
     <div class="form-group">
       <label class="form-label" for="notes">備註</label>
       <textarea class="form-textarea" id="notes" name="notes"><%= asset ? (asset.notes || '') : '' %></textarea>
@@ -102,4 +129,5 @@
   </form>
 </div>
 
+<script src="/js/asset-form.js"></script>
 <%- include('../partials/footer') %>

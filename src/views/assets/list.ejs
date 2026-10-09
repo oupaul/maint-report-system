@@ -12,7 +12,7 @@
 <div class="card">
   <% if (total > 0) { %>
     <form method="GET" action="/assets" class="asset-filter" role="search">
-      <input type="search" class="form-input" name="q" value="<%= q %>" placeholder="搜尋名稱、位置、IP、MAC、主機名稱、廠牌、型號、序號、財產編號（可輸入多個關鍵字）" aria-label="搜尋資產" autocomplete="off">
+      <input type="search" class="form-input" name="q" value="<%= q %>" placeholder="搜尋名稱、位置、IP、MAC、主機名稱、廠牌、型號、序號、財產編號、自訂欄位（可輸入多個關鍵字）" aria-label="搜尋資產" autocomplete="off">
       <select class="form-select" name="category" aria-label="依類別篩選">
         <option value="">全部類別</option>
         <% Object.keys(categoryLabels).forEach(code => { %>
@@ -42,6 +42,7 @@
             <th>序號</th>
             <th>財產編號</th>
             <th>購置日期</th>
+            <% listFields.forEach(f => { %><th><%= f.label %></th><% }) %>
             <th>狀態</th>
             <% if (can('assets.manage')) { %><th></th><% } %>
           </tr>
@@ -58,6 +59,7 @@
               <td><%= a.serial_number || '-' %></td>
               <td><%= a.asset_tag || '-' %><% if (a.identifier) { %> <span class="status-badge status-badge--warning" title="舊識別碼尚未整理：<%= a.identifier %>">待整理</span><% } %></td>
               <td><%= a.purchase_date || '-' %></td>
+              <% listFields.forEach(f => { const cd = a.customDisplay.find(x => x.id === f.id); %><td><%= cd ? cd.text : '-' %></td><% }) %>
               <td>
                 <% if (a.is_active) { %>
                   <span class="status-badge status-badge--normal">啟用</span>

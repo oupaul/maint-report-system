@@ -62,7 +62,7 @@
       </summary>
       <div class="checkbox-grid">
         <% g.items.forEach(a => { %>
-          <label class="checkbox-tile ap-tile" data-id="<%= a.id %>" data-cat="<%= a.category %>" data-loc="<%= (a.location || '').trim() %>" data-search="<%= [a.name, a.location, a.ip_address, a.mac_address, (a.mac_address || '').replace(/:/g, ''), a.hostname, a.brand, a.model, a.serial_number, a.asset_tag, a.identifier, g.label].filter(Boolean).join(' ').toLowerCase() %>">
+          <label class="checkbox-tile ap-tile" data-id="<%= a.id %>" data-cat="<%= a.category %>" data-loc="<%= (a.location || '').trim() %>" data-search="<%= [a.name, a.location, a.ip_address, a.mac_address, (a.mac_address || '').replace(/:/g, ''), a.hostname, a.brand, a.model, a.serial_number, a.asset_tag, a.identifier, a.customSearch, g.label].filter(Boolean).join(' ').toLowerCase() %>">
             <input type="checkbox" name="asset_ids" value="<%= a.id %>" <%= selectedSet.has(String(a.id)) ? 'checked' : '' %>>
             <span class="ap-tile__text">
               <strong><%= a.name %></strong>

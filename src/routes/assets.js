@@ -2,11 +2,21 @@ const express = require('express');
 const router = express.Router();
 
 // 類型下拉選單：啟用中的類型，加上這個設備目前正在用的類型（即使已停用也要保留，才不會一存檔就被改掉）
+// 驗證失敗要把使用者剛輸入的自訂欄位值帶回表單
+function customInput(body) {
+  const out = {};
+  Object.keys(body || {}).forEach(k => { const m = /^cf_(\d+)$/.exec(k); if (m) out[m[1]] = body[k]; });
+  return out;
+}
+
 function formData(asset, error) {
   const current = asset && asset.id ? asset.category : null;
+  const categories = AssetCategory.selectableCodes(current);
+  const shownCategory = asset && asset.category ? asset.category : categories[0];
   return {
     asset,
-    categories: AssetCategory.selectableCodes(current),
+    customFields: AssetField.formFields(asset ? { ...asset, custom_input: customInput(asset) } : null, shownCategory),
+    categories,
     categoryLabels: AssetCategory.labelMap(),
     categoryLocked: !!(asset && asset.id && Asset.hasRecords(asset.id)),
     // 格式問題與重複只提示、不擋存檔；編輯頁每次顯示都即時計算，所以日後別台設備改了也會反映
@@ -20,6 +30,7 @@ const { requireLogin, requirePermission } = require('../middleware/auth');
 const Asset = require('../models/Asset');
 const assetFields = require('../utils/assetFields');
 const AssetCategory = require('../models/AssetCategory');
+const AssetField = require('../models/AssetField');
 
 router.get('/', requireLogin, (req, res) => {
   const q = String(req.query.q || '').slice(0, 100);
@@ -28,6 +39,7 @@ router.get('/', requireLogin, (req, res) => {
   res.render('assets/list', {
     assets, q, category,
     total: Asset.findAll({ includeInactive: true }).length,
+    listFields: AssetField.findAll({ activeOnly: true }).filter(f => f.show_in_list),
     categoryLabels: AssetCategory.labelMap(),
   });
 });
@@ -44,8 +56,10 @@ router.post('/', requirePermission('assets.manage'), (req, res) => {
   }
   const fields = assetFields.normalize(req.body);
   if (fields.error) return res.status(400).render('assets/form', formData(req.body, fields.error));
+  const custom = AssetField.parse(req.body, category);
+  if (custom.error) return res.status(400).render('assets/form', formData(req.body, custom.error));
 
-  const asset = Asset.create({ name, category, location, notes, ...fields.values });
+  const asset = Asset.create({ name, category, location, notes, ...fields.values, custom: custom.values });
   res.redirect(`/assets/${asset.id}/edit?saved=1`);
 });
 
@@ -78,8 +92,11 @@ router.post('/:id/edit', requirePermission('assets.manage'), (req, res) => {
   const fields = assetFields.normalize(req.body);
   if (fields.error) return res.status(400).render('assets/form', formData({ ...asset, ...req.body }, fields.error));
 
+  const custom = AssetField.parse(req.body, category, AssetField.currentValues(asset.id));
+  if (custom.error) return res.status(400).render('assets/form', formData({ ...asset, ...req.body }, custom.error));
+
   const saved = Asset.update(asset.id, {
-    name, category, location, notes, ...fields.values,
+    name, category, location, notes, ...fields.values, custom: custom.values,
     identifier: assetFields.legacyIdentifier(req.body, asset.identifier),
     is_active: is_active === 'on' || is_active === '1',
   });

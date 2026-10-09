@@ -420,6 +420,9 @@ async function generateBatchReport({ batch, assets, itemsByAssetId, signaturesBy
       (asset.purchase_date ? `　購置日期：${asset.purchase_date}` : '') +
       (asset.identifier ? `　識別碼：${asset.identifier}` : '');
     if (line2.trim()) doc.text(line2.trim());
+    // 管理員自訂的欄位（只印啟用中、適用這個類別、而且有填的）
+    const line3 = (asset.customDisplay || []).map(c => `${c.label}：${c.text}`).join('　');
+    if (line3) doc.text(line3);
     doc.moveDown(0.4);
 
     // 底線

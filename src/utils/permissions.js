@@ -2,7 +2,7 @@
 // 靠群組取得；技術人員預設沒有任何額外權限，由管理員把他加進某個權限群組才會取得該群組勾選的權限。
 // 新增權限只要在這裡加一筆，群組管理頁就會自動列出；key 一旦寫進資料庫就不要改名。
 const PERMISSIONS = [
-  { key: 'categories.manage', label: '管理設備類型', description: '新增、改名、排序、停用設備類型，以及管理各類型的檢查項目' },
+  { key: 'categories.manage', label: '管理設備類型與資產欄位', description: '新增、改名、排序、停用設備類型，管理各類型的檢查項目，以及自訂資產欄位' },
   { key: 'assets.manage', label: '管理資產建檔', description: '新增、編輯資產（設備）資料' },
 ];
 

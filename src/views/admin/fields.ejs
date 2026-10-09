@@ -1,0 +1,70 @@
+<%- include('../layout', { title: '資產欄位' }) %>
+
+<div class="page-header">
+  <h1>資產欄位</h1>
+</div>
+
+<% if (ok) { %><div class="form-success"><%= ok %></div><% } %>
+<% if (error) { %><div class="form-error"><%= error %></div><% } %>
+
+<div class="card">
+  <p class="form-hint">除了系統內建的欄位（IP、MAC、主機名稱、序號、財產編號、廠牌、型號、購置日期）之外，可以在這裡自訂資產欄位，例如「保固到期日」「機櫃編號」「負責部門」。<strong>已經有設備填過資料的欄位只能停用、不能刪除</strong>（停用後從畫面隱藏，資料保留，重新啟用就會回來）。</p>
+
+  <% if (fields.length === 0) { %>
+    <div class="empty-state">還沒有自訂欄位。</div>
+  <% } else { %>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr><th>欄位</th><th>類型</th><th>適用類別</th><th>列表顯示</th><th>已填設備數</th><th>狀態</th><th></th></tr>
+      </thead>
+      <tbody>
+        <% fields.forEach((f, i) => { %>
+          <tr>
+            <td><a href="/admin/fields/<%= f.id %>"><strong><%= f.label %></strong></a></td>
+            <td><%= types[f.type] %><% if (f.type === 'select') { %> <span class="form-hint">（<%= f.optionList.length %> 個選項）</span><% } %></td>
+            <td><%= f.appliesText %></td>
+            <td><%= f.show_in_list ? '是' : '-' %></td>
+            <td><%= f.count %></td>
+            <td>
+              <% if (f.is_active) { %><span class="status-badge status-badge--normal">啟用中</span>
+              <% } else { %><span class="status-badge status-badge--warning">已停用</span><% } %>
+            </td>
+            <td>
+              <div class="page-actions">
+                <form method="POST" action="/admin/fields/<%= f.id %>/move">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <input type="hidden" name="dir" value="up">
+                  <button type="submit" class="btn btn--secondary btn--sm" <%= i === 0 ? 'disabled' : '' %> title="往上移">↑</button>
+                </form>
+                <form method="POST" action="/admin/fields/<%= f.id %>/move">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <input type="hidden" name="dir" value="down">
+                  <button type="submit" class="btn btn--secondary btn--sm" <%= i === fields.length - 1 ? 'disabled' : '' %> title="往下移">↓</button>
+                </form>
+                <a class="btn btn--secondary btn--sm" href="/admin/fields/<%= f.id %>">編輯</a>
+                <form method="POST" action="/admin/fields/<%= f.id %>/toggle" <% if (f.is_active) { %>data-confirm="停用「<%= f.label %>」後，設備的編輯頁、列表與報告都不會再顯示這個欄位（資料保留，重新啟用就會回來）。確定要停用嗎？"<% } %>>
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <button type="submit" class="btn btn--secondary btn--sm"><%= f.is_active ? '停用' : '啟用' %></button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <% } %>
+</div>
+
+<div class="card">
+  <h2>新增欄位</h2>
+  <form method="POST" action="/admin/fields">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <%- include('field-form-fields', { form, categories, types, limits, typeLocked: false }) %>
+    <button type="submit" class="btn btn--primary btn--md">新增欄位</button>
+  </form>
+</div>
+
+<script src="/js/field-form.js"></script>
+<%- include('../partials/footer') %>
