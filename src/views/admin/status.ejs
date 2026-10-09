@@ -54,7 +54,10 @@
 </div>
 
 <div class="card">
-  <h2>線上使用者</h2>
+  <div class="page-header" style="margin-bottom: var(--space-2);">
+    <h2 style="margin:0;">線上使用者</h2>
+    <a href="/admin/announcements" class="btn btn--primary btn--sm">發送訊息給使用者（例如系統即將更新）</a>
+  </div>
   <% if (online.length === 0) { %>
     <div class="empty-state">目前沒有使用者在線上。</div>
   <% } else { %>

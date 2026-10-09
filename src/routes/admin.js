@@ -30,6 +30,9 @@ router.use('/groups', require('./adminGroups'));
 // 簽核流程設定
 router.use('/approval', require('./adminApproval'));
 
+// 系統通知（發送「系統即將更新」這類訊息給使用者）
+router.use('/announcements', require('./adminAnnouncements'));
+
 // Email 通知設定與寄送紀錄
 router.use('/mail', require('./adminMail'));
 

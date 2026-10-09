@@ -24,6 +24,7 @@ const MIGRATIONS = [
   'migrate_0009_permission_groups',
   'migrate_0010_approval_workflow',
   'migrate_0011_email_notifications',
+  'migrate_0012_announcements',
 ];
 
 async function run() {

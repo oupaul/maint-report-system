@@ -11,6 +11,7 @@ const db = require('./models/db');
 const User = require('./models/User');
 const ActivityTracker = require('./services/ActivityTracker');
 const Notification = require('./models/Notification');
+const Announcement = require('./models/Announcement');
 const PermissionGroup = require('./models/PermissionGroup');
 const { can } = require('./utils/permissions');
 const BackupService = require('./services/BackupService');
@@ -114,6 +115,7 @@ app.use((req, res, next) => {
   if (req.user) {
     const uid = req.user.id;
     Object.defineProperty(res.locals, 'unreadNotifications', { get: () => Notification.unreadCount(uid), enumerable: true, configurable: true });
+    Object.defineProperty(res.locals, 'activeAnnouncements', { get: () => Announcement.forBanner(), enumerable: true, configurable: true });
     Object.defineProperty(res.locals, 'recentNotifications', { get: () => Notification.listRecent(uid, 8), enumerable: true, configurable: true });
   }
   res.locals.currentPath = req.path;

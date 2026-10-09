@@ -3,6 +3,7 @@ const router = express.Router();
 
 const { requireLogin } = require('../middleware/auth');
 const Notification = require('../models/Notification');
+const Announcement = require('../models/Announcement');
 
 router.use(requireLogin);
 
@@ -14,6 +15,12 @@ router.get('/', (req, res) => {
 router.get('/unread-count', (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.json({ count: Notification.unreadCount(req.user.id) });
+});
+
+// 導覽列定時輪詢用：未讀數 + 目前有效的系統通知橫幅（管理員發送後，線上的人幾秒內就看得到）
+router.get('/status', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ count: Notification.unreadCount(req.user.id), announcements: Announcement.forBanner() });
 });
 
 router.post('/read-all', (req, res) => {

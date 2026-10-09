@@ -26,6 +26,7 @@
           ['/admin/groups', '權限群組', isAdmin],
           ['/admin/approval', '簽核流程', isAdmin],
           ['/admin/mail', 'Email 通知', isAdmin],
+          ['/admin/announcements', '系統通知', isAdmin],
           ['/admin/categories', '設備類型', can('categories.manage')],
           ['/admin/status', '系統狀態', isAdmin],
           ['/admin/backups', '備份管理', isAdmin],
@@ -85,4 +86,17 @@
       <% } %>
     </div>
   </nav>
+  <%# 系統通知橫幅：管理員發送的限時訊息（例如「系統即將更新」），到期或被撤回就消失；使用者可以按「知道了」收起來（記在瀏覽器裡） %>
+  <% if (currentUser) { %>
+    <div class="announcements" id="announcements" aria-live="polite">
+      <% (typeof activeAnnouncements !== 'undefined' ? activeAnnouncements : []).forEach(a => { %>
+        <div class="announcement announcement--<%= a.level %>" data-id="<%= a.id %>" role="status">
+          <span class="announcement__tag"><%= a.level === 'warning' ? '重要' : '系統通知' %></span>
+          <span class="announcement__text"><%= a.message %></span>
+          <time class="announcement__time"><%= a.at %> 發布</time>
+          <button type="button" class="announcement__close">知道了</button>
+        </div>
+      <% }) %>
+    </div>
+  <% } %>
   <main class="app-main">

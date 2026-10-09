@@ -1,0 +1,107 @@
+<%- include('../layout', { title: '系統通知' }) %>
+
+<div class="page-header">
+  <h1>系統通知</h1>
+  <div class="page-actions">
+    <a href="/admin/status" class="btn btn--secondary btn--md">看線上使用者</a>
+  </div>
+</div>
+
+<% if (ok) { %><div class="form-success"><%= ok %></div><% } %>
+<% if (error) { %><div class="form-error"><%= error %></div><% } %>
+
+<div class="card">
+  <h2>發送訊息給使用者</h2>
+  <p class="form-hint">用來通知「系統即將更新」「今晚停機維護」這類事情。發送後，<strong>所有正在使用系統的人</strong>會在每一頁最上方看到一條橫幅（頁面開著也會在幾秒內自動出現，不用重新整理），到期或你撤回就會消失；同時也會依下面的對象寫入站內通知，沒在線上的人下次登入也看得到。目前約有 <strong><%= onlineUsers %></strong> 位使用者在線上（5 分鐘內有操作）。</p>
+
+  <form method="POST" action="/admin/announcements" data-confirm="確定要發送這則系統通知嗎？發送後所有正在使用系統的人都會看到。">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+    <div class="ann-template" id="ann-template">
+      <strong>快速範本：系統即將更新</strong>
+      <label>幾分鐘後開始 <input class="form-input" type="number" id="ann-in" min="1" max="1440" value="10"></label>
+      <label>預計維護 <input class="form-input" type="number" id="ann-for" min="1" max="1440" value="15"> 分鐘</label>
+      <button type="button" class="btn btn--secondary btn--sm" id="ann-apply">套用範本</button>
+      <span class="form-hint">會把訊息欄位換成一段可以再修改的文字（時間用台北時間）。</span>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="message">訊息內容</label>
+      <textarea class="form-input" id="message" name="message" maxlength="<%= maxMessage %>" rows="3" required placeholder="例如：系統將於 22:30 進行更新維護，預計 15 分鐘，期間無法使用。請儘快儲存正在填寫的內容。"><%= form.message %></textarea>
+      <p class="form-hint">最多 <%= maxMessage %> 字，純文字。</p>
+    </div>
+
+    <div class="checklist-row__grid">
+      <div class="form-group">
+        <label class="form-label" for="level">重要程度</label>
+        <select class="form-select" id="level" name="level">
+          <option value="warning" <%= form.level === 'warning' ? 'selected' : '' %>>重要（橘色警示橫幅）</option>
+          <option value="info" <%= form.level === 'info' ? 'selected' : '' %>>一般通知</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="duration">橫幅顯示多久</label>
+        <select class="form-select" id="duration" name="duration">
+          <% durations.forEach(d => { %><option value="<%= d %>" <%= Number(form.duration) === d ? 'selected' : '' %>><%= durationLabel[d] %></option><% }) %>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">寫入站內通知的對象</label>
+      <label class="form-checkbox-row"><input type="radio" name="target" value="online" <%= form.target !== 'all' ? 'checked' : '' %>><span>目前線上的使用者（約 <%= onlineUsers %> 人）</span></label>
+      <label class="form-checkbox-row"><input type="radio" name="target" value="all" <%= form.target === 'all' ? 'checked' : '' %>><span>所有啟用中的使用者（沒在線上的人下次登入也看得到）</span></label>
+      <p class="form-hint">不論選哪一個，橫幅都會顯示給「橫幅有效期間內」任何登入使用者；發送的人自己不會收到站內通知。</p>
+    </div>
+
+    <div class="form-group">
+      <label class="form-checkbox-row">
+        <input type="checkbox" name="email" value="on" <%= form.email ? 'checked' : '' %> <%= mailReady ? '' : 'disabled' %>>
+        <span>同時寄 Email 給上面的對象<% if (!mailReady) { %>（Email 寄信功能尚未啟用，請先到「Email 通知」設定）<% } %></span>
+      </label>
+    </div>
+
+    <button type="submit" class="btn btn--primary btn--md">發送通知</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>最近發送的通知</h2>
+  <% if (recent.length === 0) { %>
+    <div class="empty-state">還沒有發送過系統通知。</div>
+  <% } else { %>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>發送時間（台北時間）</th><th>內容</th><th>對象</th><th>狀態</th><th></th></tr></thead>
+        <tbody>
+          <% recent.forEach(a => { %>
+            <tr>
+              <td><%= a.created_at.slice(0, 16) %><div class="form-hint"><%= a.by_name || a.by_username || '-' %></div></td>
+              <td>
+                <span class="status-badge status-badge--<%= a.level === 'warning' ? 'warning' : 'normal' %>"><%= a.level === 'warning' ? '重要' : '一般' %></span>
+                <%= a.message %>
+              </td>
+              <td><%= a.target === 'all' ? '所有使用者' : '線上使用者' %>・<%= a.recipients %> 人<%= a.emailed ? '・含 Email' : '' %></td>
+              <td>
+                <% if (a.state === 'active') { %><span class="status-badge status-badge--warning">顯示中（到 <%= a.expires_at.slice(11, 16) %>）</span>
+                <% } else if (a.state === 'cancelled') { %><span class="form-hint">已撤回</span>
+                <% } else { %><span class="form-hint">已到期</span><% } %>
+              </td>
+              <td>
+                <% if (a.state === 'active') { %>
+                  <form method="POST" action="/admin/announcements/<%= a.id %>/cancel" data-confirm="確定要撤回這則通知嗎？橫幅會馬上從大家的畫面消失。">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button type="submit" class="btn btn--secondary btn--sm">撤回</button>
+                  </form>
+                <% } %>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>
+
+<script src="/js/announcement-form.js"></script>
+<%- include('../partials/footer') %>
