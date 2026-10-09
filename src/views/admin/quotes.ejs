@@ -38,6 +38,8 @@
       <p class="form-hint">每張請求另外寄一封到這個信箱（業務不是系統使用者、或想用共用信箱時用）。需要先在「Email 通知」設定好寄信。</p>
     </div>
 
+    <div class="form-group form-checkbox-row"><input type="checkbox" id="allow_warning_direct" name="allow_warning_direct" <%= form.allow_warning_direct ? 'checked' : '' %>><label class="form-label" for="allow_warning_direct" style="margin:0;">「警告」等級的項目也可以直接通知業務（預設不行：警告要先在「待處理項目」的處理建議選「需要報價」；異常永遠可以直接送）</label></div>
+
     <div class="form-group form-checkbox-row"><input type="checkbox" id="attach_pdf" name="attach_pdf" <%= form.attach_pdf ? 'checked' : '' %>><label class="form-label" for="attach_pdf" style="margin:0;">Email 附上這張請求的 PDF（含截圖，沒有系統帳號的人也看得到；超過 2.5MB 會自動不附）</label></div>
 
     <div class="form-group">

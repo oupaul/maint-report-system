@@ -949,3 +949,23 @@ html:has(.saveall-bar:not([hidden])) { scroll-padding-bottom: 6rem; } /* 聚焦�
 .quote-timeline li { padding: var(--space-2) 0; border-bottom: 1px solid var(--color-border); font-size: var(--text-sm); }
 .quote-timeline time { color: var(--color-text-muted); margin-right: var(--space-2); }
 .inline-edit { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; }
+
+/* ---- 處理建議（分流）---- */
+.triage-badge--observe { color: #2563EB; background: #EFF6FF; }
+.triage-badge--scheduled { color: #7C3AED; background: #F5F3FF; }
+.triage-badge--quote { color: var(--color-primary); background: var(--color-primary-soft-bg); }
+.triage-badge--resolved { color: var(--color-text-muted); background: var(--color-bg-soft); }
+.hint-line { font-size: var(--text-sm); margin: 2px 0 var(--space-2); }
+.hint-line--quote { color: var(--color-status-critical); }
+.hint-line--schedule { color: var(--color-status-warning); }
+.hint-line--observe { color: var(--color-text-muted); }
+.triage-cell { min-width: 12rem; }
+.hint-box { padding: var(--space-4); border-radius: var(--radius-md); margin: var(--space-4) 0; border: 1px solid var(--color-border); background: var(--color-bg-soft); }
+.hint-box--quote { border-color: var(--color-status-critical); background: var(--color-status-critical-bg); }
+.hint-box--schedule { border-color: var(--color-status-warning); background: var(--color-status-warning-bg); }
+.issue-table td { vertical-align: top; }
+.issue-table .issue-value { max-width: 15rem; }
+.issue-table td:nth-child(5) { max-width: 12rem; }
+.issue-table .triage-cell { width: 15rem; min-width: 0; white-space: normal; }
+.issue-table .hint-line { white-space: normal; }
+.issue-table .quote-line { margin-top: var(--space-2); padding-top: var(--space-2); border-top: 1px dashed var(--color-border); }

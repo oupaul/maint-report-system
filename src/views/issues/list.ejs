@@ -7,8 +7,9 @@
   </div>
 </div>
 
+<% if (flash) { %><div class="form-success"><%= flash %></div><% } %>
 <div class="card">
-  <p class="form-hint">每台設備的每個檢查項目，只看<strong>最新一次</strong>巡檢的結果，最新一次是<strong>警告或異常</strong>才會列在這裡（舊批次裡已經恢復正常的不會留著）。草稿批次也算。點項目名稱或「查看」會開啟該批次並直接捲到那一列。</p>
+  <p class="form-hint">每台設備的每個檢查項目，只看<strong>最新一次</strong>巡檢的結果，最新一次是<strong>警告或異常</strong>才會列在這裡（舊批次裡已經恢復正常的不會留著）。草稿批次也算。點項目名稱或「查看」會開啟該批次並直接捲到那一列。<strong>警告不一定要報價</strong>：先用「處理建議」決定要持續觀察、排程處理、需要報價，還是已處理；已分流的項目不會再催（複查日期到了、惡化成異常、或標記之後的巡檢仍然異常時，會自動回到「未分流」）。</p>
 
   <form method="GET" action="/issues" class="asset-filter" id="issue-filter">
     <select class="form-select" name="category" aria-label="依類別篩選">
@@ -41,6 +42,11 @@
         <option value="done" <%= f.quote === 'done' ? 'selected' : '' %>>報價已完成</option>
       </select>
     <% } %>
+    <select class="form-select" name="triage" aria-label="依處理建議篩選">
+      <option value="">不限處理建議</option>
+      <option value="none" <%= f.triage === 'none' ? 'selected' : '' %>>未分流（<%= untriaged %>）</option>
+      <% Object.keys(DISPOSITIONS).forEach(k => { %><option value="<%= k %>" <%= f.triage === k ? 'selected' : '' %>><%= DISPOSITIONS[k] %></option><% }) %>
+    </select>
     <select class="form-select" name="streak" aria-label="連續出現次數">
       <option value="">不限連續次數</option>
       <option value="2" <%= f.minStreak === 2 ? 'selected' : '' %>>連續 2 次以上</option>
@@ -65,9 +71,9 @@
     <div class="empty-state">沒有符合條件的項目。<a href="/issues">清除篩選</a></div>
   <% } else { %>
     <div class="table-wrap">
-      <table class="data-table">
+      <table class="data-table issue-table">
         <thead>
-          <tr><th>嚴重度</th><th>設備</th><th>位置</th><th>檢查項目</th><th>數值 / 備註</th><th>最新巡檢</th><% if (quoteEnabled) { %><th>報價</th><% } %></tr>
+          <tr><th>嚴重度</th><th>設備 / 位置</th><th>檢查項目</th><th>數值 / 備註</th><th>最新巡檢</th><th>處理建議<%= quoteEnabled ? ' / 報價' : '' %></th></tr>
         </thead>
         <tbody>
           <% rows.forEach(r => { %>
@@ -76,8 +82,7 @@
                 <span class="status-badge status-badge--<%= r.status %>"><%= r.status === 'critical' ? '異常' : '警告' %></span><br>
                 <small class="form-hint"><%= r.streak >= 2 ? `連續 ${r.streak} 次` : '首次' %></small>
               </td>
-              <td><strong><%= r.asset_name %></strong><br><small class="form-hint"><%= categoryLabels[r.category] || r.category %></small></td>
-              <td><%= r.location || '-' %></td>
+              <td><strong><%= r.asset_name %></strong><br><small class="form-hint"><%= categoryLabels[r.category] || r.category %><%= r.location ? '・' + r.location : '' %></small></td>
               <td>
                 <a href="/batches/<%= r.batch_id %>#item-<%= r.item_id %>"><strong><%= r.label %></strong></a>
                 <div class="issue-actions">
@@ -96,15 +101,29 @@
                 <small class="form-hint"><a href="/batches/<%= r.batch_id %>"><%= r.batch_title %></a>
                   <span class="status-badge status-badge--<%= r.batchInfo.tone === 'draft' ? 'warning' : r.batchInfo.tone %>"><%= r.batchInfo.text %></span></small>
               </td>
-              <% if (quoteEnabled) { %>
-              <td>
-                <% if (r.quote) { %>
-                  <a href="/quotes/<%= r.quote.id %>"><span class="status-badge <%= ['quoted'].includes(r.quote.status) ? 'status-badge--normal' : (['closed'].includes(r.quote.status) ? '' : 'status-badge--warning') %>">Q-<%= r.quote.id %> <%= STATUS[r.quote.status] %></span></a>
+              <td class="triage-cell">
+                <% if (r.triage) { %>
+                  <span class="status-badge triage-badge triage-badge--<%= r.triage.disposition %>"><%= DISPOSITIONS[r.triage.disposition] %><%= r.triage.review_date ? '・' + r.triage.review_date : '' %></span>
+                  <% if (r.triage.note) { %><div class="form-hint"><%= r.triage.note %></div><% } %>
+                  <div class="form-hint"><%= r.triage.updated_by_name %>・<%= (r.triage.updated_at || '').slice(0, 10) %>　<a href="/issues/triage?item=<%= r.item_id %>">修改</a></div>
                 <% } else { %>
-                  <a class="btn btn--secondary btn--sm" href="/quotes/new?item=<%= r.item_id %>">通知業務報價</a>
+                  <span class="status-badge status-badge--warning">未分流</span>
+                  <% if (r.resurfaced) { %><div class="import-warn"><%= r.resurfaced %></div><% } %>
+                  <div class="hint-line hint-line--<%= r.hint.tone %>">建議：<%= r.hint.text %></div>
+                  <a class="btn btn--secondary btn--sm" href="/issues/triage?item=<%= r.item_id %>">處理建議</a>
+                <% } %>
+                <% if (quoteEnabled) { %>
+                  <div class="quote-line">
+                <% if (r.quote) { %>
+                    <a href="/quotes/<%= r.quote.id %>"><span class="status-badge <%= ['quoted'].includes(r.quote.status) ? 'status-badge--normal' : (['closed'].includes(r.quote.status) ? '' : 'status-badge--warning') %>">Q-<%= r.quote.id %> <%= STATUS[r.quote.status] %></span></a>
+                  <% } else if (r.canQuote) { %>
+                    <a class="btn btn--secondary btn--sm" href="/quotes/new?item=<%= r.item_id %>">通知業務報價</a>
+                  <% } else { %>
+                    <span class="form-hint">警告：先選處理建議</span>
+                  <% } %>
+                  </div>
                 <% } %>
               </td>
-              <% } %>
             </tr>
           <% }) %>
         </tbody>

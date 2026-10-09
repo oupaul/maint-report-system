@@ -20,6 +20,7 @@ const QuotePdf = require('./QuotePdfService');
 const capacity = require('../utils/capacity');
 const { can } = require('../utils/permissions');
 const PermissionGroup = require('../models/PermissionGroup');
+const IssueTriage = require('../models/IssueTriage');
 const { nowTaipei } = require('../utils/time');
 
 const STATUS = { pending_confirm: '待主管確認', sent: '已送出', processing: '處理中', quoted: '已報價', closed: '已結案', cancelled: '已取消' };
@@ -60,6 +61,7 @@ function validateSettings(input) {
   return {
     values: {
       notify_group_id: notifyGroup,
+      allow_warning_direct: b(input.allow_warning_direct),
       enabled: b(input.enabled), sales_email: email || null, attach_pdf: b(input.attach_pdf),
       show_ip: b(input.show_ip), show_mac: b(input.show_mac), show_serial: b(input.show_serial),
       show_purchase: b(input.show_purchase), show_custom: b(input.show_custom),
@@ -71,8 +73,8 @@ function validateSettings(input) {
 function saveSettings(v) {
   db.prepare(
     `UPDATE quote_settings SET enabled = ?, sales_email = ?, attach_pdf = ?, show_ip = ?, show_mac = ?, show_serial = ?,
-       show_purchase = ?, show_custom = ?, require_confirm = ?, remind_days = ?, notify_group_id = ? WHERE id = 1`
-  ).run(v.enabled, v.sales_email, v.attach_pdf, v.show_ip, v.show_mac, v.show_serial, v.show_purchase, v.show_custom, v.require_confirm, v.remind_days, v.notify_group_id);
+       show_purchase = ?, show_custom = ?, require_confirm = ?, remind_days = ?, notify_group_id = ?, allow_warning_direct = ? WHERE id = 1`
+  ).run(v.enabled, v.sales_email, v.attach_pdf, v.show_ip, v.show_mac, v.show_serial, v.show_purchase, v.show_custom, v.require_confirm, v.remind_days, v.notify_group_id, v.allow_warning_direct);
 }
 
 // ---------- 人 ----------
@@ -222,6 +224,17 @@ function assetSnapshot(asset) {
   });
 }
 
+// 這個項目能不能通知業務報價：異常可以直接送；警告要先在「處理建議」選「需要報價」，
+// 除非管理員在設定頁打開「警告也可以直接通知業務」。回傳 { ok } 或 { ok:false, reason }
+function quoteAllowance(item, settings = getSettings()) {
+  if (item.status === 'critical') return { ok: true };
+  if (item.status !== 'warning') return { ok: false, reason: '只有警告或異常的項目可以通知業務報價' };
+  if (settings.allow_warning_direct) return { ok: true };
+  const t = IssueTriage.activeFor(item.asset_id, item.checklist_item_id);
+  if (t && t.disposition === 'quote') return { ok: true };
+  return { ok: false, reason: '警告等級的項目要先到「處理建議」選「需要報價」，才能通知業務' };
+}
+
 function create(user, { itemIds, urgency, description }) {
   const settings = getSettings();
   if (!settings.enabled) return fail('報價請求功能目前沒有啟用');
@@ -239,6 +252,10 @@ function create(user, { itemIds, urgency, description }) {
   if (rows.length !== ids.length) return fail('找不到指定的檢查項目，請重新整理頁面');
   if (new Set(rows.map(r => r.asset_id)).size !== 1) return fail('一張請求只能包含同一台設備的項目');
   if (rows.some(r => r.status !== 'warning' && r.status !== 'critical')) return fail('只有警告或異常的項目可以通知業務報價');
+  for (const r of rows) {
+    const allow = quoteAllowance(r, settings);
+    if (!allow.ok) return fail(`「${r.label}」：${allow.reason}`, 403);
+  }
   const asset = Asset.findById(rows[0].asset_id);
   if (!asset || !asset.is_active) return fail('這台設備已停用，無法建立報價請求');
   for (const r of rows) {
@@ -277,6 +294,12 @@ function create(user, { itemIds, urgency, description }) {
     addEvent(rid, user.id, 'created', `${label(user)} 建立請求（${rows.length} 個項目，${URGENCY[urg]}）${status === 'pending_confirm' ? '，等待主管確認' : ''}`);
     return rid;
   })();
+
+  // 已經決定要報價了：處理建議同步標成「需要報價」（待處理項目清單就不會再當成還沒分流）
+  for (const r of rows) {
+    const cur = IssueTriage.get(r.asset_id, r.checklist_item_id);
+    if (!cur || cur.disposition !== 'quote') IssueTriage.save(r.asset_id, r.checklist_item_id, { disposition: 'quote', note: `已通知業務報價 Q-${requestId}`, review_date: null }, user.id);
+  }
 
   const request = findRequest(requestId);
   if (status === 'pending_confirm') {
@@ -662,6 +685,6 @@ module.exports = {
   STATUS, OPEN, URGENCY, MAX_ITEMS,
   getSettings, validateSettings, saveSettings, isHandler, canView,
   findRequest, getDetail, openRequestFor, latestByPair,
-  create, confirm, reject, claim, quote, close, cancel, remind, addNote,
+  quoteAllowance, create, confirm, reject, claim, quote, close, cancel, remind, addNote,
   runReminders, startReminders, listFor, counts, dashboardFor, stats, salesRecipients, receiveGroups,
 };

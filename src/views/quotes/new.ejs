@@ -25,6 +25,7 @@
             <small class="form-hint">（<%= c.batch_date %> <%= c.batch_title %>）</small>
             <% if (c.display) { %><span class="issue-value form-hint"><%= c.display %></span><% } %>
             <% if (c.note) { %><span class="form-hint">備註：<%= c.note %></span><% } %>
+            <% if (!c.blocked && !c.allowed) { %><span class="import-warn"><%= c.reason %>　<a href="<%= c.triageLink %>">前往處理建議</a></span><% } %>
             <% if (c.blocked) { %><span class="import-warn">已經有進行中的報價請求 <a href="/quotes/<%= c.blocked.id %>">Q-<%= c.blocked.id %></a>，不能重複送出</span><% } %>
           </span>
         </label>

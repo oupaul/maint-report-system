@@ -1,0 +1,74 @@
+<%- include('../layout', { title: '處理建議：' + item.asset_name }) %>
+<%
+  const cur = form ? form.disposition : (rec ? rec.disposition : '');
+  const curNote = form ? (form.note || '') : (rec ? (rec.note || '') : '');
+  const curDate = form ? (form.review_date || '') : (rec && rec.review_date ? rec.review_date : '');
+%>
+<div class="page-header">
+  <h1>處理建議</h1>
+  <div class="page-actions"><a href="/issues" class="btn btn--secondary btn--md">回到待處理項目</a></div>
+</div>
+
+<div class="card" style="max-width: 760px;">
+  <% if (error) { %><div class="form-error"><%= error %></div><% } %>
+  <h2><%= item.asset_name %>　<small class="form-hint"><%= item.label %></small></h2>
+
+  <% if (!row) { %>
+    <div class="form-success">這個項目最新一次巡檢已經<strong>恢復正常</strong>，不需要分流。</div>
+  <% } else { %>
+    <p>
+      <span class="status-badge status-badge--<%= row.status %>"><%= row.status === 'critical' ? '異常' : '警告' %></span>
+      <% if (row.streak >= 2) { %><span class="form-hint">連續 <%= row.streak %> 次</span><% } %>
+      <span class="form-hint">最新巡檢：<%= row.batch_date %>　<a href="/batches/<%= row.batch_id %>#item-<%= row.item_id %>"><%= row.batch_title %></a></span>
+    </p>
+    <% if (row.display) { %><p class="issue-value"><%= row.display %></p><% } %>
+    <% if (row.note) { %><p class="form-hint">備註：<%= row.note %></p><% } %>
+
+    <div class="hint-box hint-box--<%= row.hint.tone %>">
+      <strong>系統建議</strong>：<%= row.hint.text %>
+      <div class="form-hint">這只是依狀態、連續次數、容量預測與保固日期做的參考，最後由你決定。</div>
+    </div>
+    <% if (row.resurfaced) { %><div class="form-warning" role="status">這個項目重新回到「未分流」：<%= row.resurfaced %>。請重新決定。</div><% } %>
+
+    <form method="POST" action="/issues/triage" id="triage-form">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input type="hidden" name="item" value="<%= item.id %>">
+
+      <div class="form-group">
+        <span class="form-label">這個項目要怎麼處理？</span>
+        <label class="form-checkbox-row"><input type="radio" name="disposition" value="observe" <%= cur === 'observe' ? 'checked' : '' %>> <span><strong>持續觀察</strong>　先不處理，到複查日期再看；到期前不會再催（如果惡化成異常會自動回到未分流）</span></label>
+        <label class="form-checkbox-row"><input type="radio" name="disposition" value="scheduled" <%= cur === 'scheduled' ? 'checked' : '' %>> <span><strong>排程處理</strong>　自己安排時間處理（例如下次維護時順便做），不需要報價</span></label>
+        <label class="form-checkbox-row"><input type="radio" name="disposition" value="quote" <%= cur === 'quote' ? 'checked' : '' %> <%= quoteEnabled ? '' : 'disabled' %>> <span><strong>需要報價</strong>　要換料、擴充或維修，接著填報價請求通知業務<%= quoteEnabled ? '' : '（報價請求功能目前沒有啟用）' %></span></label>
+        <label class="form-checkbox-row"><input type="radio" name="disposition" value="resolved" <%= cur === 'resolved' ? 'checked' : '' %>> <span><strong>已處理／不需處理</strong>　已經處理好、或客戶決定不處理（要寫原因）</span></label>
+        <% if (hasRecord) { %><label class="form-checkbox-row"><input type="radio" name="disposition" value=""> <span>取消分流，改回「未分流」</span></label><% } %>
+      </div>
+
+      <div class="form-group" id="triage-date" hidden>
+        <label class="form-label" for="review_date" id="triage-date-label">複查日期</label>
+        <input class="form-input" type="date" id="review_date" name="review_date" min="<%= today %>" value="<%= curDate %>" data-default="<%= defaultReview %>" style="max-width: 12rem;">
+        <p class="form-hint" id="triage-date-hint">持續觀察預設 <%= defaultReview %>（30 天後），可以自己改。</p>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="note">備註<span id="triage-note-req" class="form-hint"></span></label>
+        <textarea class="form-textarea" id="note" name="note" rows="3" maxlength="500" placeholder="例如：使用率成長緩慢，預計明年預算再擴充。"><%= curNote %></textarea>
+      </div>
+
+      <button type="submit" class="btn btn--primary btn--md">儲存</button>
+    </form>
+  <% } %>
+</div>
+
+<% if (history.length > 0) { %>
+  <div class="card" style="max-width: 760px;">
+    <h2>修改紀錄</h2>
+    <ul class="plain-list quote-timeline">
+      <% history.forEach(h => { %>
+        <li><time><%= h.created_at.slice(0, 16) %></time> <strong><%= h.disposition ? DISPOSITIONS[h.disposition] : '取消分流' %></strong><%= h.review_date ? '（' + h.review_date + '）' : '' %><%= h.note ? '：' + h.note : '' %> <small class="form-hint">（<%= h.who %>）</small></li>
+      <% }) %>
+    </ul>
+  </div>
+<% } %>
+
+<script src="/js/triage-form.js"></script>
+<%- include('../partials/footer') %>

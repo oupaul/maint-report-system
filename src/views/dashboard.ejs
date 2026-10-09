@@ -53,7 +53,7 @@
 
 <% if (issues.critical + issues.warning > 0) { %>
   <div class="card">
-    <h2>待處理項目（異常 <%= issues.critical %>・警告 <%= issues.warning %>）</h2>
+    <h2>待處理項目（未分流：異常 <%= issues.critical %>・警告 <%= issues.warning %>）</h2>
     <div class="table-wrap">
       <table class="data-table">
         <thead><tr><th>嚴重度</th><th>設備</th><th>檢查項目</th><th>數值 / 備註</th><th>最新巡檢</th></tr></thead>
@@ -70,7 +70,7 @@
         </tbody>
       </table>
     </div>
-    <p style="margin-top: var(--space-2);"><a href="/issues">查看全部待處理項目<%= issues.critical + issues.warning > issues.top.length ? '（另有 ' + (issues.critical + issues.warning - issues.top.length) + ' 筆）' : '' %></a></p>
+    <p style="margin-top: var(--space-2);"><a href="/issues">查看全部待處理項目<%= issues.critical + issues.warning > issues.top.length ? '（另有 ' + (issues.critical + issues.warning - issues.top.length) + ' 筆）' : '' %></a><%= issues.triaged ? '　・　另有 ' + issues.triaged + ' 項已分流（持續觀察／排程／需要報價／已處理）' : '' %></p>
   </div>
 <% } %>
 

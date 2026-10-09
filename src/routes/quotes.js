@@ -72,8 +72,15 @@ function newPageData(user, firstItemId, selected) {
     id: r.item_id, label: r.label, status: r.status, batch_title: r.batch_title, batch_date: r.batch_date,
     display: r.display || r.value_text || '', note: r.note || '',
     blocked: QuoteService.openRequestFor(r.asset_id, r.checklist_item_id) || null,
-    allowed: r.status === 'warning' || r.status === 'critical',
+    allowed: false,
+    reason: '',
   }));
+  candidates.forEach((c, i) => {
+    const a = QuoteService.quoteAllowance({ status: c.status, asset_id: list[i].asset_id, checklist_item_id: list[i].checklist_item_id });
+    c.allowed = a.ok;
+    c.reason = a.reason || '';
+    c.triageLink = `/issues/triage?item=${c.id}`;
+  });
   const picked = (selected && selected.length ? selected : [firstItemId]);
   return { assetName: clicked.asset_name, candidates, picked: new Set(picked), firstItemId };
 }

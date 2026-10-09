@@ -120,7 +120,7 @@
           <tbody>
             <% items.forEach(item => { %>
               <tr id="item-<%= item.id %>">
-                <td><%= item.checklist_label %><% if (item.status !== 'normal') { %> <a class="form-hint" href="/quotes/new?item=<%= item.id %>" title="把這個異常項目通知業務報價">通知業務報價</a><% } %></td>
+                <td><%= item.checklist_label %><% if (item.status === 'critical') { %> <a class="form-hint" href="/quotes/new?item=<%= item.id %>" title="把這個異常項目通知業務報價">通知業務報價</a><% } else if (item.status === 'warning') { %> <a class="form-hint" href="/issues/triage?item=<%= item.id %>" title="決定這個警告要持續觀察、排程處理還是報價">處理建議</a><% } %></td>
                 <td><span class="status-badge status-badge--<%= item.status %>"><%= item.status === 'normal' ? '正常' : (item.status === 'warning' ? '警告' : '異常') %></span></td>
                 <td>
                   <% if (item.volumes && item.volumes.length > 0) { %>
