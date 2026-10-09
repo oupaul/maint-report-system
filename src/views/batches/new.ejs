@@ -33,9 +33,9 @@
               <option value="<%= c %>"><%= categoryLabels[c] %></option>
             <% }) %>
           </select>
-          <select class="form-select" name="new_asset_customer" aria-label="客戶" <%= customers.length > 0 ? 'required' : '' %>>
+          <select class="form-select" name="new_asset_customer" aria-label="客戶" data-searchable <%= customers.length > 0 ? 'required' : '' %>>
             <option value=""><%= customers.length > 0 ? '客戶…' : '（尚未建立客戶）' %></option>
-            <% customers.forEach(c => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %>
+            <% customers.forEach(c => { %><option value="<%= c.id %>" data-search="<%= [c.tax_id, c.code].filter(Boolean).join(' ') %>"><%= c.name %></option><% }) %>
           </select>
           <input class="form-input" type="text" name="new_asset_location" placeholder="位置（選填）">
         </div>

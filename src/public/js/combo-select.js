@@ -1,4 +1,5 @@
 // 可搜尋的下拉選單：<select data-searchable> 的選項很多（8 個以上）時，加上一個輸入框，輸入關鍵字即時過濾。
+// 點進輸入框不會展開清單（客戶很多時一長串很難找），要開始輸入才會出現符合的選項；清空文字再離開＝選回「空值」選項。
 // 原本的 <select> 還在（視覺上隱藏），所選的值、表單送出、required 檢查、change 事件都照舊，
 // 所以其他頁面程式（選了就自動套用篩選等）完全不用改。選項可以加 data-search 補充搜尋字（例如統編、代碼）。
 // 鍵盤：↑↓ 移動、Enter 選取、Esc 取消；多個關鍵字用空白分開（每個都要符合）。
@@ -87,6 +88,15 @@
       if (el) el.scrollIntoView({ block: 'nearest' });
     }
 
+    function hideList() {
+      list.hidden = true;
+      input.setAttribute('aria-expanded', 'false');
+    }
+    // 使用者把文字刪光（而且目前選的不是空值）：視為要清除選擇
+    function clearedByTyping() {
+      return typing && input.value.trim() === '' && !!emptyOpt && select.value !== emptyOpt.value;
+    }
+    // 只有按 ↑↓ 才會列出全部選項（鍵盤使用者用來瀏覽）
     function open() {
       if (!list.hidden) return;
       list.hidden = false;
@@ -114,21 +124,33 @@
     }
 
     input.value = currentLabel();
-    input.addEventListener('focus', function () { input.select(); open(); });
-    // 已經有焦點、清單關閉時再點一下：開啟並全選文字，直接輸入就是新的搜尋（延後一拍，等瀏覽器放完游標）
+    // 點進輸入框只全選文字（直接輸入就是新的搜尋），不展開清單；Chrome 會在 mouseup 之後才放游標，所以延後一拍
+    input.addEventListener('focus', function () { input.select(); });
     input.addEventListener('mousedown', function () { input._wasClosed = list.hidden; });
     input.addEventListener('click', function () {
-      if (input._wasClosed) { open(); setTimeout(function () { input.select(); }, 0); }
+      if (input._wasClosed) setTimeout(function () { input.select(); }, 0);
     });
-    input.addEventListener('input', function () { typing = true; if (list.hidden) { list.hidden = false; input.setAttribute('aria-expanded', 'true'); } render(); });
+    input.addEventListener('input', function () {
+      typing = true;
+      if (input.value.trim() === '') { hideList(); return; } // 清空了就不列任何選項
+      if (list.hidden) { list.hidden = false; input.setAttribute('aria-expanded', 'true'); }
+      render();
+    });
     input.addEventListener('keydown', function (e) {
       if (e.key === 'ArrowDown') { e.preventDefault(); if (list.hidden) open(); else move(1); }
       else if (e.key === 'ArrowUp') { e.preventDefault(); if (list.hidden) open(); else move(-1); }
-      else if (e.key === 'Enter') { if (!list.hidden) { e.preventDefault(); if (shown[active]) choose(shown[active]); } }
-      else if (e.key === 'Escape') { if (!list.hidden) { e.preventDefault(); close(); } }
+      else if (e.key === 'Enter') {
+        if (!list.hidden) { e.preventDefault(); if (shown[active]) choose(shown[active]); }
+        else if (clearedByTyping()) { e.preventDefault(); choose(emptyOpt); }
+      }
+      else if (e.key === 'Escape') { if (!list.hidden || typing) { e.preventDefault(); close(); } }
       else if (e.key === 'Tab') { if (!list.hidden) close(); }
     });
-    input.addEventListener('blur', function () { if (!list.hidden) close(); });
+    // 離開輸入框：清空了文字＝選回空值（全部客戶／請選擇客戶）；否則放棄沒選的輸入、還原原本的選擇
+    input.addEventListener('blur', function () {
+      if (clearedByTyping()) choose(emptyOpt);
+      else if (!list.hidden || typing) close();
+    });
     // mousedown 先擋掉，輸入框才不會在點選項目之前失焦
     list.addEventListener('mousedown', function (e) {
       e.preventDefault();
@@ -142,5 +164,23 @@
     if (select.form) select.form.addEventListener('reset', function () { setTimeout(function () { input.value = currentLabel(); }, 0); });
   }
 
-  document.querySelectorAll('select[data-searchable]').forEach(enhance);
+  function init(root) {
+    (root || document).querySelectorAll('select[data-searchable]').forEach(enhance);
+  }
+  // 複製一份已啟用的區塊（例如「新增一列」）時，先把複製品還原成原生 select，再重新 init
+  function reset(root) {
+    root.querySelectorAll('.cs').forEach(function (wrap) {
+      const sel = wrap.querySelector('select');
+      if (sel) {
+        delete sel.dataset.csDone;
+        sel.classList.remove('cs__native');
+        sel.removeAttribute('aria-hidden');
+        sel.removeAttribute('tabindex');
+        wrap.parentNode.insertBefore(sel, wrap);
+      }
+      wrap.remove();
+    });
+  }
+  window.ComboSelect = { init: init, reset: reset };
+  init(document);
 })();
