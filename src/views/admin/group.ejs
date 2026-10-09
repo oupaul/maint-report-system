@@ -23,6 +23,7 @@
     </div>
     <div class="form-group">
       <label class="form-label">這個群組的成員可以…</label>
+      <p class="form-hint">例如「設備管理員」要能新增、編輯設備，請勾「管理資產建檔」；「管理設備類型與資產欄位」只管類型、檢查項目與欄位定義，兩者是分開的。</p>
       <% permissions.forEach(p => { %>
         <label class="form-checkbox-row" style="align-items: flex-start; margin-bottom: var(--space-2);">
           <input type="checkbox" name="permissions" value="<%= p.key %>" <%= form.permissions.includes(p.key) ? 'checked' : '' %>>
@@ -37,14 +38,42 @@
     <hr style="border: none; border-top: 1px solid var(--color-border); margin: var(--space-6) 0;">
     <h2>成員（<%= members.length %> 人）</h2>
     <% if (members.length === 0) { %>
-      <p class="form-hint">還沒有成員。到「使用者管理」編輯使用者，在「權限群組」欄位選這個群組即可加入。</p>
+      <p class="form-hint">還沒有成員，從下面「加入成員」挑選人員即可。</p>
     <% } else { %>
-      <ul class="plain-list">
+      <ul class="plain-list member-list">
         <% members.forEach(m => { %>
-          <li><a href="/users/<%= m.id %>/edit"><%= m.display_name || m.username %></a>
-            <span class="form-hint">（<%= m.username %><%= m.is_active ? '' : '・已停用' %><%= m.role === 'admin' ? '・管理員' : '' %>）</span></li>
+          <li>
+            <span><a href="/users/<%= m.id %>/edit"><%= m.display_name || m.username %></a>
+              <span class="form-hint">（<%= m.username %><%= m.is_active ? '' : '・已停用' %><%= m.role === 'admin' ? '・管理員' : '' %>）</span></span>
+            <form method="POST" action="/admin/groups/<%= group.id %>/members/<%= m.id %>/remove" data-confirm="確定要把「<%= m.display_name || m.username %>」移出群組「<%= group.name %>」嗎？移出後他就不再有這個群組的權限。">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <button type="submit" class="btn btn--secondary btn--sm">移出</button>
+            </form>
+          </li>
         <% }) %>
       </ul>
+    <% } %>
+
+    <h3 style="margin-top: var(--space-6);">加入成員</h3>
+    <% if (candidates.length === 0) { %>
+      <p class="form-hint">沒有可以加入的人員（只列出啟用中的技術人員；管理員本來就擁有全部權限，不需要加入群組）。</p>
+    <% } else { %>
+      <form method="POST" action="/admin/groups/<%= group.id %>/members">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="checkbox-grid">
+          <% candidates.forEach(u => { %>
+            <label class="checkbox-tile">
+              <input type="checkbox" name="user_ids" value="<%= u.id %>">
+              <span class="ap-tile__text">
+                <strong><%= u.display_name || u.username %></strong>
+                <small><%= u.username %><%= u.current_group_name ? '・目前在「' + u.current_group_name + '」，加入後會移出原群組' : '' %></small>
+              </span>
+            </label>
+          <% }) %>
+        </div>
+        <p class="form-hint">一個人同時只屬於一個群組。勾選後按「加入」立即生效（對方重新整理頁面就會有新權限）。</p>
+        <button type="submit" class="btn btn--primary btn--sm">加入選取的人員</button>
+      </form>
     <% } %>
     <form method="POST" action="/admin/groups/<%= group.id %>/delete" data-confirm="確定要刪除群組「<%= group.name %>」嗎？" style="margin-top: var(--space-4);">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">

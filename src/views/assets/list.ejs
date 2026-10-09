@@ -1,5 +1,16 @@
 <%- include('../layout', { title: '資產管理' }) %>
 
+<%
+  // 欄位標題可點擊排序（再點一次反向）；目前排序的欄位顯示箭頭
+  const sortHead = (key, label) => {
+    const active = params.sort === key;
+    const next = active && params.dir === 'asc' ? 'desc' : 'asc';
+    return `<a href="${link({ sort: key, dir: next, page: 1 })}" class="sort-link${active ? ' is-active' : ''}" title="依${label}排序">${label}${active ? (params.dir === 'asc' ? ' ▲' : ' ▼') : ''}</a>`;
+  };
+  const filtered = !!(params.q || params.category || params.location || params.status || params.tag);
+  const colCount = 10 + (params.grouped ? 0 : 1) + listFields.length + (can('assets.manage') ? 1 : 0);
+%>
+
 <div class="page-header">
   <h1>資產管理</h1>
   <div class="page-actions">
@@ -10,48 +21,95 @@
 </div>
 
 <div class="card">
-  <% if (total > 0) { %>
-    <form method="GET" action="/assets" class="asset-filter" role="search">
-      <input type="search" class="form-input" name="q" value="<%= q %>" placeholder="搜尋名稱、位置、IP、MAC、主機名稱、廠牌、型號、序號、財產編號、自訂欄位（可輸入多個關鍵字）" aria-label="搜尋資產" autocomplete="off">
+  <% if (totalAll > 0) { %>
+    <form method="GET" action="/assets" class="asset-filter" id="asset-filter" role="search">
+      <input type="search" class="form-input" name="q" value="<%= params.q %>" placeholder="搜尋名稱、位置、IP、序號、標籤…（可輸入多個關鍵字）" title="可搜尋：名稱、位置、IP、MAC、主機名稱、廠牌、型號、序號、財產編號、購置日期、標籤、自訂欄位" aria-label="搜尋資產" autocomplete="off">
       <select class="form-select" name="category" aria-label="依類別篩選">
         <option value="">全部類別</option>
-        <% Object.keys(categoryLabels).forEach(code => { %>
-          <option value="<%= code %>" <%= category === code ? 'selected' : '' %>><%= categoryLabels[code] %></option>
+        <% categoryOrder.forEach(code => { %>
+          <option value="<%= code %>" <%= params.category === code ? 'selected' : '' %>><%= categoryLabels[code] %></option>
         <% }) %>
       </select>
+      <select class="form-select" name="location" aria-label="依位置篩選">
+        <option value="">全部位置</option>
+        <% locations.forEach(l => { %><option value="<%= l %>" <%= params.location === l ? 'selected' : '' %>><%= l %></option><% }) %>
+      </select>
+      <select class="form-select" name="status" aria-label="依狀態篩選">
+        <option value="">全部狀態</option>
+        <option value="1" <%= params.status === '1' ? 'selected' : '' %>>啟用中</option>
+        <option value="0" <%= params.status === '0' ? 'selected' : '' %>>已停用</option>
+      </select>
+      <% if (tagList.length > 0) { %>
+        <select class="form-select" name="tag" aria-label="依標籤篩選">
+          <option value="">全部標籤</option>
+          <% tagList.forEach(t => { %><option value="<%= t.name %>" <%= params.tag === t.name ? 'selected' : '' %>><%= t.name %>（<%= t.count %>）</option><% }) %>
+        </select>
+      <% } %>
+      <input type="hidden" name="group" value="<%= params.grouped ? '1' : '0' %>">
+      <input type="hidden" name="sort" value="<%= params.sort %>">
+      <input type="hidden" name="dir" value="<%= params.dir %>">
+      <input type="hidden" name="per" value="<%= params.per %>">
       <button type="submit" class="btn btn--secondary btn--md">搜尋</button>
-      <% if (q || category) { %><a href="/assets" class="btn btn--secondary btn--md">清除</a><% } %>
+      <% if (filtered) { %><a href="<%= link({ q: '', category: '', location: '', status: '', tag: '', page: 1 }) %>" class="btn btn--secondary btn--md">清除</a><% } %>
     </form>
-    <% if (q || category) { %><p class="form-hint">符合 <%= assets.length %> / <%= total %> 筆</p><% } %>
+    <div class="asset-toolbar">
+      <span class="form-hint"><%= filtered ? `符合 ${total} / 全部 ${totalAll} 筆` : `共 ${totalAll} 筆` %><%= pages > 1 ? `・第 ${page} / ${pages} 頁` : '' %></span>
+      <span class="asset-toolbar__right">
+        <a href="<%= link({ group: params.grouped ? '0' : '1', page: 1 }) %>" class="btn btn--secondary btn--sm"><%= params.grouped ? '改成平面列表' : '改成依類別分組' %></a>
+        <span class="form-hint">每頁</span>
+        <% perOptions.forEach(n => { %>
+          <a href="<%= link({ per: n, page: 1 }) %>" class="btn btn--sm <%= params.per === n ? 'btn--primary' : 'btn--secondary' %>"><%= n %></a>
+        <% }) %>
+      </span>
+    </div>
   <% } %>
-  <% if (total === 0) { %>
+
+  <% if (totalAll === 0) { %>
     <div class="empty-state">尚無資產資料。</div>
-  <% } else if (assets.length === 0) { %>
+  <% } else if (total === 0) { %>
     <div class="empty-state">沒有符合條件的資產。</div>
   <% } else { %>
     <div class="table-wrap">
-      <table class="data-table">
+      <table class="data-table asset-table">
         <thead>
           <tr>
-            <th>名稱</th>
-            <th>類別</th>
-            <th>位置</th>
-            <th>IP / MAC</th>
-            <th>主機名稱</th>
-            <th>廠牌 / 型號</th>
-            <th>序號</th>
-            <th>財產編號</th>
-            <th>購置日期</th>
+            <th><%- sortHead('name', '名稱') %></th>
+            <% if (!params.grouped) { %><th><%- sortHead('category', '類別') %></th><% } %>
+            <th><%- sortHead('location', '位置') %></th>
+            <th><%- sortHead('ip_address', 'IP') %> / MAC</th>
+            <th><%- sortHead('hostname', '主機名稱') %></th>
+            <th><%- sortHead('brand', '廠牌 / 型號') %></th>
+            <th><%- sortHead('serial_number', '序號') %></th>
+            <th><%- sortHead('asset_tag', '財產編號') %></th>
+            <th><%- sortHead('purchase_date', '購置日期') %></th>
             <% listFields.forEach(f => { %><th><%= f.label %></th><% }) %>
-            <th>狀態</th>
+            <th>標籤</th>
+            <th><%- sortHead('is_active', '狀態') %></th>
             <% if (can('assets.manage')) { %><th></th><% } %>
           </tr>
         </thead>
+        <%
+          // 依序輸出；分組顯示時每遇到新的類別就先插一列標題（可摺疊），標題顯示該類別符合條件的總台數與本頁台數
+          const onPage = {};
+          rows.forEach(a => { onPage[a.category] = (onPage[a.category] || 0) + 1; });
+          let lastCat = null;
+        %>
         <tbody>
-          <% assets.forEach(a => { %>
-            <tr>
+          <% rows.forEach(a => { %>
+            <% if (params.grouped && a.category !== lastCat) { lastCat = a.category; %>
+              <tr class="group-row" data-group="<%= a.category %>">
+                <td colspan="<%= colCount %>">
+                  <button type="button" class="group-toggle" aria-expanded="true">
+                    <span class="group-toggle__icon" aria-hidden="true">▾</span>
+                    <strong><%= categoryLabels[a.category] || a.category %></strong>
+                    <span class="form-hint">（共 <%= groupCounts[a.category] %> 台<%= onPage[a.category] !== groupCounts[a.category] ? `，本頁 ${onPage[a.category]} 台` : '' %>）</span>
+                  </button>
+                </td>
+              </tr>
+            <% } %>
+            <tr data-g="<%= a.category %>">
               <td><%= a.name %></td>
-              <td><%= categoryLabels[a.category] || a.category %></td>
+              <% if (!params.grouped) { %><td><%= categoryLabels[a.category] || a.category %></td><% } %>
               <td><%= a.location || '-' %></td>
               <td><%= a.ip_address || '-' %><% if (a.mac_address) { %><br><small class="form-hint"><%= a.mac_address %></small><% } %></td>
               <td><%= a.hostname || '-' %></td>
@@ -60,6 +118,10 @@
               <td><%= a.asset_tag || '-' %><% if (a.identifier) { %> <span class="status-badge status-badge--warning" title="舊識別碼尚未整理：<%= a.identifier %>">待整理</span><% } %></td>
               <td><%= a.purchase_date || '-' %></td>
               <% listFields.forEach(f => { const cd = a.customDisplay.find(x => x.id === f.id); %><td><%= cd ? cd.text : '-' %></td><% }) %>
+              <td>
+                <% if (a.tags.length === 0) { %>-<% } %>
+                <% a.tags.forEach(t => { %><a class="tag-chip" href="<%= link({ tag: t, page: 1 }) %>" title="只看這個標籤"><%= t %></a> <% }) %>
+              </td>
               <td>
                 <% if (a.is_active) { %>
                   <span class="status-badge status-badge--normal">啟用</span>
@@ -75,7 +137,24 @@
         </tbody>
       </table>
     </div>
+
+    <% if (pages > 1) {
+      // 頁碼：第一頁、最後一頁、目前頁前後各 2 頁，中間用 … 省略
+      const nums = [];
+      for (let i = 1; i <= pages; i++) { if (i === 1 || i === pages || Math.abs(i - page) <= 2) nums.push(i); }
+    %>
+      <nav class="pager" aria-label="分頁">
+        <% if (page > 1) { %><a class="btn btn--secondary btn--sm" href="<%= link({ page: page - 1 }) %>">上一頁</a><% } %>
+        <% nums.forEach((n, i) => { %>
+          <% if (i > 0 && n - nums[i - 1] > 1) { %><span class="form-hint">…</span><% } %>
+          <% if (n === page) { %><span class="btn btn--primary btn--sm" aria-current="page"><%= n %></span>
+          <% } else { %><a class="btn btn--secondary btn--sm" href="<%= link({ page: n }) %>"><%= n %></a><% } %>
+        <% }) %>
+        <% if (page < pages) { %><a class="btn btn--secondary btn--sm" href="<%= link({ page: page + 1 }) %>">下一頁</a><% } %>
+      </nav>
+    <% } %>
   <% } %>
 </div>
 
+<script src="/js/assets-list.js"></script>
 <%- include('../partials/footer') %>

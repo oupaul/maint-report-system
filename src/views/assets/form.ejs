@@ -4,7 +4,7 @@
   <h1><%= asset && asset.id ? '編輯資產' : '新增資產' %></h1>
 </div>
 
-<div class="card" style="max-width: 560px;">
+<div class="card" style="max-width: 640px;">
   <% if (error) { %>
     <div class="form-error"><%= error %></div>
   <% } %>
@@ -21,6 +21,8 @@
   <% } %>
   <form method="POST" action="<%= asset && asset.id ? `/assets/${asset.id}/edit` : '/assets' %>">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <fieldset class="form-section">
+    <legend>基本資料</legend>
     <div class="form-group">
       <label class="form-label" for="name">資產名稱</label>
       <input class="form-input" type="text" id="name" name="name" value="<%= asset ? (asset.name || '') : '' %>" required>
@@ -44,8 +46,27 @@
     </div>
     <div class="form-group">
       <label class="form-label" for="location">位置</label>
-      <input class="form-input" type="text" id="location" name="location" value="<%= asset ? (asset.location || '') : '' %>">
+      <input class="form-input" type="text" id="location" name="location" maxlength="100" list="location-list" autocomplete="off" value="<%= asset ? (asset.location || '') : '' %>">
+      <datalist id="location-list">
+        <% locations.forEach(l => { %><option value="<%= l %>"></option><% }) %>
+      </datalist>
+      <p class="form-hint">輸入時會列出已經用過的位置，請盡量選同一種寫法，之後才好篩選。</p>
     </div>
+    <div class="form-group">
+      <label class="form-label" for="tags">標籤</label>
+      <input class="form-input" type="text" id="tags" name="tags" maxlength="300" autocomplete="off" value="<%= tagsText %>" placeholder="例如：ERP, 財務部, 重要">
+      <p class="form-hint">用逗號分隔，一台設備最多 10 個、每個最多 20 字。標籤可以跨類別、跨位置地分組與篩選（列表、建立巡檢批次時都能用）。</p>
+      <% if (tagSuggestions.length > 0) { %>
+        <div class="tag-suggest" id="tag-suggest" aria-label="現有標籤，點一下加入或移除">
+          <span class="form-hint">現有標籤：</span>
+          <% tagSuggestions.forEach(t => { %><button type="button" class="tag-chip" data-tag="<%= t.name %>"><%= t.name %></button><% }) %>
+        </div>
+      <% } %>
+    </div>
+    </fieldset>
+
+    <fieldset class="form-section">
+    <legend>網路</legend>
     <div class="form-group">
       <label class="form-label" for="ip_address">IP 位址</label>
       <input class="form-input" type="text" id="ip_address" name="ip_address" maxlength="200" value="<%= asset ? (asset.ip_address || '') : '' %>" placeholder="例如 192.168.1.10">
@@ -60,6 +81,10 @@
       <label class="form-label" for="hostname">主機名稱</label>
       <input class="form-input" type="text" id="hostname" name="hostname" maxlength="100" value="<%= asset ? (asset.hostname || '') : '' %>">
     </div>
+    </fieldset>
+
+    <fieldset class="form-section">
+    <legend>識別與採購</legend>
     <div class="form-group">
       <label class="form-label" for="serial_number">序號</label>
       <input class="form-input" type="text" id="serial_number" name="serial_number" maxlength="100" value="<%= asset ? (asset.serial_number || '') : '' %>">
@@ -86,6 +111,13 @@
         <input class="form-input" type="text" id="identifier" name="identifier" maxlength="200" value="<%= asset.identifier %>">
         <p class="form-hint">這是舊版「識別碼」欄位留下的內容。請把它分到上面對應的欄位，再把這一欄清空；清空儲存後這一欄就不會再出現。</p>
       </div>
+    <% } %>
+    </fieldset>
+
+    <% const shownCustom = customFields.filter(f => !(categoryLocked && !f.applies)); %>
+    <% if (shownCustom.length > 0) { %>
+    <fieldset class="form-section" id="custom-section">
+    <legend>自訂欄位</legend>
     <% } %>
     <% customFields.forEach(f => {
       // 已有檢查紀錄而鎖定類型時，不適用的欄位直接不顯示；可改類型時全部渲染，由 asset-form.js 依選的類別顯示或隱藏
@@ -114,6 +146,10 @@
         <% } %>
       </div>
     <% }) %>
+    <% if (shownCustom.length > 0) { %></fieldset><% } %>
+
+    <fieldset class="form-section">
+    <legend>其他</legend>
     <div class="form-group">
       <label class="form-label" for="notes">備註</label>
       <textarea class="form-textarea" id="notes" name="notes"><%= asset ? (asset.notes || '') : '' %></textarea>
@@ -124,6 +160,7 @@
         <label class="form-label" for="is_active" style="margin:0;">啟用中</label>
       </div>
     <% } %>
+    </fieldset>
     <button type="submit" class="btn btn--primary btn--md">儲存</button>
     <a href="/assets" class="btn btn--secondary btn--md">取消</a>
   </form>

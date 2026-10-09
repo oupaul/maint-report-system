@@ -3,7 +3,7 @@
 // 新增權限只要在這裡加一筆，群組管理頁就會自動列出；key 一旦寫進資料庫就不要改名。
 const PERMISSIONS = [
   { key: 'categories.manage', label: '管理設備類型與資產欄位', description: '新增、改名、排序、停用設備類型，管理各類型的檢查項目，以及自訂資產欄位' },
-  { key: 'assets.manage', label: '管理資產建檔', description: '新增、編輯資產（設備）資料' },
+  { key: 'assets.manage', label: '管理資產建檔', description: '新增、編輯資產（設備）資料，包含位置、標籤與自訂欄位的值（和上面「管理設備類型與資產欄位」是分開的權限，要讓成員能新增、編輯設備請勾這一項）' },
 ];
 
 const PERMISSION_KEYS = PERMISSIONS.map(p => p.key);
