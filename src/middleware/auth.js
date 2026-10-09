@@ -1,9 +1,12 @@
 const { can } = require('../utils/permissions');
 const { safeReturnPath } = require('../utils/safeRedirect');
+const { isAjax } = require('../utils/ajax');
 
 // 沒登入就導去登入頁，順便記住原本要去的頁面（GET 才記），登入成功後回到那裡——
 // 例如從通知信的連結點進來，登入後直接看到那個批次。
 function redirectToLogin(req, res) {
+  // 就地儲存（背景請求）遇到登入逾時：回 401 JSON，讓畫面在該列顯示「登入已逾時」，不要被導到登入頁而默默失敗
+  if (isAjax(req)) return res.status(401).json({ ok: false, error: '登入已逾時，請重新整理頁面並重新登入後再儲存。' });
   if (req.method === 'GET' && req.session) {
     const target = safeReturnPath(req.originalUrl);
     if (target) req.session.returnTo = target;

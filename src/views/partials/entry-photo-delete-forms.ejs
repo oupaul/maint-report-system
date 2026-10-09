@@ -1,0 +1,6 @@
+<%# HTML 不允許 <form> 巢狀：刪除用的表單放在儲存表單外面，縮圖上的「刪除」按鈕用 form="..." 屬性指過來 %>
+<% photos.forEach(photo => { %>
+  <form id="photo-delete-<%= photo.id %>" method="POST" action="/batches/<%= batch.id %>/photos/<%= photo.id %>/delete" data-confirm="確定要刪除這張截圖嗎？">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+  </form>
+<% }) %>

@@ -14,6 +14,7 @@ const ChecklistItem = require('../models/ChecklistItem');
 const Asset = require('../models/Asset');
 const ImageService = require('../services/ImageService');
 const ApprovalService = require('../services/ApprovalService');
+const { isAjax, sendError } = require('../utils/ajax');
 const statusColors = require('../utils/statusColors');
 const AssetCategory = require('../models/AssetCategory');
 const {
@@ -29,16 +30,45 @@ router.use((req, res, next) => {
 });
 
 // 審核中與已核准的批次鎖定：伺服器端一律擋下（不只是把按鈕藏起來）
-function rejectIfLocked(res, batch) {
+function rejectIfLocked(req, res, batch) {
   if (!ApprovalService.isLocked(batch)) return false;
-  res.status(409).render('error', {
-    title: '批次已鎖定',
-    message: batch.approval_status === 'pending'
-      ? '這個批次正在審核中，不能編輯。如需修改，請由送審的人或管理員先「撤回審核」。'
-      : '這個批次已經核准，不能編輯。如需修改，請由管理員「重新開啟」。',
-  });
+  sendError(req, res, 409, '批次已鎖定', batch.approval_status === 'pending'
+    ? '這個批次正在審核中，不能編輯。如需修改，請由送審的人或管理員先「撤回審核」。'
+    : '這個批次已經核准，不能編輯。如需修改，請由管理員「重新開啟」。');
   return true;
 }
+
+// ---- 填寫頁「就地儲存」：回傳這一列最新的狀態與截圖區 HTML（由伺服器用同一份 partial 渲染，前端直接換上去）----
+const STATUS_LABEL = { normal: '正常', warning: '警告', critical: '異常' };
+
+function renderPartial(req, view, locals) {
+  return new Promise((resolve, reject) => req.app.render(view, locals, (err, html) => (err ? reject(err) : resolve(html))));
+}
+
+async function rowPayload(req, res, batch, asset, checklistItem, item) {
+  const photos = InspectionItemPhoto.findByItemId(item.id)
+    .filter(p => p.path)
+    .map(p => ({ ...p, filename: path.basename(p.path) }));
+  const locals = {
+    batch, photos, itemId: item.id, assetName: asset.name, itemLabel: checklistItem.label, csrfToken: res.locals.csrfToken,
+  };
+  const [thumbsHtml, deleteFormsHtml] = await Promise.all([
+    renderPartial(req, 'partials/entry-photo-thumbs', locals),
+    renderPartial(req, 'partials/entry-photo-delete-forms', locals),
+  ]);
+  return {
+    ok: true,
+    itemId: item.id,
+    status: item.status,
+    statusLabel: STATUS_LABEL[item.status] || item.status,
+    photoCount: photos.length,
+    thumbsHtml,
+    deleteFormsHtml,
+  };
+}
+
+// 儲存／刪除之後導回填寫頁時，帶上錨點，瀏覽器會捲到剛處理的那一列（沒有 JavaScript 時的退路）
+const rowAnchor = (assetId, checklistItemId) => `#row-a${assetId}-c${checklistItemId}`;
 
 router.get('/', requireLogin, (req, res) => {
   const batches = InspectionBatch.findAll().map(b => ({ ...b, statusInfo: ApprovalService.statusInfo(b), locked: ApprovalService.isLocked(b) }));
@@ -185,7 +215,7 @@ router.post('/:id/assets', requireLogin, (req, res) => {
   if (!batch) {
     return res.status(404).render('error', { title: '找不到批次', message: '找不到指定的巡檢批次' });
   }
-  if (rejectIfLocked(res, batch)) return;
+  if (rejectIfLocked(req, res, batch)) return;
 
   let assetIds = req.body.asset_ids || [];
   if (!Array.isArray(assetIds)) assetIds = [assetIds];
@@ -234,24 +264,25 @@ router.post('/:id/items/:checklistItemId', requireLogin, upload.array('screensho
   try {
     const batch = InspectionBatch.findById(req.params.id);
     if (!batch) {
-      return res.status(404).render('error', { title: '找不到批次', message: '找不到指定的巡檢批次' });
+      return sendError(req, res, 404, '找不到批次', '找不到指定的巡檢批次');
     }
-    if (rejectIfLocked(res, batch)) return;
+    if (rejectIfLocked(req, res, batch)) return;
 
     const checklistItem = ChecklistItem.findById(req.params.checklistItemId);
     if (!checklistItem) {
-      return res.status(404).render('error', { title: '找不到檢查項目', message: '找不到指定的檢查項目' });
+      return sendError(req, res, 404, '找不到檢查項目', '找不到指定的檢查項目');
     }
 
     const assetId = parseInt(req.body.asset_id, 10);
     const asset = Asset.findById(assetId);
     if (!asset) {
-      return res.status(400).render('error', { title: '無效的資產', message: '找不到指定的資產' });
+      return sendError(req, res, 400, '無效的資產', '找不到指定的資產');
     }
 
     const status = req.body.status;
     if (!isValidStatus(status)) {
-      return res.redirect(`/batches/${batch.id}/entry`);
+      if (isAjax(req)) return sendError(req, res, 400, '狀態不正確', '請選擇正常、警告或異常');
+      return res.redirect(`/batches/${batch.id}/entry${rowAnchor(asset.id, checklistItem.id)}`);
     }
 
     const item = InspectionItem.upsert({
@@ -279,10 +310,12 @@ router.post('/:id/items/:checklistItemId', requireLogin, upload.array('screensho
           // 這張處理失敗：清掉佔位列，並告訴使用者是「哪一個檔案」的問題（前面已處理成功的檔案會保留）
           InspectionItemPhoto.remove(photo.id);
           if (err.userFacing) {
-            return res.status(400).render('error', {
-              title: '圖片上傳失敗',
-              message: `「${upload.decodeFilename(file.originalname)}」：${err.message}`,
-            });
+            const message = `「${upload.decodeFilename(file.originalname)}」：${err.message}`;
+            if (isAjax(req)) {
+              // 文字欄位與前面處理成功的截圖已經存起來了：連同最新的這一列內容一起回傳，畫面才能如實顯示
+              return res.status(400).json({ ...(await rowPayload(req, res, batch, asset, checklistItem, item)), ok: false, savedPartial: true, error: `圖片上傳失敗，${message}` });
+            }
+            return res.status(400).render('error', { title: '圖片上傳失敗', message });
           }
           throw err;
         }
@@ -290,30 +323,47 @@ router.post('/:id/items/:checklistItemId', requireLogin, upload.array('screensho
       }
     }
 
-    res.redirect(`/batches/${batch.id}/entry`);
+    if (isAjax(req)) return res.json(await rowPayload(req, res, batch, asset, checklistItem, item));
+    res.redirect(`/batches/${batch.id}/entry${rowAnchor(asset.id, checklistItem.id)}`);
   } catch (err) {
     next(err);
   }
 });
 
-router.post('/:id/photos/:photoId/delete', requireLogin, (req, res) => {
-  const batch = InspectionBatch.findById(req.params.id);
-  if (!batch) {
-    return res.status(404).render('error', { title: '找不到批次', message: '找不到指定的巡檢批次' });
-  }
-  if (rejectIfLocked(res, batch)) return;
+router.post('/:id/photos/:photoId/delete', requireLogin, async (req, res, next) => {
+  try {
+    const batch = InspectionBatch.findById(req.params.id);
+    if (!batch) {
+      return sendError(req, res, 404, '找不到批次', '找不到指定的巡檢批次');
+    }
+    if (rejectIfLocked(req, res, batch)) return;
 
-  const photo = InspectionItemPhoto.findById(req.params.photoId);
-  if (photo && photo.path) {
-    try {
-      fs.unlinkSync(photo.path);
-    } catch (err) {
-      // 檔案可能已經不存在，不影響刪除這筆紀錄
+    const photo = InspectionItemPhoto.findById(req.params.photoId);
+    const item = photo ? InspectionItem.findById(photo.inspection_item_id) : null;
+    // 這張截圖必須真的屬於這個批次（不能拿 A 批次的網址去刪 B 批次的截圖）
+    if (!photo || !item || item.batch_id !== batch.id) {
+      if (isAjax(req)) return sendError(req, res, 404, '找不到截圖', '找不到這張截圖（可能已經被刪除），請重新整理頁面');
+      return res.redirect(`/batches/${batch.id}/entry`);
+    }
+
+    if (photo.path) {
+      try {
+        fs.unlinkSync(photo.path);
+      } catch (err) {
+        // 檔案可能已經不存在，不影響刪除這筆紀錄
+      }
     }
     InspectionItemPhoto.remove(photo.id);
-  }
 
-  res.redirect(`/batches/${batch.id}/entry`);
+    if (isAjax(req)) {
+      const asset = Asset.findById(item.asset_id);
+      const checklistItem = ChecklistItem.findById(item.checklist_item_id);
+      return res.json(await rowPayload(req, res, batch, asset, checklistItem, item));
+    }
+    res.redirect(`/batches/${batch.id}/entry${rowAnchor(item.asset_id, item.checklist_item_id)}`);
+  } catch (err) {
+    next(err);
+  }
 });
 
 router.post('/:id/complete', requireLogin, (req, res) => {
@@ -328,7 +378,7 @@ router.post('/:id/complete', requireLogin, (req, res) => {
       message: '已啟用簽核流程，批次要「送出審核」並通過簽核才算完成。',
     });
   }
-  if (rejectIfLocked(res, batch)) return;
+  if (rejectIfLocked(req, res, batch)) return;
   InspectionBatch.complete(batch.id);
   res.redirect(`/batches/${batch.id}`);
 });

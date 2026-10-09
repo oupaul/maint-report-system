@@ -702,3 +702,12 @@ a.is-viewing { font-weight: 600; }
 .ap-tile__text { display: grid; line-height: 1.35; }
 .ap-tile__text small { color: var(--color-text-muted); font-size: 0.78rem; }
 .ap-tile input { margin-top: 0.2rem; }
+
+/* 填寫頁就地儲存（public/js/entry-save.js） */
+.row-msg { min-height: 1.25rem; margin-top: var(--space-2); font-size: var(--text-sm); color: var(--color-text-muted); }
+.row-msg:empty { min-height: 0; margin-top: 0; }
+.row-msg--busy { color: var(--color-text-muted); }
+.row-msg--ok { color: var(--color-status-normal); font-weight: 600; }
+.row-msg--err { color: var(--color-status-critical); font-weight: 600; }
+.row-msg--dirty { color: var(--color-status-warning); font-weight: 600; }
+.checklist-row.is-dirty { box-shadow: inset 3px 0 0 var(--color-primary); }

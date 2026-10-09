@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { isAjax } = require('../utils/ajax');
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
@@ -35,6 +36,7 @@ function csrfProtection(req, res, next) {
 
   const sent = (req.body && req.body._csrf) || req.query._csrf || req.get('x-csrf-token');
   if (!tokensMatch(req.session.csrfToken, sent)) {
+    if (isAjax(req)) return res.status(403).json({ ok: false, error: '頁面已逾時或重新登入過，請重新整理頁面後再試一次（你輸入的內容請先自行保留）。' });
     return res.status(403).render('error', {
       title: '驗證失敗',
       message: '表單驗證已失效（可能是停留太久或重新開啟了網頁），請回上一頁重新整理後再試一次。',

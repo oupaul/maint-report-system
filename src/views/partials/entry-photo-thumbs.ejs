@@ -1,0 +1,14 @@
+<%# 填寫頁單一檢查項目的截圖縮圖區（伺服器端渲染一次、就地儲存後也由伺服器重新渲染這一塊交給前端換上，兩邊永遠一致） %>
+<% if (photos.length > 0) { %>
+  <div class="photo-thumb-list">
+    <% photos.forEach((photo, pi) => { %>
+      <div class="photo-thumb-list__item">
+        <a href="/uploads/<%= batch.id %>/<%= photo.filename %>" data-viewer="viewer-<%= itemId %>" data-label="<%= assetName %>・<%= itemLabel %>・截圖 <%= pi + 1 %>" title="點一下就地放大檢視">
+          <img class="screenshot-thumb" src="/uploads/<%= batch.id %>/<%= photo.filename %>" alt="已上傳截圖">
+        </a>
+        <button type="submit" form="photo-delete-<%= photo.id %>" class="photo-thumb-list__delete" title="刪除這張截圖">刪除</button>
+      </div>
+    <% }) %>
+  </div>
+  <div id="viewer-<%= itemId %>" class="photo-viewer-host" data-viewer-host hidden></div>
+<% } %>

@@ -36,7 +36,7 @@
     </div>
 
     <% section.rows.forEach(row => { %>
-      <div class="checklist-row">
+      <div class="checklist-row" id="row-a<%= section.asset.id %>-c<%= row.checklistItem.id %>">
         <div class="checklist-row__title">
           <strong><%= row.checklistItem.label %></strong>
           <% if (row.existing) {
@@ -46,7 +46,7 @@
             <span class="status-badge status-badge--<%= st %>"><%= stLabel %></span>
           <% } %>
         </div>
-        <form method="POST" action="/batches/<%= batch.id %>/items/<%= row.checklistItem.id %>?_csrf=<%= csrfToken %>" enctype="multipart/form-data">
+        <form class="item-form" method="POST" action="/batches/<%= batch.id %>/items/<%= row.checklistItem.id %>?_csrf=<%= csrfToken %>" enctype="multipart/form-data">
           <input type="hidden" name="asset_id" value="<%= section.asset.id %>">
           <div class="checklist-row__grid">
             <div class="form-group" style="margin-bottom:0;">
@@ -71,32 +71,15 @@
               <button type="submit" class="btn btn--primary btn--sm">儲存</button>
             </div>
           </div>
+          <div class="row-msg" role="status" aria-live="polite"></div>
 
           <div class="form-group checklist-row__photos">
             <label class="form-label">截圖（可多選）</label>
             <input class="form-input" type="file" name="screenshots" multiple accept="image/jpeg,image/png,image/webp,image/gif">
-            <% if (row.photos && row.photos.length > 0) { %>
-              <div class="photo-thumb-list">
-                <% row.photos.forEach((photo, pi) => { %>
-                  <div class="photo-thumb-list__item">
-                    <a href="/uploads/<%= batch.id %>/<%= photo.filename %>" data-viewer="viewer-<%= row.existing.id %>" data-label="<%= section.asset.name %>・<%= row.checklistItem.label %>・截圖 <%= pi + 1 %>" title="點一下就地放大檢視">
-                      <img class="screenshot-thumb" src="/uploads/<%= batch.id %>/<%= photo.filename %>" alt="已上傳截圖">
-                    </a>
-                    <button type="submit" form="photo-delete-<%= photo.id %>" class="photo-thumb-list__delete" title="刪除這張截圖">刪除</button>
-                  </div>
-                <% }) %>
-              </div>
-              <div id="viewer-<%= row.existing.id %>" class="photo-viewer-host" data-viewer-host hidden></div>
-            <% } %>
+            <div class="photo-thumbs"><% if (row.photos && row.photos.length > 0) { %><%- include('../partials/entry-photo-thumbs', { batch, photos: row.photos, itemId: row.existing.id, assetName: section.asset.name, itemLabel: row.checklistItem.label }) %><% } %></div>
           </div>
         </form>
-        <%# HTML 不允許 <form> 巢狀，內層的 form 會被瀏覽器直接丟掉，「刪除」按鈕就會變成送出外層的儲存表單。
-            所以刪除用的表單放在儲存表單外面，按鈕用 form="..." 屬性指過來。 %>
-        <% (row.photos || []).forEach(photo => { %>
-          <form id="photo-delete-<%= photo.id %>" method="POST" action="/batches/<%= batch.id %>/photos/<%= photo.id %>/delete" data-confirm="確定要刪除這張截圖嗎？">
-            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-          </form>
-        <% }) %>
+        <div class="photo-delete-forms"><%- include('../partials/entry-photo-delete-forms', { batch, photos: row.photos || [], csrfToken }) %></div>
       </div>
     <% }) %>
   </section>
@@ -139,5 +122,6 @@
 <script src="/js/asset-quick-add.js"></script>
 <script src="/js/asset-picker.js"></script>
 <script src="/js/photo-viewer.js"></script>
+<script src="/js/entry-save.js"></script>
 
 <%- include('../partials/footer') %>

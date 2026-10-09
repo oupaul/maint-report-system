@@ -18,6 +18,7 @@ const HealthService = require('./services/HealthService');
 const BrandingService = require('./services/BrandingService');
 const { securityHeaders } = require('./middleware/securityHeaders');
 const { csrfProtection } = require('./middleware/csrf');
+const { isAjax } = require('./utils/ajax');
 
 const app = express();
 
@@ -194,6 +195,8 @@ app.use((err, req, res, next) => {
   } else {
     message = '系統錯誤: ' + (err.message || '未知錯誤');
   }
+
+  if (isAjax(req)) return res.status(status).json({ ok: false, error: message });
 
   try {
     res.status(status).render('error', { title: '系統錯誤', message });
