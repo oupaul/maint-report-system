@@ -46,7 +46,7 @@
       <span class="form-label">會通知誰</span>
       <% if (settings.require_confirm) { %><p class="form-hint">目前設定為<strong>需要主管確認</strong>：送出後先通知管理員，確認後才會通知業務。</p><% } %>
       <p class="form-hint">
-        <% if (recipients.length > 0) { %>業務：<%= recipients.map(u => u.display_name || u.username).join('、') %><% } else { %><span class="import-warn">目前沒有可以通知的業務（請管理員在「權限群組」把人加進「業務」群組）</span><% } %>
+        <% if (recipients.length > 0) { %>業務：<%= recipients.map(u => u.display_name || u.username).join('、') %><% } else { %><span class="import-warn">目前沒有人收得到通知（請管理員到「報價請求設定」確認通知群組，並在「權限群組」把人加進去）。請求仍會建立，管理員可以在「報價請求」頁看到。</span><% } %>
         <% if (settings.sales_email) { %>　另外會寄到業務信箱。<% } %>
       </p>
     </div>

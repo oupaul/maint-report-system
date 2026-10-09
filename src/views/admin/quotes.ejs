@@ -9,21 +9,27 @@
 <% if (error) { %><div class="form-error"><%= error %></div><% } %>
 
 <div class="card" style="max-width: 720px;">
-  <p class="form-hint">工程師在異常／警告的檢查項目上按「通知業務報價」，系統會建立一張有追蹤狀態的報價請求並通知業務。誰是「業務」由<strong>權限群組</strong>決定：有「接收與處理報價請求」權限的群組成員（預設已建立「業務」群組）。</p>
-
-  <div class="form-group">
-    <span class="form-label">目前收得到通知的業務</span>
-    <p class="form-hint">
-      <% if (salesGroups.length === 0) { %><span class="import-warn">沒有任何群組有「接收與處理報價請求」權限，請到「權限群組」設定。</span><% } else { %>
-        群組：<%= salesGroups.map(g => g.name + '（' + g.member_count + ' 人）').join('、') %><br>
-      <% } %>
-      <% if (sales.length === 0) { %><span class="import-warn">目前沒有可通知的業務，請求會改通知管理員。請到「權限群組」把人加進群組。</span><% } else { %>成員：<%= sales.map(u => u.display_name || u.username).join('、') %><% } %>
-      <a href="/admin/groups">前往權限群組</a>
-    </p>
-  </div>
+  <p class="form-hint">工程師在異常／警告的檢查項目上按「通知業務報價」，系統會建立一張有追蹤狀態的報價請求並通知業務。誰收得到通知由下面指定的<strong>權限群組</strong>決定（預設已建立「業務」群組，管理員把人加進去即可）。</p>
 
   <form method="POST" action="/admin/quotes">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <div class="form-group">
+      <label class="form-label" for="notify_group_id">通知哪個群組</label>
+      <select class="form-select" id="notify_group_id" name="notify_group_id">
+        <option value="" <%= form.notify_group_id ? '' : 'selected' %>>所有有「接收與處理報價請求」權限的群組</option>
+        <% salesGroups.forEach(g => { %><option value="<%= g.id %>" <%= Number(form.notify_group_id) === g.id ? 'selected' : '' %>><%= g.name %>（<%= g.member_count %> 人）</option><% }) %>
+      </select>
+      <p class="form-hint">
+        只有這個群組的成員會收到新請求與提醒的通知（站內＋Email），<strong>管理員不會自動被通知</strong>（要的話把他加進這個群組）；管理員仍然可以在「報價請求」頁看到並處理全部請求。
+        下拉選單只列出有「接收與處理報價請求」權限的群組，要用別的群組請先到<a href="/admin/groups">權限群組</a>勾選這個權限，成員也在那裡加入或移除。
+      </p>
+      <p class="form-hint">
+        目前會收到通知的人：
+        <% if (sales.length === 0) { %><span class="import-warn">沒有人（這個群組沒有啟用中的成員）。請求仍會建立，但沒有人收得到通知，請先把人加進群組。</span>
+        <% } else { %><%= sales.map(u => u.display_name || u.username).join('、') %><% } %>
+      </p>
+    </div>
+
     <div class="form-group form-checkbox-row"><input type="checkbox" id="enabled" name="enabled" <%= form.enabled ? 'checked' : '' %>><label class="form-label" for="enabled" style="margin:0;">啟用報價請求功能（關閉後不能建立新的請求，既有的照常處理）</label></div>
 
     <div class="form-group">

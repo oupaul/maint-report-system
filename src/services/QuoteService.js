@@ -3,7 +3,8 @@
 // 規則重點：
 //   · 請求內容（設備資料、項目、截圖）是送出當下的「快照」，之後批次被鎖定或項目被改都不影響；截圖會複製一份。
 //   · 同一個「設備＋檢查項目」已經有進行中的請求就不能再送（避免重複通知），只能「再次提醒」。
-//   · 業務＝有 quotes.receive 權限的群組成員；沒有任何可通知的業務時改通知管理員，不會默默沒人知道。
+//   · 收通知的人＝設定頁指定群組（需有 quotes.receive 權限）的成員；不會自動加上管理員。沒有人收得到時，請求照樣建立並在時間軸記一筆警告，
+//     管理員仍可在「報價請求」頁看到並處理（只是不會被通知）。
 //   · 通知業務時，站內通知＋一封附 PDF 的 Email（另外可設固定業務信箱）；寄信失敗不影響請求本身，結果記在時間軸。
 const fs = require('fs');
 const path = require('path');
@@ -51,8 +52,14 @@ function validateSettings(input) {
   const days = input.remind_days === '' || input.remind_days == null ? 3 : Number(input.remind_days);
   if (!Number.isInteger(days) || days < 0 || days > 30) return { error: '提醒天數請輸入 0–30 的整數（0＝不自動提醒）' };
   const b = (v) => (v === 'on' || v === '1' || v === true ? 1 : 0);
+  let notifyGroup = null;
+  if (input.notify_group_id !== '' && input.notify_group_id != null) {
+    notifyGroup = Number(input.notify_group_id);
+    if (!Number.isInteger(notifyGroup) || !receiveGroups().some(g => g.id === notifyGroup)) return { error: '請選擇有「接收與處理報價請求」權限的群組' };
+  }
   return {
     values: {
+      notify_group_id: notifyGroup,
       enabled: b(input.enabled), sales_email: email || null, attach_pdf: b(input.attach_pdf),
       show_ip: b(input.show_ip), show_mac: b(input.show_mac), show_serial: b(input.show_serial),
       show_purchase: b(input.show_purchase), show_custom: b(input.show_custom),
@@ -64,23 +71,40 @@ function validateSettings(input) {
 function saveSettings(v) {
   db.prepare(
     `UPDATE quote_settings SET enabled = ?, sales_email = ?, attach_pdf = ?, show_ip = ?, show_mac = ?, show_serial = ?,
-       show_purchase = ?, show_custom = ?, require_confirm = ?, remind_days = ? WHERE id = 1`
-  ).run(v.enabled, v.sales_email, v.attach_pdf, v.show_ip, v.show_mac, v.show_serial, v.show_purchase, v.show_custom, v.require_confirm, v.remind_days);
+       show_purchase = ?, show_custom = ?, require_confirm = ?, remind_days = ?, notify_group_id = ? WHERE id = 1`
+  ).run(v.enabled, v.sales_email, v.attach_pdf, v.show_ip, v.show_mac, v.show_serial, v.show_purchase, v.show_custom, v.require_confirm, v.remind_days, v.notify_group_id);
 }
 
 // ---------- 人 ----------
 
 const isHandler = (user) => !!user && can(user, 'quotes.receive'); // 管理員 can() 永遠為真
 
-// 業務（有 quotes.receive 的群組的啟用中成員）；沒有就改由管理員接手。excludeId：不通知這個人（例如送出請求的人自己）
+// 收得到報價請求通知的人＝管理員在設定頁「指定的群組」的啟用中成員（沒指定、或指定的群組已不存在或不再有 quotes.receive 權限時，
+// 退回成「所有有這個權限的群組」的成員）。**不會自動加上管理員**——要讓管理員收到，就把他放進這個群組。
+// excludeId：不通知這個人（例如送出請求的人自己）
 function salesRecipients(excludeId = null) {
-  let users = db.prepare(
+  const gid = getSettings().notify_group_id;
+  const rows = db.prepare(
     `SELECT DISTINCT u.* FROM users u
      JOIN permission_group_perms p ON p.group_id = u.group_id AND p.permission = 'quotes.receive'
-     WHERE u.is_active = 1 AND u.role <> 'admin'`
-  ).all();
-  if (users.length === 0) users = db.prepare("SELECT * FROM users WHERE role = 'admin' AND is_active = 1").all();
+     WHERE u.is_active = 1 ${gid ? 'AND u.group_id = ?' : ''}`
+  ).all(...(gid ? [gid] : []));
+  const users = rows.length === 0 && gid && !groupHasReceive(gid)
+    ? db.prepare(
+      `SELECT DISTINCT u.* FROM users u JOIN permission_group_perms p ON p.group_id = u.group_id AND p.permission = 'quotes.receive' WHERE u.is_active = 1`
+    ).all()
+    : rows;
   return users.filter(u => u.id !== excludeId);
+}
+
+const groupHasReceive = (gid) => !!db.prepare("SELECT 1 FROM permission_group_perms WHERE group_id = ? AND permission = 'quotes.receive'").get(gid);
+
+// 可以被指定為通知對象的群組（有 quotes.receive 權限的）
+function receiveGroups() {
+  return db.prepare(
+    `SELECT g.id, g.name, (SELECT COUNT(*) FROM users u WHERE u.group_id = g.id AND u.is_active = 1) AS member_count
+     FROM permission_groups g JOIN permission_group_perms p ON p.group_id = g.id AND p.permission = 'quotes.receive' ORDER BY g.id`
+  ).all();
 }
 
 function admins(excludeId = null) {
@@ -295,7 +319,7 @@ function notifySales(request, kind) {
   for (const u of users) {
     notifMap.set(u.id, Notification.create(u.id, { batchId: null, type: reminder ? 'quote_reminder' : 'quote_new', title, message, link: `/quotes/${request.id}` }));
   }
-  if (users.length === 0) addEvent(request.id, null, 'warn', '目前沒有可以通知的業務（請在「權限群組」把人加進「業務」群組）');
+  if (users.length === 0) addEvent(request.id, null, 'warn', '目前沒有人收得到這張請求的通知（指定的通知群組沒有啟用中的成員）。請管理員到「報價請求設定」確認通知群組，並在「權限群組」把人加進去；管理員仍可在「報價請求」頁看到並處理。');
   queueRichEmails(request.id, users, notifMap, title, reminder);
 }
 
@@ -639,5 +663,5 @@ module.exports = {
   getSettings, validateSettings, saveSettings, isHandler, canView,
   findRequest, getDetail, openRequestFor, latestByPair,
   create, confirm, reject, claim, quote, close, cancel, remind, addNote,
-  runReminders, startReminders, listFor, counts, dashboardFor, stats, salesRecipients,
+  runReminders, startReminders, listFor, counts, dashboardFor, stats, salesRecipients, receiveGroups,
 };

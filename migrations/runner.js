@@ -32,6 +32,7 @@ const MIGRATIONS = [
   'migrate_0017_user_signatures',
   'migrate_0018_capacity_volumes',
   'migrate_0019_quote_requests',
+  'migrate_0020_quote_notify_group',
 ];
 
 async function run() {
