@@ -115,6 +115,31 @@ router.get('/', requireLogin, (req, res) => {
   res.render('batches/list', { batches, customerList: Customer.findAll(), filter: String(filter) });
 });
 
+// ---- 匯出（要放在 /:id 之前）----
+const BatchExportService = require('../services/BatchExportService');
+
+function csvDownload(res, name, result) {
+  res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${name}-${new Date().toISOString().slice(0, 10)}.csv"` });
+  res.send(result.csv);
+}
+
+router.get('/export', requireLogin, (req, res) => {
+  res.render('batches/export', {
+    f: BatchExportService.parseFilters(req.query),
+    customerList: Customer.findAll(),
+    categoryList: AssetCategory.findAll(),
+    error: req.query.err === 'toomany' ? `資料超過 ${BatchExportService.MAX_ROWS} 筆，請縮小日期範圍或條件` : null,
+  });
+});
+
+router.get('/export/batches.csv', requireLogin, (req, res, next) => {
+  try { csvDownload(res, 'inspection-batches', BatchExportService.batchesCsv(BatchExportService.parseFilters(req.query))); } catch (e) { e.userFacing ? res.redirect('/batches/export?err=toomany') : next(e); }
+});
+
+router.get('/export/records.csv', requireLogin, (req, res, next) => {
+  try { csvDownload(res, 'inspection-records', BatchExportService.recordsCsv(BatchExportService.parseFilters(req.query))); } catch (e) { e.userFacing ? res.redirect('/batches/export?err=toomany') : next(e); }
+});
+
 // 「帶入某次巡檢的設備」用：最近 20 個批次與各自的設備 id（例行巡檢大多是同一批設備）
 function recentBatchesForPicker() {
   return InspectionBatch.findAll().slice(0, 20).map(b => ({

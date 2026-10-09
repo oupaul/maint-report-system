@@ -1,0 +1,77 @@
+<%- include('../layout', { title: '匯出巡檢資料' }) %>
+
+<div class="page-header">
+  <h1>匯出巡檢資料</h1>
+  <div class="page-actions"><a href="/batches" class="btn btn--secondary btn--md">回到巡檢批次</a></div>
+</div>
+
+<div class="card" style="max-width: 760px;">
+  <% if (error) { %><div class="form-error"><%= error %></div><% } %>
+  <p class="form-hint">匯出成 CSV（UTF-8，Excel 可直接開啟），給你自己分析或留存。兩種匯出共用下面的篩選條件，沒填的條件就是不限。</p>
+
+  <form method="GET" action="/batches/export/records.csv" id="export-form">
+    <div class="checklist-row__grid">
+      <div class="form-group">
+        <label class="form-label" for="from">巡檢日期（起）</label>
+        <input class="form-input" type="date" id="from" name="from" value="<%= f.from %>">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="to">巡檢日期（迄）</label>
+        <input class="form-input" type="date" id="to" name="to" value="<%= f.to %>">
+      </div>
+    </div>
+    <div class="checklist-row__grid">
+      <div class="form-group">
+        <label class="form-label" for="customer">客戶</label>
+        <select class="form-select" id="customer" name="customer">
+          <option value="">全部客戶</option>
+          <option value="none" <%= f.customer === 'none' ? 'selected' : '' %>>未指定客戶</option>
+          <% customerList.forEach(c => { %><option value="<%= c.id %>" <%= f.customer === String(c.id) ? 'selected' : '' %>><%= c.name %></option><% }) %>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="scope">批次範圍</label>
+        <select class="form-select" id="scope" name="scope">
+          <option value="">全部批次（含草稿、審核中）</option>
+          <option value="completed" <%= f.scope === 'completed' ? 'selected' : '' %>>只含已完成／已核准的批次</option>
+        </select>
+      </div>
+    </div>
+
+    <h2 style="margin-top: var(--space-4);">只對「巡檢紀錄明細」有效的條件</h2>
+    <div class="checklist-row__grid">
+      <div class="form-group">
+        <label class="form-label" for="severity">檢查結果</label>
+        <select class="form-select" id="severity" name="severity">
+          <option value="">全部項目</option>
+          <option value="abnormal" <%= f.severity === 'abnormal' ? 'selected' : '' %>>只要警告與異常</option>
+          <option value="critical" <%= f.severity === 'critical' ? 'selected' : '' %>>只要異常</option>
+          <option value="warning" <%= f.severity === 'warning' ? 'selected' : '' %>>只要警告</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="category">設備類別</label>
+        <select class="form-select" id="category" name="category">
+          <option value="">全部類別</option>
+          <% categoryList.forEach(c => { %><option value="<%= c.code %>" <%= f.category === c.code ? 'selected' : '' %>><%= c.label %></option><% }) %>
+        </select>
+      </div>
+    </div>
+
+    <div class="page-actions" style="margin-top: var(--space-4);">
+      <button type="submit" class="btn btn--primary btn--md">下載巡檢紀錄明細 CSV</button>
+      <button type="submit" formaction="/batches/export/batches.csv" class="btn btn--secondary btn--md">下載批次清單 CSV</button>
+    </div>
+  </form>
+</div>
+
+<div class="card" style="max-width: 760px;">
+  <h2>欄位說明</h2>
+  <ul class="form-hint">
+    <li><strong>巡檢紀錄明細</strong>：每個「批次 × 設備 × 檢查項目」一列——批次編號與標題、巡檢日期、批次狀態、客戶、設備（資產ID、名稱、類別、位置、IP、序號、財產編號）、檢查項目、狀態（正常／警告／異常）、數值、備註、截圖數、記錄人與時間。容量型項目（磁碟空間）另有「最高使用率(%)」與「磁碟區明細」。</li>
+    <li><strong>批次清單</strong>：每個批次一列——標題、日期、狀態（含簽核）、涵蓋客戶、設備數、未指定客戶的設備數、檢查項目數、警告／異常項目數、建立者、建立與完成時間、備註。</li>
+    <li>只想匯出單一批次：到那個批次的摘要頁按「匯出本批次紀錄」。想看磁碟容量的歷次變化（每個磁碟區一列）：到「容量預警」頁匯出容量歷史。</li>
+  </ul>
+</div>
+
+<%- include('../partials/footer') %>

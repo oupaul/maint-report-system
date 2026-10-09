@@ -362,17 +362,18 @@ function cleanupPending() {
   const now = Date.now();
   for (const [token, v] of pending) if (v.expires < now) pending.delete(token);
 }
-function savePending(userId, data) {
+// kind：資產匯入與客戶匯入各自一份（同一個人同時開著兩種匯入預覽，不會互相蓋掉）
+function savePending(userId, data, kind = 'assets') {
   cleanupPending();
-  for (const [token, v] of pending) if (v.userId === userId) pending.delete(token);
+  for (const [token, v] of pending) if (v.userId === userId && v.kind === kind) pending.delete(token);
   const token = crypto.randomBytes(16).toString('hex');
-  pending.set(token, { userId, ...data, expires: Date.now() + PENDING_TTL_MS });
+  pending.set(token, { userId, kind, ...data, expires: Date.now() + PENDING_TTL_MS });
   return token;
 }
-function getPending(userId, token) {
+function getPending(userId, token, kind = 'assets') {
   cleanupPending();
   const v = pending.get(String(token || ''));
-  return v && v.userId === userId ? v : null;
+  return v && v.userId === userId && v.kind === kind ? v : null;
 }
 function dropPending(token) { pending.delete(String(token || '')); }
 

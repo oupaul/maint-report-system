@@ -7,6 +7,7 @@
       <a href="/batches/<%= batch.id %>/entry" class="btn btn--secondary btn--md"><%= batch.status === 'draft' ? '繼續填寫' : '編輯內容' %></a>
     <% } %>
     <a href="/batches/<%= batch.id %>/report.pdf" class="btn btn--primary btn--md" target="_blank">下載 PDF 報告</a>
+    <a href="/batches/export/records.csv?batch=<%= batch.id %>" class="btn btn--secondary btn--md" title="把這個批次的每個檢查項目匯出成 CSV">匯出本批次紀錄</a>
   </div>
 </div>
 
