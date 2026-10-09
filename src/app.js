@@ -49,6 +49,13 @@ app.use((req, res, next) => {
 });
 
 // 靜態檔案放在 session 前面：載入 css/js 不需要（也不該）建立或更新 session
+// view 裡一律用 assetUrl('/js/x.js') 引用（網址帶內容版本碼 ?v=）：帶版本碼的可以長期快取（檔案一改網址就變），
+// 沒帶的一律要求重新驗證（no-cache），避免瀏覽器或 CDN 留著舊版。serve-static 不會蓋掉已設定的 Cache-Control
+app.locals.assetUrl = require('./utils/assetVersion').asset; // 不要叫 asset：編輯設備頁有同名的區域變數會蓋掉它
+app.use(['/css', '/js'], (req, res, next) => {
+  res.setHeader('Cache-Control', req.query.v ? 'public, max-age=31536000, immutable' : 'no-cache');
+  next();
+});
 app.use(express.static(path.join(__dirname, 'public')));
 // M365 登入用的 MSAL.js（瀏覽器端函式庫）直接從 node_modules 提供，不依賴外部 CDN，CSP 也就不用開放外部腳本
 app.get('/vendor/msal-browser.min.js', (req, res) => {

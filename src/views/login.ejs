@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>登入 - <%= siteName %></title>
   <%- include('partials/head-icons') %>
-  <link rel="stylesheet" href="/css/tokens.css">
-  <link rel="stylesheet" href="/css/components.css">
-  <link rel="stylesheet" href="/css/app.css">
+  <link rel="stylesheet" href="<%= assetUrl('/css/tokens.css') %>">
+  <link rel="stylesheet" href="<%= assetUrl('/css/components.css') %>">
+  <link rel="stylesheet" href="<%= assetUrl('/css/app.css') %>">
 </head>
 <body>
   <div class="login-shell">
@@ -39,7 +39,7 @@
   </div>
 <% if (m365Enabled) { %>
   <script src="/vendor/msal-browser.min.js"></script>
-  <script src="/js/m365-login.js"></script>
+  <script src="<%= assetUrl('/js/m365-login.js') %>"></script>
 <% } %>
 </body>
 </html>
