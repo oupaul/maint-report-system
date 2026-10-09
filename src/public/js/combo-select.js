@@ -40,9 +40,17 @@
     list.setAttribute('role', 'listbox');
     list.hidden = true;
 
+    // 右側的 ▾ 按鈕：點它才會展開完整清單（想瀏覽全部客戶時用）；點輸入框本身不展開，要輸入才過濾
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'cs__toggle';
+    toggle.tabIndex = -1;
+    toggle.setAttribute('aria-label', '展開全部選項');
+
     select.parentNode.insertBefore(wrap, select);
     wrap.appendChild(select);
     wrap.appendChild(input);
+    wrap.appendChild(toggle);
     wrap.appendChild(list);
     select.classList.add('cs__native');
     select.tabIndex = -1;
@@ -124,6 +132,15 @@
     }
 
     input.value = currentLabel();
+    // ▾：展開／收合完整清單。mousedown 先擋掉，輸入框才不會因為點按鈕而失焦
+    toggle.addEventListener('mousedown', function (e) { e.preventDefault(); });
+    toggle.addEventListener('click', function () {
+      if (!list.hidden) { close(); return; }
+      input.focus();
+      typing = false;
+      input.select();
+      open();
+    });
     // 點進輸入框只全選文字（直接輸入就是新的搜尋），不展開清單；Chrome 會在 mouseup 之後才放游標，所以延後一拍
     input.addEventListener('focus', function () { input.select(); });
     input.addEventListener('mousedown', function () { input._wasClosed = list.hidden; });
