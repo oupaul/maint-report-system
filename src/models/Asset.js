@@ -3,10 +3,16 @@ const { nowTaipei } = require('../utils/time');
 const AssetField = require('./AssetField');
 const AssetTag = require('./AssetTag');
 
-// 取回設備後補上自訂欄位的值與標籤（所有對外回傳設備的方法都要經過這裡）
+// 取回設備後補上自訂欄位的值、標籤與客戶名稱（所有對外回傳設備的方法都要經過這裡）
 function enrich(rows) {
   AssetField.attach(rows);
   AssetTag.attach(rows);
+  if (rows.some(r => r.customer_id)) {
+    const names = new Map(db.prepare('SELECT id, name FROM customers').all().map(c => [c.id, c.name]));
+    rows.forEach(r => { r.customer_name = r.customer_id ? (names.get(r.customer_id) || null) : null; });
+  } else {
+    rows.forEach(r => { r.customer_name = null; });
+  }
   return rows;
 }
 
@@ -15,6 +21,7 @@ const SORT_COLUMNS = (() => {
   const text = (...cols) => Object.assign(cols.map(c => `a.${c}`), { nullsLast: true });
   return {
     category: Object.assign(['ac.sort_order', 'a.category'], { nullsLast: false }),
+    customer: Object.assign(['cu.name'], { nullsLast: true }),
     name: Object.assign(['a.name'], { nullsLast: false }),
     location: text('location'),
     ip_address: text('ip_address'),
@@ -27,6 +34,7 @@ const SORT_COLUMNS = (() => {
   };
 })();
 
+// 客戶名稱另外在 query() 用 JOIN 的 cu.name 搜尋
 const SEARCH_COLUMNS = ['name', 'location', 'ip_address', 'mac_address', 'hostname', 'serial_number', 'asset_tag', 'brand', 'model', 'purchase_date', 'identifier'];
 
 const Asset = {
@@ -60,7 +68,7 @@ const Asset = {
   // q 以空白分隔多個關鍵字（全部都要符合），比對名稱、位置、IP、MAC、主機名稱、序號、財產編號、廠牌、型號、購置日期、
   // 舊識別碼、標籤與啟用中自訂欄位的值。
   // 回傳 { rows, total, groupCounts }：total＝符合條件的總數（分頁前）、groupCounts＝各類別的符合台數（分組標題用）。
-  query({ q = '', category = '', location = '', status = '', tag = '', sort = 'category', dir = 'asc', grouped = true, page = 1, per = 50, all = false } = {}) {
+  query({ q = '', category = '', location = '', status = '', tag = '', sort = 'category', dir = 'asc', customer = '', grouped = true, page = 1, per = 50, all = false } = {}) {
     const where = [];
     const params = [];
     String(q).trim().toLowerCase().split(/\s+/).filter(Boolean).slice(0, 8).forEach(token => {
@@ -77,6 +85,9 @@ const Asset = {
       conds.push(`EXISTS (SELECT 1 FROM asset_field_values v JOIN asset_field_defs d ON d.id = v.field_id
         WHERE v.asset_id = a.id AND d.is_active = 1 AND d.type <> 'boolean' AND LOWER(v.value) LIKE ? ESCAPE '\\')`);
       params.push(like);
+      // 客戶名稱
+      conds.push(`LOWER(COALESCE(cu.name, '')) LIKE ? ESCAPE '\\'`);
+      params.push(like);
       // 標籤
       conds.push(`EXISTS (SELECT 1 FROM asset_tag_links l JOIN asset_tags t ON t.id = l.tag_id
         WHERE l.asset_id = a.id AND LOWER(t.name) LIKE ? ESCAPE '\\')`);
@@ -85,13 +96,15 @@ const Asset = {
     });
     if (category) { where.push('a.category = ?'); params.push(category); }
     if (location) { where.push('a.location = ?'); params.push(location); }
+    if (customer === 'none') where.push('a.customer_id IS NULL');
+    else if (customer) { where.push('a.customer_id = ?'); params.push(Number(customer) || 0); }
     if (status === '1' || status === '0') { where.push('a.is_active = ?'); params.push(Number(status)); }
     if (tag) {
       where.push('EXISTS (SELECT 1 FROM asset_tag_links l JOIN asset_tags t ON t.id = l.tag_id WHERE l.asset_id = a.id AND t.name = ?)');
       params.push(tag);
     }
     const whereSql = where.length ? 'WHERE ' + where.join(' AND ') : '';
-    const from = 'FROM assets a LEFT JOIN asset_categories ac ON ac.code = a.category';
+    const from = 'FROM assets a LEFT JOIN asset_categories ac ON ac.code = a.category LEFT JOIN customers cu ON cu.id = a.customer_id';
 
     // 排序：欄位只能是白名單裡的（不把使用者輸入拼進 SQL）；空值一律排最後
     const col = Object.prototype.hasOwnProperty.call(SORT_COLUMNS, sort) ? SORT_COLUMNS[sort] : SORT_COLUMNS.category;
@@ -136,13 +149,14 @@ const Asset = {
   },
 
   // custom：AssetField.parse 的結果（{欄位id: 值或 null}），和資產本身放在同一個交易裡寫入
-  create({ name, category, location, ip_address, mac_address, hostname, serial_number, asset_tag, brand, model, purchase_date, notes, custom, tags }) {
+  create({ name, category, customer_id, location, ip_address, mac_address, hostname, serial_number, asset_tag, brand, model, purchase_date, notes, custom, tags }) {
     const id = db.transaction(() => {
       const result = db.prepare(
         `INSERT INTO assets (name, category, location, ip_address, mac_address, hostname, serial_number, asset_tag, brand, model, purchase_date, notes, is_active, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`
       ).run(name, category, location || null, ip_address || null, mac_address || null, hostname || null, serial_number || null,
         asset_tag || null, brand || null, model || null, purchase_date || null, notes || null, nowTaipei());
+      if (customer_id) db.prepare('UPDATE assets SET customer_id = ? WHERE id = ?').run(customer_id, result.lastInsertRowid);
       if (custom) AssetField.saveValues(result.lastInsertRowid, custom);
       if (tags) AssetTag.setForAsset(result.lastInsertRowid, tags);
       return result.lastInsertRowid;
@@ -151,7 +165,7 @@ const Asset = {
   },
 
   // identifier 是舊的「識別碼」欄位（待整理用，只能保留或清空，不再新增內容）
-  update(id, { name, category, location, ip_address, mac_address, hostname, serial_number, asset_tag, brand, model, purchase_date, identifier, notes, is_active, custom, tags }) {
+  update(id, { name, category, customer_id, location, ip_address, mac_address, hostname, serial_number, asset_tag, brand, model, purchase_date, identifier, notes, is_active, custom, tags }) {
     db.transaction(() => {
       db.prepare(
         `UPDATE assets SET name = ?, category = ?, location = ?, ip_address = ?, mac_address = ?, hostname = ?, serial_number = ?,
@@ -159,6 +173,8 @@ const Asset = {
          WHERE id = ?`
       ).run(name, category, location || null, ip_address || null, mac_address || null, hostname || null, serial_number || null,
         asset_tag || null, brand || null, model || null, purchase_date || null, identifier || null, notes || null, is_active ? 1 : 0, id);
+      // customer_id：undefined＝不動（例如 CSV 沒有客戶欄），null＝清除，數字＝指定
+      if (customer_id !== undefined) db.prepare('UPDATE assets SET customer_id = ? WHERE id = ?').run(customer_id || null, id);
       if (custom) AssetField.saveValues(id, custom);
       if (tags) AssetTag.setForAsset(id, tags);
     })();

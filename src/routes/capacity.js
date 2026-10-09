@@ -51,7 +51,9 @@ function allSeries() {
 }
 
 router.get('/', requireLogin, (req, res) => {
-  const all = allSeries().sort(compareRank);
+  const customerFilter = req.query.customer === 'none' ? 'none' : (/^\d{1,9}$/.test(String(req.query.customer || '')) ? String(req.query.customer) : '');
+  const everything = allSeries().sort(compareRank);
+  const all = customerFilter ? everything.filter(s => (customerFilter === 'none' ? !s.customer_id : String(s.customer_id) === customerFilter)) : everything;
   const showAll = req.query.view === 'all';
   const list = showAll ? all : all.filter(needsAttention);
   const per = 100;
@@ -61,7 +63,9 @@ router.get('/', requireLogin, (req, res) => {
     rows: list.slice((page - 1) * per, page * per).map(s => ({ ...s, text: forecastText(s) })),
     total: all.length,
     attentionCount: all.filter(needsAttention).length,
-    showAll, page, pages, fmt: capacity,
+    showAll, page, pages, fmt: capacity, customerFilter,
+    customerOptions: [...new Map(everything.filter(s => s.customer_id).map(s => [s.customer_id, s.customer_name])).entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name, 'zh-Hant')),
+    hasUnassigned: everything.some(s => !s.customer_id),
   });
 });
 

@@ -1,4 +1,5 @@
 <%- include('../layout', { title: '容量預警' }) %>
+<% const cq = customerFilter ? 'customer=' + customerFilter + '&' : ''; %>
 
 <div class="page-header">
   <h1>容量預警</h1>
@@ -10,11 +11,22 @@
 
 <div class="card">
   <p class="form-hint">彙整所有「容量型」檢查項目（磁碟空間）的記錄。<strong>需要注意</strong>＝目前使用率已達警告門檻，或依成長趨勢預估 6 個月內會達 90%。預測用最近幾次巡檢的線性趨勢推算（至少 3 次、跨 28 天以上才會預測；磁碟擴充後從擴充後的記錄重新算），僅供規劃參考。</p>
+  <% if (customerOptions.length > 0) { %>
+    <form method="GET" action="/capacity" class="asset-filter" id="cap-filter">
+      <input type="hidden" name="view" value="<%= showAll ? 'all' : 'attention' %>">
+      <select class="form-select" name="customer" aria-label="依客戶篩選">
+        <option value="">全部客戶</option>
+        <% customerOptions.forEach(c => { %><option value="<%= c.id %>" <%= customerFilter === String(c.id) ? 'selected' : '' %>><%= c.name %></option><% }) %>
+        <% if (hasUnassigned) { %><option value="none" <%= customerFilter === 'none' ? 'selected' : '' %>>未指定客戶</option><% } %>
+      </select>
+      <noscript><button type="submit" class="btn btn--secondary btn--md">篩選</button></noscript>
+    </form>
+  <% } %>
   <div class="asset-toolbar">
     <span class="form-hint">共 <%= total %> 個磁碟區，其中 <%= attentionCount %> 個需要注意</span>
     <span class="asset-toolbar__right">
-      <a href="/capacity" class="btn btn--sm <%= showAll ? 'btn--secondary' : 'btn--primary' %>">只看需要注意</a>
-      <a href="/capacity?view=all" class="btn btn--sm <%= showAll ? 'btn--primary' : 'btn--secondary' %>">全部</a>
+      <a href="/capacity?<%= cq %>view=attention" class="btn btn--sm <%= showAll ? 'btn--secondary' : 'btn--primary' %>">只看需要注意</a>
+      <a href="/capacity?<%= cq %>view=all" class="btn btn--sm <%= showAll ? 'btn--primary' : 'btn--secondary' %>">全部</a>
     </span>
   </div>
 
@@ -31,7 +43,7 @@
         <tbody>
           <% rows.forEach(s => { const p = s.last.pct; const lvl = p >= s.crit_pct ? 'critical' : (p >= s.warn_pct ? 'warning' : 'normal'); %>
             <tr>
-              <td><a href="/capacity/assets/<%= s.asset_id %>"><%= s.asset_name %></a><% if (s.location) { %><br><small class="form-hint"><%= s.location %></small><% } %></td>
+              <td><a href="/capacity/assets/<%= s.asset_id %>"><%= s.asset_name %></a><% if (s.customer_name || s.location) { %><br><small class="form-hint"><%= [s.customer_name, s.location].filter(Boolean).join('・') %></small><% } %></td>
               <td><%= s.volume %></td>
               <td><%= s.last.date %></td>
               <td>
@@ -48,12 +60,13 @@
     </div>
     <% if (pages > 1) { %>
       <nav class="pager" aria-label="分頁">
-        <% if (page > 1) { %><a class="btn btn--secondary btn--sm" href="/capacity?view=<%= showAll ? 'all' : 'attention' %>&page=<%= page - 1 %>">上一頁</a><% } %>
+        <% if (page > 1) { %><a class="btn btn--secondary btn--sm" href="/capacity?<%= cq %>view=<%= showAll ? 'all' : 'attention' %>&page=<%= page - 1 %>">上一頁</a><% } %>
         <span class="form-hint">第 <%= page %> / <%= pages %> 頁</span>
-        <% if (page < pages) { %><a class="btn btn--secondary btn--sm" href="/capacity?view=<%= showAll ? 'all' : 'attention' %>&page=<%= page + 1 %>">下一頁</a><% } %>
+        <% if (page < pages) { %><a class="btn btn--secondary btn--sm" href="/capacity?<%= cq %>view=<%= showAll ? 'all' : 'attention' %>&page=<%= page + 1 %>">下一頁</a><% } %>
       </nav>
     <% } %>
   <% } %>
 </div>
 
+<script src="/js/cap-filter.js"></script>
 <%- include('../partials/footer') %>

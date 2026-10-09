@@ -12,6 +12,9 @@
     if (!(a.category in gIndex)) { gIndex[a.category] = groups.length; groups.push({ code: a.category, label: categoryLabels[a.category] || a.category, items: [] }); }
     groups[gIndex[a.category]].items.push(a);
   });
+  const custCounts = {};
+  pickerAssets.forEach(a => { const k = a.customer_name || ''; custCounts[k] = (custCounts[k] || 0) + 1; });
+  const custNames = Object.keys(custCounts).filter(Boolean).sort((x, y) => x.localeCompare(y, 'zh-Hant'));
   const tagCounts = {};
   pickerAssets.forEach(a => (a.tags || []).forEach(t => { tagCounts[t] = (tagCounts[t] || 0) + 1; }));
   const tagNames = Object.keys(tagCounts).sort((x, y) => x.localeCompare(y, 'zh-Hant'));
@@ -33,11 +36,18 @@
   <% } %>
 
   <div class="ap-toolbar">
-    <input type="search" class="form-input ap-search" placeholder="搜尋名稱、位置、IP、MAC、主機名稱、廠牌型號、序號、財產編號、標籤" aria-label="搜尋設備" autocomplete="off">
+    <input type="search" class="form-input ap-search" placeholder="搜尋名稱、客戶、位置、IP、MAC、主機名稱、廠牌型號、序號、財產編號、標籤" aria-label="搜尋設備" autocomplete="off">
     <% if (locations.length > 1) { %>
       <select class="form-select ap-location" aria-label="依位置篩選">
         <option value="">全部位置</option>
         <% locations.forEach(l => { %><option value="<%= l %>"><%= l %></option><% }) %>
+      </select>
+    <% } %>
+    <% if (custNames.length > 0) { %>
+      <select class="form-select ap-customer" aria-label="依客戶篩選">
+        <option value="">全部客戶</option>
+        <% custNames.forEach(n => { %><option value="<%= n %>"><%= n %>（<%= custCounts[n] %>）</option><% }) %>
+        <% if (custCounts['']) { %><option value="__none__">未指定客戶（<%= custCounts[''] %>）</option><% } %>
       </select>
     <% } %>
     <% if (tagNames.length > 0) { %>
@@ -71,11 +81,11 @@
       </summary>
       <div class="checkbox-grid">
         <% g.items.forEach(a => { %>
-          <label class="checkbox-tile ap-tile" data-id="<%= a.id %>" data-cat="<%= a.category %>" data-loc="<%= (a.location || '').trim() %>" data-tags="<%= JSON.stringify(a.tags || []) %>" data-search="<%= [a.name, a.location, a.ip_address, a.mac_address, (a.mac_address || '').replace(/:/g, ''), a.hostname, a.brand, a.model, a.serial_number, a.asset_tag, a.identifier, a.customSearch, (a.tags || []).join(' '), g.label].filter(Boolean).join(' ').toLowerCase() %>">
+          <label class="checkbox-tile ap-tile" data-id="<%= a.id %>" data-cat="<%= a.category %>" data-loc="<%= (a.location || '').trim() %>" data-cust="<%= a.customer_name || '' %>" data-tags="<%= JSON.stringify(a.tags || []) %>" data-search="<%= [a.name, a.location, a.ip_address, a.mac_address, (a.mac_address || '').replace(/:/g, ''), a.hostname, a.brand, a.model, a.serial_number, a.asset_tag, a.identifier, a.customer_name, a.customSearch, (a.tags || []).join(' '), g.label].filter(Boolean).join(' ').toLowerCase() %>">
             <input type="checkbox" name="asset_ids" value="<%= a.id %>" <%= selectedSet.has(String(a.id)) ? 'checked' : '' %>>
             <span class="ap-tile__text">
               <strong><%= a.name %></strong>
-              <% const sub = [a.location, a.hostname, a.ip_address].filter(Boolean).join('・'); %>
+              <% const sub = [a.customer_name, a.location, a.hostname, a.ip_address].filter(Boolean).join('・'); %>
               <% if (sub) { %><small><%= sub %></small><% } %>
             </span>
           </label>

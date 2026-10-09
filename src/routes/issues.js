@@ -19,6 +19,7 @@ function parseFilters(query) {
     severity: ['critical', 'warning'].includes(query.severity) ? query.severity : '',
     category: str(query.category, 60),
     location: str(query.location),
+    customer: query.customer === 'none' ? 'none' : (/^\d{1,9}$/.test(String(query.customer || '')) ? String(query.customer) : ''),
     tag: str(query.tag, 40),
     label: str(query.label, 60),
     batch: num(query.batch),
@@ -82,6 +83,8 @@ router.get('/', requireLogin, (req, res) => {
     categoryLabels: AssetCategory.labelMap(),
     categoryCodes: uniq(all.map(r => r.category)),
     locations: uniq(all.map(r => r.location)).sort((a, b) => a.localeCompare(b, 'zh-Hant')),
+    customerOptions: [...new Map(all.filter(r => r.customer_id).map(r => [r.customer_id, r.customer_name])).entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name, 'zh-Hant')),
+    hasUnassigned: all.some(r => !r.customer_id),
     tags: uniq(all.flatMap(r => r.tags)).sort((a, b) => a.localeCompare(b, 'zh-Hant')),
     labels: uniq(all.map(r => r.label)).sort((a, b) => a.localeCompare(b, 'zh-Hant')),
     batches: [...new Map(all.map(r => [r.batch_id, { id: r.batch_id, title: r.batch_title, date: r.batch_date }])).values()].sort((a, b) => (a.date < b.date ? 1 : -1)),
@@ -92,9 +95,9 @@ router.get('/export.csv', requireLogin, (req, res) => {
   const labels = AssetCategory.labelMap();
   const exportFilters = parseFilters(req.query);
   const rows = filterQuote(OpenIssues.filter(withQuotes(OpenIssues.loadAll()), exportFilters), exportFilters);
-  const header = ['嚴重度', '設備', '類別', '位置', '檢查項目', '數值', '備註', '最新巡檢日期', '巡檢批次', '批次狀態', '連續次數', '處理建議', '系統建議', '報價狀態'];
+  const header = ['嚴重度', '設備', '客戶', '類別', '位置', '檢查項目', '數值', '備註', '最新巡檢日期', '巡檢批次', '批次狀態', '連續次數', '處理建議', '系統建議', '報價狀態'];
   const lines = [header, ...rows.map(r => [
-    r.status === 'critical' ? '異常' : '警告', r.asset_name, labels[r.category] || r.category, r.location || '', r.label,
+    r.status === 'critical' ? '異常' : '警告', r.asset_name, r.customer_name || '', labels[r.category] || r.category, r.location || '', r.label,
     r.display.replace(/\n/g, '；'), r.note || '', r.batch_date, r.batch_title, batchInfo(r).text, r.streak, r.triage ? `${IssueTriage.DISPOSITIONS[r.triage.disposition]}${r.triage.review_date ? `（${r.triage.review_date}）` : ''}${r.triage.note ? `：${r.triage.note}` : ''}` : (r.resurfaced ? `未分流（${r.resurfaced}）` : '未分流'), r.hint.text, r.quote ? `Q-${r.quote.id} ${QuoteService.STATUS[r.quote.status]}` : '尚未通知',
   ])];
   res.set({

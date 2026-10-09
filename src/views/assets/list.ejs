@@ -7,8 +7,9 @@
     const next = active && params.dir === 'asc' ? 'desc' : 'asc';
     return `<a href="${link({ sort: key, dir: next, page: 1 })}" class="sort-link${active ? ' is-active' : ''}" title="依${label}排序">${label}${active ? (params.dir === 'asc' ? ' ▲' : ' ▼') : ''}</a>`;
   };
-  const filtered = !!(params.q || params.category || params.location || params.status || params.tag);
-  const colCount = 10 + (params.grouped ? 0 : 1) + listFields.length + 1;
+  const filtered = !!(params.q || params.category || params.location || params.status || params.tag || params.customer);
+  const manage = can('assets.manage');
+  const colCount = 11 + (params.grouped ? 0 : 1) + listFields.length + 1 + (manage ? 1 : 0);
 %>
 
 <div class="page-header">
@@ -23,6 +24,7 @@
   </div>
 </div>
 
+<% if (flash) { %><div class="form-success"><%= flash %></div><% } %>
 <div class="card">
   <% if (totalAll > 0) { %>
     <form method="GET" action="/assets" class="asset-filter" id="asset-filter" role="search">
@@ -33,6 +35,13 @@
           <option value="<%= code %>" <%= params.category === code ? 'selected' : '' %>><%= categoryLabels[code] %></option>
         <% }) %>
       </select>
+      <% if (customerList.length > 0) { %>
+        <select class="form-select" name="customer" aria-label="依客戶篩選">
+          <option value="">全部客戶</option>
+          <option value="none" <%= params.customer === 'none' ? 'selected' : '' %>>未指定客戶（<%= unassignedCount %>）</option>
+          <% customerList.forEach(c => { %><option value="<%= c.id %>" <%= params.customer === String(c.id) ? 'selected' : '' %>><%= c.name %>（<%= c.asset_count %>）<%= c.is_active ? '' : '・已停用' %></option><% }) %>
+        </select>
+      <% } %>
       <select class="form-select" name="location" aria-label="依位置篩選">
         <option value="">全部位置</option>
         <% locations.forEach(l => { %><option value="<%= l %>" <%= params.location === l ? 'selected' : '' %>><%= l %></option><% }) %>
@@ -53,7 +62,7 @@
       <input type="hidden" name="dir" value="<%= params.dir %>">
       <input type="hidden" name="per" value="<%= params.per %>">
       <button type="submit" class="btn btn--secondary btn--md">搜尋</button>
-      <% if (filtered) { %><a href="<%= link({ q: '', category: '', location: '', status: '', tag: '', page: 1 }) %>" class="btn btn--secondary btn--md">清除</a><% } %>
+      <% if (filtered) { %><a href="<%= link({ q: '', category: '', location: '', status: '', tag: '', customer: '', page: 1 }) %>" class="btn btn--secondary btn--md">清除</a><% } %>
     </form>
     <div class="asset-toolbar">
       <span class="form-hint"><%= filtered ? `符合 ${total} / 全部 ${totalAll} 筆` : `共 ${totalAll} 筆` %><%= pages > 1 ? `・第 ${page} / ${pages} 頁` : '' %></span>
@@ -72,11 +81,27 @@
   <% } else if (total === 0) { %>
     <div class="empty-state">沒有符合條件的資產。</div>
   <% } else { %>
+    <% if (manage && customerList.some(c => c.is_active)) { %>
+      <div class="bulk-bar" id="bulk-bar">
+        <span class="form-hint">批次設定客戶：先勾選下面的設備，</span>
+        <select class="form-select" name="customer_id" form="bulk-form" id="bulk-customer" aria-label="要設定的客戶">
+          <option value="">（清除客戶＝未指定）</option>
+          <% customerList.filter(c => c.is_active).forEach(c => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %>
+        </select>
+        <button type="submit" form="bulk-form" class="btn btn--secondary btn--sm" id="bulk-apply" disabled>套用到已選的 <span id="bulk-count">0</span> 台</button>
+        <label class="form-hint"><input type="checkbox" name="scope" value="all" form="bulk-form" id="bulk-all"> 改成套用到「目前篩選條件下的全部 <%= total %> 台」</label>
+      </div>
+    <% } %>
+    <form method="POST" action="/assets/bulk-customer" id="bulk-form" data-confirm="確定要變更這些設備的客戶嗎？">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <% ['q', 'category', 'location', 'status', 'tag', 'customer'].forEach(k => { if (params[k]) { %><input type="hidden" name="<%= k %>" value="<%= params[k] %>"><% } }) %>
     <div class="table-wrap">
       <table class="data-table asset-table">
         <thead>
           <tr>
+            <% if (manage) { %><th><input type="checkbox" id="select-all" aria-label="全選本頁"></th><% } %>
             <th><%- sortHead('name', '名稱') %></th>
+            <th><%- sortHead('customer', '客戶') %></th>
             <% if (!params.grouped) { %><th><%- sortHead('category', '類別') %></th><% } %>
             <th><%- sortHead('location', '位置') %></th>
             <th><%- sortHead('ip_address', 'IP') %> / MAC</th>
@@ -111,7 +136,9 @@
               </tr>
             <% } %>
             <tr data-g="<%= a.category %>">
+              <% if (manage) { %><td><input type="checkbox" class="row-check" name="ids" value="<%= a.id %>" aria-label="選取 <%= a.name %>"></td><% } %>
               <td><%= a.name %></td>
+              <td><%= a.customer_name || '-' %></td>
               <% if (!params.grouped) { %><td><%= categoryLabels[a.category] || a.category %></td><% } %>
               <td><%= a.location || '-' %></td>
               <td><%= a.ip_address || '-' %><% if (a.mac_address) { %><br><small class="form-hint"><%= a.mac_address %></small><% } %></td>
@@ -142,6 +169,7 @@
         </tbody>
       </table>
     </div>
+    </form>
 
     <% if (pages > 1) {
       // 頁碼：第一頁、最後一頁、目前頁前後各 2 頁，中間用 … 省略

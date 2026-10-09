@@ -28,6 +28,7 @@ function formData(asset, error) {
     tagsText: asset && typeof asset.tags_input === 'string' ? asset.tags_input : (asset && asset.tags ? asset.tags.join(', ') : ''),
     tagSuggestions: AssetTag.inUse(),
     locations: Asset.locations(),
+    customers: Customer.selectable(asset && asset.customer_id ? Number(asset.customer_id) : null),
     error,
   };
 }
@@ -40,10 +41,11 @@ const AssetField = require('../models/AssetField');
 const AssetTag = require('../models/AssetTag');
 const InspectionVolume = require('../models/InspectionVolume');
 const AssetCsvService = require('../services/AssetCsvService');
+const Customer = require('../models/Customer');
 const csv = require('../utils/csv');
 const multer = require('multer');
 
-const SORT_KEYS = ['category', 'name', 'location', 'ip_address', 'hostname', 'brand', 'serial_number', 'asset_tag', 'purchase_date', 'is_active'];
+const SORT_KEYS = ['category', 'customer', 'name', 'location', 'ip_address', 'hostname', 'brand', 'serial_number', 'asset_tag', 'purchase_date', 'is_active'];
 const PER_PAGE = [50, 100, 200];
 
 // 位置是自由輸入的：多個空白收成一個、去頭尾空白，減少「1F 前台」「1F  前台」被當成兩個位置
@@ -61,6 +63,7 @@ function parseListParams(query) {
     location: str(req.query.location),
     status: ['1', '0'].includes(req.query.status) ? req.query.status : '',
     tag: str(req.query.tag, 40),
+    customer: req.query.customer === 'none' ? 'none' : (/^\d{1,9}$/.test(String(req.query.customer || '')) ? String(req.query.customer) : ''),
     sort: SORT_KEYS.includes(req.query.sort) ? req.query.sort : 'category',
     dir: req.query.dir === 'desc' ? 'desc' : 'asc',
     grouped: req.query.group !== '0',
@@ -97,6 +100,9 @@ router.get('/', requireLogin, (req, res) => {
     categoryLabels: AssetCategory.labelMap(),
     categoryOrder: AssetCategory.findAll().map(c => c.code),
     locations: Asset.locations(),
+    flash: req.query.ok === 'customer' ? `已更新 ${parseInt(req.query.n, 10) || 0} 台設備的客戶。` : null,
+    customerList: Customer.findAll(),
+    unassignedCount: Asset.query({ customer: 'none', per: 10 }).total,
     tagList: AssetTag.inUse(),
     perOptions: PER_PAGE,
     capacityAssets: InspectionVolume.assetIdsWithData(),
@@ -135,6 +141,25 @@ function renderImport(res, extra = {}) {
 }
 
 router.get('/import', requirePermission('assets.manage'), (req, res) => renderImport(res));
+
+// 批次設定客戶：勾選的設備（或「目前篩選條件下的全部」）一次指定到某個客戶；customer_id 空白＝清除
+router.post('/bulk-customer', requirePermission('assets.manage'), (req, res) => {
+  const raw = String(req.body.customer_id || '').trim();
+  const cust = raw ? Customer.findById(Number(raw)) : null;
+  if (raw && (!cust || !cust.is_active)) return res.status(400).render('error', { title: '無法設定客戶', message: '請選擇有效的客戶' });
+  let ids;
+  if (req.body.scope === 'all') {
+    // 目前篩選條件下的全部（上限 5000 台，避免一次動到太多）
+    const filters = { ...parseListParams(req.body), all: true };
+    ids = Asset.query(filters).rows.map(a => a.id).slice(0, 5000);
+  } else {
+    ids = [].concat(req.body.ids || []);
+  }
+  if (ids.length === 0) return res.status(400).render('error', { title: '沒有選取設備', message: '請先勾選要設定客戶的設備' });
+  const n = Customer.assignAssets(ids, cust ? cust.id : null);
+  console.log(`[客戶] ${req.user.username} 將 ${n} 台設備${cust ? `設定為客戶「${cust.name}」` : '改為未指定客戶'}`);
+  res.redirect(`/assets?ok=customer&n=${n}`);
+});
 
 // 上傳（multipart：CSRF token 在網址 ?_csrf=，因為 CSRF 檢查在解析 multipart 之前）→ 解析、規劃、顯示預覽（還沒寫入任何資料）
 router.post('/import', requirePermission('assets.manage'), (req, res, next) => {
@@ -175,8 +200,22 @@ router.get('/new', requirePermission('assets.manage'), (req, res) => {
   res.render('assets/form', formData(null, null));
 });
 
+// 客戶欄位：空白＝未指定；有值必須是存在的客戶，而且是啟用中的（或這台設備本來就屬於它）。
+// 新增設備時，只要系統裡有啟用中的客戶就必須選一個；編輯舊設備可以維持未指定
+function parseCustomer(body, current = null) {
+  const raw = String(body.customer_id == null ? '' : body.customer_id).trim();
+  if (!raw) return { id: null };
+  const c = /^\d+$/.test(raw) ? Customer.findById(Number(raw)) : null;
+  if (!c || (!c.is_active && !(current && Number(current.customer_id) === c.id))) return { error: '請選擇有效的客戶' };
+  return { id: c.id };
+}
+
 router.post('/', requirePermission('assets.manage'), (req, res) => {
   const { name, category, location, notes } = req.body;
+  const cust = parseCustomer(req.body);
+  if (cust.error || (cust.id === null && Customer.count() > 0)) {
+    return res.status(400).render('assets/form', formData(req.body, cust.error || '請選擇這台設備所屬的客戶'));
+  }
 
   if (!name || !AssetCategory.isSelectable(category)) {
     return res.status(400).render('assets/form', formData(req.body, '請輸入資產名稱並選擇有效的類別'));
@@ -188,7 +227,7 @@ router.post('/', requirePermission('assets.manage'), (req, res) => {
   const tags = AssetTag.parse(req.body.tags);
   if (tags.error) return res.status(400).render('assets/form', formData(req.body, tags.error));
 
-  const asset = Asset.create({ name, category, location: cleanLocation(location), notes, ...fields.values, custom: custom.values, tags: tags.tags });
+  const asset = Asset.create({ name, category, customer_id: cust.id, location: cleanLocation(location), notes, ...fields.values, custom: custom.values, tags: tags.tags });
   res.redirect(`/assets/${asset.id}/edit?saved=1`);
 });
 
@@ -227,8 +266,11 @@ router.post('/:id/edit', requirePermission('assets.manage'), (req, res) => {
   const tags = Object.prototype.hasOwnProperty.call(req.body, 'tags') ? AssetTag.parse(req.body.tags) : { tags: undefined, error: null };
   if (tags.error) return res.status(400).render('assets/form', formData({ ...asset, ...req.body, tags_input: req.body.tags, tags: asset.tags }, tags.error));
 
+  const cust = parseCustomer(req.body, asset);
+  if (cust.error) return res.status(400).render('assets/form', formData({ ...asset, ...req.body }, cust.error));
+
   const saved = Asset.update(asset.id, {
-    name, category, location: cleanLocation(location), notes, ...fields.values, custom: custom.values, tags: tags.tags,
+    name, category, customer_id: cust.id, location: cleanLocation(location), notes, ...fields.values, custom: custom.values, tags: tags.tags,
     identifier: assetFields.legacyIdentifier(req.body, asset.identifier),
     is_active: is_active === 'on' || is_active === '1',
   });

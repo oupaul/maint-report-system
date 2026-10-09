@@ -7,7 +7,7 @@
 
 <div class="card" style="max-width: 760px;">
   <% if (error) { %><div class="form-error"><%= error %></div><% } %>
-  <p>設備：<strong><%= assetName %></strong></p>
+  <p>設備：<strong><%= assetName %></strong><% if (typeof customerName !== 'undefined' && customerName) { %> <span class="form-hint">（客戶：<%= customerName %>）</span><% } %></p>
   <p class="form-hint">系統會把這些項目<strong>送出當下</strong>的狀態、數值、備註與截圖（每項最多 3 張）做成一張報價請求，通知業務<%= settings.attach_pdf ? '，Email 另附一份 PDF' : '' %>。之後項目被修改不會影響這張請求。</p>
 
   <form method="POST" action="/quotes/new">

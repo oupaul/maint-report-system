@@ -17,6 +17,8 @@
   巡檢日期：<%= batch.batch_date %>
   ・狀態：<% if (approval.status.tone === 'draft') { %><%= approval.status.text %><% } else { %><span class="status-badge status-badge--<%= approval.status.tone %>"><%= approval.status.text %></span><% } %>
   <% if (batch.notes) { %>・備註：<%= batch.notes %><% } %>
+  <% const custLine = [...new Set(assets.map(a => a.customer_name).filter(Boolean))]; %>
+  <% if (custLine.length) { %><br>涵蓋客戶：<strong><%= custLine.join('、') %></strong><%= assets.some(a => !a.customer_name) ? '（另有設備未指定客戶）' : '' %><% } %>
 </p>
 
 <% if (approval.show) { %>
@@ -95,9 +97,16 @@
 </section>
 <% } %>
 
+<%
+  const hasCust = assets.some(a => a.customer_name);
+  const custNames = [...new Set(assets.map(a => a.customer_name).filter(Boolean))];
+  let lastCust = null;
+%>
 <% assets.forEach(asset => {
   const items = itemsByAssetId.get(asset.id) || [];
+  const custLabel = asset.customer_name || '未指定客戶';
 %>
+  <% if (hasCust && custLabel !== lastCust) { lastCust = custLabel; %><h2 class="customer-heading">客戶：<%= custLabel %></h2><% } %>
   <section class="asset-section">
     <div class="asset-section__header">
       <h2><%= asset.name %></h2>

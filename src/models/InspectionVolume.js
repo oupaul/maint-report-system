@@ -64,13 +64,14 @@ const InspectionVolume = {
   // 全部設備的資料（容量預警與 CSV 匯出用）
   allRows() {
     return db.prepare(
-      `SELECT a.id AS asset_id, a.name AS asset_name, a.category, a.location, a.is_active,
+      `SELECT a.id AS asset_id, a.name AS asset_name, a.category, a.location, a.is_active, a.customer_id, cu.name AS customer_name,
               v.name AS volume, v.used_gb, v.total_gb, b.batch_date AS date, b.id AS batch_id, b.title AS batch_title,
               ii.checklist_item_id, COALESCE(ii.item_label, ci.label) AS item_label, ci.warn_pct, ci.crit_pct
        FROM inspection_item_volumes v
        JOIN inspection_items ii ON ii.id = v.inspection_item_id
        JOIN inspection_batches b ON b.id = ii.batch_id
        JOIN assets a ON a.id = ii.asset_id
+       LEFT JOIN customers cu ON cu.id = a.customer_id
        JOIN checklist_items ci ON ci.id = ii.checklist_item_id
        ORDER BY a.name ASC, b.batch_date ASC, b.id ASC, v.sort_order ASC`
     ).all();
@@ -89,7 +90,7 @@ const InspectionVolume = {
       const volume = r.volume || r.name;
       const key = `${r.asset_id || ''}|${r.checklist_item_id}|${String(volume).toLowerCase()}`;
       if (!map.has(key)) {
-        map.set(key, { asset_id: r.asset_id, asset_name: r.asset_name, category: r.category, location: r.location, is_active: r.is_active,
+        map.set(key, { asset_id: r.asset_id, asset_name: r.asset_name, category: r.category, location: r.location, is_active: r.is_active, customer_id: r.customer_id, customer_name: r.customer_name,
           item_id: r.checklist_item_id, item_label: r.item_label, volume, warn_pct: r.warn_pct || 85, crit_pct: r.crit_pct || 95, points: [] });
       }
       const s = map.get(key);

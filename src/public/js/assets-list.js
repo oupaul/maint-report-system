@@ -20,3 +20,24 @@
     });
   }
 })();
+
+// 批次設定客戶：勾選設備、更新「套用到已選的 N 台」按鈕
+(function () {
+  const bar = document.getElementById('bulk-bar');
+  if (!bar) return;
+  const boxes = Array.prototype.slice.call(document.querySelectorAll('.row-check'));
+  const all = document.getElementById('select-all');
+  const apply = document.getElementById('bulk-apply');
+  const count = document.getElementById('bulk-count');
+  const scopeAll = document.getElementById('bulk-all');
+  function refresh() {
+    const n = boxes.filter(function (b) { return b.checked; }).length;
+    count.textContent = n;
+    apply.disabled = !(n > 0 || scopeAll.checked);
+    if (all) all.checked = boxes.length > 0 && n === boxes.length;
+  }
+  boxes.forEach(function (b) { b.addEventListener('change', refresh); });
+  if (all) all.addEventListener('change', function () { boxes.forEach(function (b) { b.checked = all.checked; }); refresh(); });
+  scopeAll.addEventListener('change', refresh);
+  refresh();
+})();

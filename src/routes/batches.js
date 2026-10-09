@@ -14,6 +14,7 @@ const sharp = require('sharp');
 const User = require('../models/User');
 const ChecklistItem = require('../models/ChecklistItem');
 const InspectionVolume = require('../models/InspectionVolume');
+const Customer = require('../models/Customer');
 const capacity = require('../utils/capacity');
 const db = require('../models/db');
 const Asset = require('../models/Asset');
@@ -102,8 +103,16 @@ async function rowPayload(req, res, batch, asset, checklistItem, item) {
 const rowAnchor = (assetId, checklistItemId) => `#row-a${assetId}-c${checklistItemId}`;
 
 router.get('/', requireLogin, (req, res) => {
-  const batches = InspectionBatch.findAll().map(b => ({ ...b, statusInfo: ApprovalService.statusInfo(b), locked: ApprovalService.isLocked(b) }));
-  res.render('batches/list', { batches });
+  const summary = InspectionBatch.customerSummary();
+  const filter = req.query.customer === 'none' ? 'none' : (/^\d{1,9}$/.test(String(req.query.customer || '')) ? Number(req.query.customer) : '');
+  let batches = InspectionBatch.findAll().map(b => ({
+    ...b, statusInfo: ApprovalService.statusInfo(b), locked: ApprovalService.isLocked(b),
+    cust: summary.get(b.id) || { customers: [], unassigned: 0, total: 0 },
+  }));
+  // 依客戶篩選：批次只要有一台設備屬於那個客戶就算（「未指定」＝有設備還沒指定客戶）
+  if (filter === 'none') batches = batches.filter(b => b.cust.unassigned > 0);
+  else if (filter) batches = batches.filter(b => b.cust.customers.some(c => c.id === filter));
+  res.render('batches/list', { batches, customerList: Customer.findAll(), filter: String(filter) });
 });
 
 // 「帶入某次巡檢的設備」用：最近 20 個批次與各自的設備 id（例行巡檢大多是同一批設備）
@@ -116,6 +125,35 @@ function recentBatchesForPicker() {
   })).filter(b => b.assets.length > 0);
 }
 
+// 快速新增的設備（建立批次、填寫頁「新增設備到本次巡檢」共用）：每一列有名稱、類別、客戶、位置。
+// 系統裡有啟用中的客戶時，每台新設備都要選客戶（批次可以涵蓋多家客戶，所以是每列各自選）。
+// 先全部驗證、都沒問題才建立，不會出現「建了一半、其他列出錯」的設備。回傳 { rows, error }
+function parseQuickAssets(body) {
+  const arr = (v) => (v === undefined ? [] : (Array.isArray(v) ? v : [v]));
+  const names = arr(body.new_asset_name);
+  const categories = arr(body.new_asset_category);
+  const locations = arr(body.new_asset_location);
+  const customers = arr(body.new_asset_customer);
+  const needCustomer = Customer.count() > 0;
+  const rows = [];
+  for (let i = 0; i < names.length; i++) {
+    const name = (names[i] || '').trim();
+    const category = categories[i];
+    if (!name || !AssetCategory.isSelectable(category)) continue; // 空白列直接跳過，不當成錯誤
+    let customerId = null;
+    const raw = String(customers[i] || '').trim();
+    if (raw) {
+      const c = /^\d+$/.test(raw) ? Customer.findById(Number(raw)) : null;
+      if (!c || !c.is_active) return { rows, error: `新設備「${name}」的客戶無效，請重新選擇` };
+      customerId = c.id;
+    } else if (needCustomer) {
+      return { rows, error: `請為新設備「${name}」選擇所屬客戶` };
+    }
+    rows.push({ name, category, customer_id: customerId, location: (locations[i] || '').trim() });
+  }
+  return { rows, error: null };
+}
+
 router.get('/new', requireLogin, (req, res) => {
   const assets = Asset.findAll();
   res.render('batches/new', {
@@ -124,6 +162,7 @@ router.get('/new', requireLogin, (req, res) => {
     assets,
     categories: AssetCategory.selectableCodes(),
     categoryLabels: AssetCategory.labelMap(),
+    customers: Customer.selectable(),
     error: null,
     formValues: null,
   });
@@ -138,25 +177,9 @@ router.post('/new', requireLogin, (req, res) => {
   if (!Array.isArray(assetIds)) assetIds = [assetIds];
   assetIds = assetIds.filter(Boolean).map(id => parseInt(id, 10));
 
-  let newNames = req.body.new_asset_name || [];
-  let newCategories = req.body.new_asset_category || [];
-  let newLocations = req.body.new_asset_location || [];
-  if (!Array.isArray(newNames)) newNames = [newNames];
-  if (!Array.isArray(newCategories)) newCategories = [newCategories];
-  if (!Array.isArray(newLocations)) newLocations = [newLocations];
+  const quick = parseQuickAssets(req.body);
 
-  const createdAssetIds = [];
-  for (let i = 0; i < newNames.length; i++) {
-    const name = (newNames[i] || '').trim();
-    const category = newCategories[i];
-    if (!name || !AssetCategory.isSelectable(category)) continue; // 空白列直接跳過，不當成錯誤
-    const asset = Asset.create({ name, category, location: (newLocations[i] || '').trim() });
-    createdAssetIds.push(asset.id);
-  }
-
-  const allAssetIds = [...assetIds, ...createdAssetIds];
-
-  if (!title || !batch_date || allAssetIds.length === 0) {
+  if (quick.error || !title || !batch_date || assetIds.length + quick.rows.length === 0) {
     const assets = Asset.findAll();
     return res.status(400).render('batches/new', {
       pickerBatches: recentBatchesForPicker(),
@@ -164,10 +187,14 @@ router.post('/new', requireLogin, (req, res) => {
       assets,
       categories: AssetCategory.selectableCodes(),
       categoryLabels: AssetCategory.labelMap(),
-      error: '請輸入標題、日期，並至少新增或勾選一項設備',
+      customers: Customer.selectable(),
+      error: quick.error || '請輸入標題、日期，並至少新增或勾選一項設備',
       formValues: req.body,
     });
   }
+
+  // 驗證都通過才建立新設備（標題或客戶填錯時不會留下半途建立的設備）
+  const allAssetIds = [...assetIds, ...quick.rows.map(r => Asset.create(r).id)];
 
   const batch = InspectionBatch.create({
     title,
@@ -232,6 +259,7 @@ router.get('/:id/entry', requireLogin, (req, res) => {
     availableAssets: data.availableAssets,
     categories: AssetCategory.selectableCodes(),
     categoryLabels: AssetCategory.labelMap(),
+    customers: Customer.selectable(),
     statuses: ITEM_STATUSES,
     statusColors,
     addAssetError: null,
@@ -253,25 +281,9 @@ router.post('/:id/assets', requireLogin, (req, res) => {
   if (!Array.isArray(assetIds)) assetIds = [assetIds];
   assetIds = assetIds.filter(Boolean).map(id => parseInt(id, 10));
 
-  let newNames = req.body.new_asset_name || [];
-  let newCategories = req.body.new_asset_category || [];
-  let newLocations = req.body.new_asset_location || [];
-  if (!Array.isArray(newNames)) newNames = [newNames];
-  if (!Array.isArray(newCategories)) newCategories = [newCategories];
-  if (!Array.isArray(newLocations)) newLocations = [newLocations];
-
-  const createdAssetIds = [];
-  for (let i = 0; i < newNames.length; i++) {
-    const name = (newNames[i] || '').trim();
-    const category = newCategories[i];
-    if (!name || !AssetCategory.isSelectable(category)) continue;
-    const asset = Asset.create({ name, category, location: (newLocations[i] || '').trim() });
-    createdAssetIds.push(asset.id);
-  }
-
-  const allAssetIds = [...assetIds, ...createdAssetIds];
-
-  if (allAssetIds.length === 0) {
+  const quick = parseQuickAssets(req.body);
+  const emptyError = quick.error || (assetIds.length + quick.rows.length === 0 ? '請至少新增或勾選一項設備' : null);
+  if (emptyError) {
     const data = buildEntryData(batch.id);
     return res.status(400).render('batches/entry', {
       batch: data.batch,
@@ -279,11 +291,13 @@ router.post('/:id/assets', requireLogin, (req, res) => {
       availableAssets: data.availableAssets,
       categories: AssetCategory.selectableCodes(),
       categoryLabels: AssetCategory.labelMap(),
+      customers: Customer.selectable(),
       statuses: ITEM_STATUSES,
       statusColors,
-      addAssetError: '請至少新增或勾選一項設備',
+      addAssetError: emptyError,
     });
   }
+  const allAssetIds = [...assetIds, ...quick.rows.map(r => Asset.create(r).id)];
 
   for (const assetId of allAssetIds) {
     InspectionBatch.addAsset(batch.id, assetId);

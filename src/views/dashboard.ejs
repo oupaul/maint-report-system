@@ -61,7 +61,7 @@
           <% issues.top.forEach(r => { %>
             <tr>
               <td><span class="status-badge status-badge--<%= r.status %>"><%= r.status === 'critical' ? '異常' : '警告' %></span></td>
-              <td><%= r.asset_name %></td>
+              <td><%= r.asset_name %><% if (r.customer_name) { %><br><small class="form-hint"><%= r.customer_name %></small><% } %></td>
               <td><a href="/batches/<%= r.batch_id %>#item-<%= r.item_id %>"><%= r.label %></a></td>
               <td><small><%= (r.display || r.note || '-').split('\n')[0] %></small></td>
               <td><small><%= r.batch_date %></small></td>
@@ -83,7 +83,7 @@
         <tbody>
           <% capacityAlerts.forEach(s => { const p = s.last.pct; const lvl = p >= s.crit_pct ? 'critical' : (p >= s.warn_pct ? 'warning' : 'normal'); %>
             <tr>
-              <td><a href="/capacity/assets/<%= s.asset_id %>"><%= s.asset_name %></a></td>
+              <td><a href="/capacity/assets/<%= s.asset_id %>"><%= s.asset_name %></a><% if (s.customer_name) { %><br><small class="form-hint"><%= s.customer_name %></small><% } %></td>
               <td><%= s.volume %></td>
               <td><span class="cap-pct cap-pct--<%= lvl %>"><%= (Math.round(p * 10) / 10).toFixed(1) %>%</span></td>
               <td><small><%= s.text %></small></td>

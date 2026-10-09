@@ -16,6 +16,13 @@
       <option value="">全部類別</option>
       <% categoryCodes.forEach(c => { %><option value="<%= c %>" <%= f.category === c ? 'selected' : '' %>><%= categoryLabels[c] || c %></option><% }) %>
     </select>
+    <% if (customerOptions.length > 0) { %>
+      <select class="form-select" name="customer" aria-label="依客戶篩選">
+        <option value="">全部客戶</option>
+        <% customerOptions.forEach(c => { %><option value="<%= c.id %>" <%= f.customer === String(c.id) ? 'selected' : '' %>><%= c.name %></option><% }) %>
+        <% if (hasUnassigned) { %><option value="none" <%= f.customer === 'none' ? 'selected' : '' %>>未指定客戶</option><% } %>
+      </select>
+    <% } %>
     <select class="form-select" name="location" aria-label="依位置篩選">
       <option value="">全部位置</option>
       <% locations.forEach(l => { %><option value="<%= l %>" <%= f.location === l ? 'selected' : '' %>><%= l %></option><% }) %>
@@ -82,7 +89,7 @@
                 <span class="status-badge status-badge--<%= r.status %>"><%= r.status === 'critical' ? '異常' : '警告' %></span><br>
                 <small class="form-hint"><%= r.streak >= 2 ? `連續 ${r.streak} 次` : '首次' %></small>
               </td>
-              <td><strong><%= r.asset_name %></strong><br><small class="form-hint"><%= categoryLabels[r.category] || r.category %><%= r.location ? '・' + r.location : '' %></small></td>
+              <td><strong><%= r.asset_name %></strong><br><small class="form-hint"><%= [r.customer_name, categoryLabels[r.category] || r.category, r.location].filter(Boolean).join('・') %></small></td>
               <td>
                 <a href="/batches/<%= r.batch_id %>#item-<%= r.item_id %>"><strong><%= r.label %></strong></a>
                 <div class="issue-actions">

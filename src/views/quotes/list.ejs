@@ -46,7 +46,7 @@
           <% rows.forEach(r => { %>
             <tr>
               <td><a href="/quotes/<%= r.id %>"><strong>Q-<%= r.id %></strong></a><% if (r.urgency === 'urgent') { %><br><span class="status-badge status-badge--critical">緊急</span><% } %></td>
-              <td><a href="/quotes/<%= r.id %>"><%= r.asset.name %></a><br><small class="form-hint"><%= r.asset.location %></small></td>
+              <td><a href="/quotes/<%= r.id %>"><%= r.asset.name %></a><br><small class="form-hint"><%= [r.asset.customerName, r.asset.location].filter(Boolean).join('・') %></small></td>
               <td><small><%= r.item_labels %></small></td>
               <td><span class="status-badge <%= tone[r.status] ? 'status-badge--' + tone[r.status] : '' %>"><%= STATUS[r.status] %></span></td>
               <td><%= r.requested_by_name %><br><small class="form-hint"><%= (r.sent_at || r.requested_at).slice(0, 16) %></small></td>

@@ -45,6 +45,14 @@
       <% } %>
     </div>
     <div class="form-group">
+      <label class="form-label" for="customer_id">客戶</label>
+      <select class="form-select" id="customer_id" name="customer_id" <%= !(asset && asset.id) && customers.length > 0 ? 'required' : '' %>>
+        <option value=""><%= asset && asset.id ? '（未指定客戶）' : '請選擇客戶' %></option>
+        <% customers.forEach(c => { %><option value="<%= c.id %>" <%= asset && Number(asset.customer_id) === c.id ? 'selected' : '' %>><%= c.name %></option><% }) %>
+      </select>
+      <p class="form-hint">這台設備屬於哪一家客戶。巡檢批次可以同時涵蓋多家客戶的設備，報告與清單都會標示每台設備的客戶。<% if (can('assets.manage')) { %>客戶清單在「系統管理 → 客戶」維護。<% } %></p>
+    </div>
+    <div class="form-group">
       <label class="form-label" for="location">位置</label>
       <input class="form-input" type="text" id="location" name="location" maxlength="100" list="location-list" autocomplete="off" value="<%= asset ? (asset.location || '') : '' %>">
       <datalist id="location-list">

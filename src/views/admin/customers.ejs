@@ -1,0 +1,71 @@
+<%- include('../layout', { title: '客戶' }) %>
+
+<div class="page-header">
+  <h1>客戶</h1>
+  <div class="page-actions"><a href="/assets" class="btn btn--secondary btn--md">資產管理</a></div>
+</div>
+
+<% if (ok) { %><div class="form-success"><%= ok %></div><% } %>
+<% if (error) { %><div class="form-error"><%= error %></div><% } %>
+
+<div class="card">
+  <p class="form-hint">每台設備歸屬一家客戶；<strong>巡檢批次可以同時涵蓋多家客戶的設備</strong>，批次裡看到的客戶就是它涵蓋的設備所屬的客戶。<strong>有設備的客戶只能停用、不能刪除</strong>（停用後新增設備不會再列出，既有設備與報告照常顯示）。位置維持是設備自己的欄位，可以當作客戶底下的據點。既有設備要補客戶：到「資產管理」勾選後「批次設定客戶」，或用 CSV 匯入加「客戶」欄。</p>
+  <% if (customers.length === 0) { %>
+    <div class="empty-state">還沒有客戶，請在下方新增。</div>
+  <% } else { %>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>客戶</th><th>簡稱／代碼</th><th>設備數</th><th>備註</th><th>狀態</th><th></th></tr></thead>
+        <tbody>
+          <% customers.forEach(c => { %>
+            <tr>
+              <td><strong><%= c.name %></strong></td>
+              <td><%= c.code || '-' %></td>
+              <td><a href="/assets?customer=<%= c.id %>"><%= c.asset_count %></a></td>
+              <td><small class="form-hint"><%= c.notes || '' %></small></td>
+              <td><% if (c.is_active) { %><span class="status-badge status-badge--normal">啟用中</span><% } else { %><span class="status-badge status-badge--warning">已停用</span><% } %></td>
+              <td>
+                <div class="page-actions">
+                  <a class="btn btn--secondary btn--sm" href="/admin/customers?edit=<%= c.id %>">編輯</a>
+                  <form method="POST" action="/admin/customers/<%= c.id %>/toggle" <% if (c.is_active) { %>data-confirm="停用「<%= c.name %>」後，新增設備時不會再列出這個客戶（既有設備與報告不受影響）。確定要停用嗎？"<% } %>>
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button type="submit" class="btn btn--secondary btn--sm"><%= c.is_active ? '停用' : '啟用' %></button>
+                  </form>
+                  <% if (c.asset_count === 0) { %>
+                    <form method="POST" action="/admin/customers/<%= c.id %>/delete" data-confirm="確定要刪除客戶「<%= c.name %>」嗎？它底下沒有任何設備，刪除後無法復原。">
+                      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                      <button type="submit" class="btn btn--secondary btn--sm">刪除</button>
+                    </form>
+                  <% } %>
+                </div>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>
+
+<div class="card" style="max-width: 640px;">
+  <h2><%= editId ? '編輯客戶' : '新增客戶' %></h2>
+  <form method="POST" action="<%= editId ? '/admin/customers/' + editId : '/admin/customers' %>">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <div class="form-group">
+      <label class="form-label" for="name">客戶名稱</label>
+      <input class="form-input" type="text" id="name" name="name" maxlength="<%= max.name %>" value="<%= form.name %>" required placeholder="例如：A 公司">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="code">簡稱／代碼（選填）</label>
+      <input class="form-input" type="text" id="code" name="code" maxlength="<%= max.code %>" value="<%= form.code %>" style="max-width: 12rem;">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="notes">備註（選填）</label>
+      <textarea class="form-textarea" id="notes" name="notes" rows="2" maxlength="<%= max.notes %>"><%= form.notes %></textarea>
+    </div>
+    <button type="submit" class="btn btn--primary btn--md"><%= editId ? '儲存' : '新增客戶' %></button>
+    <% if (editId) { %><a href="/admin/customers" class="btn btn--secondary btn--md">取消</a><% } %>
+  </form>
+</div>
+
+<%- include('../partials/footer') %>

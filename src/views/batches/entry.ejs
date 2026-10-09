@@ -35,9 +35,18 @@
   </div>
 <% } %>
 
-<p class="form-hint">巡檢日期：<%= batch.batch_date %><% if (batch.status === 'completed') { %> ・ <strong style="color: var(--color-status-normal);">已完成</strong><% } %></p>
+<p class="form-hint">巡檢日期：<%= batch.batch_date %><% const custTop = [...new Set(assetSections.map(s => s.asset.customer_name).filter(Boolean))]; if (custTop.length) { %> ・ 涵蓋客戶：<strong><%= custTop.join('、') %></strong><%= assetSections.some(s => !s.asset.customer_name) ? '（另有設備未指定客戶）' : '' %><% } %><% if (batch.status === 'completed') { %> ・ <strong style="color: var(--color-status-normal);">已完成</strong><% } %></p>
 
-<% assetSections.forEach(section => { %>
+<%
+  // 批次可以涵蓋多家客戶：設備依客戶排在一起，客戶換了就插一個標題（只有批次裡有設備指定了客戶才顯示）
+  const hasCust = assetSections.some(s => s.asset.customer_name);
+  const custNames = [...new Set(assetSections.map(s => s.asset.customer_name).filter(Boolean))];
+  let lastCust = null;
+%>
+<% assetSections.forEach(section => {
+  const custLabel = section.asset.customer_name || '未指定客戶';
+%>
+  <% if (hasCust && custLabel !== lastCust) { lastCust = custLabel; %><h2 class="customer-heading">客戶：<%= custLabel %></h2><% } %>
   <section class="asset-section">
     <div class="asset-section__header">
       <h2><%= section.asset.name %></h2>
@@ -120,6 +129,10 @@
             <% categories.forEach(c => { %>
               <option value="<%= c %>"><%= categoryLabels[c] %></option>
             <% }) %>
+          </select>
+          <select class="form-select" name="new_asset_customer" aria-label="客戶" <%= customers.length > 0 ? 'required' : '' %>>
+            <option value=""><%= customers.length > 0 ? '客戶…' : '（尚未建立客戶）' %></option>
+            <% customers.forEach(c => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %>
           </select>
           <input class="form-input" type="text" name="new_asset_location" placeholder="位置（選填）">
         </div>

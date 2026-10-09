@@ -63,8 +63,9 @@ function newPageData(user, firstItemId, selected) {
   const open = OpenIssues.loadAll().filter(r => r.asset_id === row.asset_id);
   const clicked = db.prepare(
     `SELECT ii.id AS item_id, ii.status, ii.asset_id, ii.checklist_item_id, COALESCE(ii.item_label, ci.label) AS label, ii.value_text, ii.note,
-            b.id AS batch_id, b.title AS batch_title, b.batch_date, a.name AS asset_name
+            b.id AS batch_id, b.title AS batch_title, b.batch_date, a.name AS asset_name, cu.name AS customer_name
      FROM inspection_items ii JOIN checklist_items ci ON ci.id = ii.checklist_item_id JOIN inspection_batches b ON b.id = ii.batch_id JOIN assets a ON a.id = ii.asset_id
+     LEFT JOIN customers cu ON cu.id = a.customer_id
      WHERE ii.id = ?`
   ).get(firstItemId);
   const list = [clicked, ...open.filter(r => r.item_id !== firstItemId && r.checklist_item_id !== clicked.checklist_item_id)];
@@ -82,7 +83,7 @@ function newPageData(user, firstItemId, selected) {
     c.triageLink = `/issues/triage?item=${c.id}`;
   });
   const picked = (selected && selected.length ? selected : [firstItemId]);
-  return { assetName: clicked.asset_name, candidates, picked: new Set(picked), firstItemId };
+  return { assetName: clicked.asset_name, customerName: clicked.customer_name || '', candidates, picked: new Set(picked), firstItemId };
 }
 
 function renderNew(req, res, firstItemId, { error = null, selected = null, urgency = 'normal', description = '', status = 200 } = {}) {

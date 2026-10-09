@@ -12,6 +12,7 @@ const Asset = require('../models/Asset');
 const AssetCategory = require('../models/AssetCategory');
 const AssetField = require('../models/AssetField');
 const AssetTag = require('../models/AssetTag');
+const Customer = require('../models/Customer');
 const assetFields = require('../utils/assetFields');
 const csv = require('../utils/csv');
 
@@ -24,6 +25,7 @@ const PENDING_TTL_MS = 30 * 60 * 1000;
 const FIXED = [
   { key: 'id', label: '資產ID', aliases: ['id', 'asset_id', 'assetid'] },
   { key: 'name', label: '資產名稱', aliases: ['名稱', 'name', 'assetname'] },
+  { key: 'customer', label: '客戶', aliases: ['customer', '客戶名稱', 'customername'] },
   { key: 'category', label: '類別', aliases: ['類型', 'category', 'type'] },
   { key: 'location', label: '位置', aliases: ['location'] },
   { key: 'tags', label: '標籤', aliases: ['tags', 'tag'] },
@@ -64,7 +66,7 @@ function exportCsv(assets) {
   const rows = [headerRow()];
   for (const a of assets) {
     rows.push([
-      a.id, a.name, labels[a.category] || a.category, a.location || '', (a.tags || []).join(', '),
+      a.id, a.name, a.customer_name || '', labels[a.category] || a.category, a.location || '', (a.tags || []).join(', '),
       a.ip_address || '', a.mac_address || '', a.hostname || '', a.serial_number || '', a.asset_tag || '',
       a.brand || '', a.model || '', a.purchase_date || '', a.notes || '', a.is_active ? '啟用' : '停用',
       ...defs.map(d => {
@@ -138,6 +140,8 @@ function plan(table) {
   });
   const dupIndex = assetFields.buildDuplicateIndex(allAssets);
   const seenNames = new Set();
+  const customersByName = new Map(Customer.findAll().map(c => [c.name.toLowerCase(), c]));
+  const hasCustomers = Customer.count() > 0;
   const labels = AssetCategory.labelMap();
 
   for (const { cells, line } of dataRows) {
@@ -197,6 +201,34 @@ function plan(table) {
     const notesCell = cell('notes');
     const notes = notesCell !== undefined ? notesCell : (current ? (current.notes || '') : '');
     if (notes.length > MAX_NOTES) fail(`備註太長了（最多 ${MAX_NOTES} 個字）`);
+
+    // 客戶：欄位存在且空白＝清除；有名稱＝對應既有客戶，沒有就在確認匯入時自動建立；欄位不存在＝不動
+    let customerId; // undefined＝不動、null＝清除
+    let customerName;
+    const customerCell = cell('customer');
+    if (customerCell !== undefined) {
+      if (customerCell === '') {
+        customerId = null;
+        customerName = '';
+        if (mode === 'create' && hasCustomers) row.warnings.push('沒有指定客戶（會是「未指定客戶」，之後可以在資產管理批次設定）');
+      } else {
+        const name = String(customerCell).replace(/\s+/g, ' ').trim();
+        const existing = customersByName.get(name.toLowerCase());
+        if (existing) {
+          if (!existing.is_active && !(current && current.customer_id === existing.id)) fail(`客戶「${existing.name}」已停用`);
+          customerId = existing.id;
+          customerName = existing.name;
+        } else {
+          const cv = Customer.validate({ name }, -1);
+          if (cv.error && !/同名/.test(cv.error)) fail(cv.error);
+          customerId = null;
+          customerName = name;
+          row.newCustomer = name;
+        }
+      }
+    } else if (mode === 'create' && hasCustomers) {
+      row.warnings.push('沒有指定客戶（會是「未指定客戶」，之後可以在資產管理批次設定）');
+    }
 
     // 標籤
     let tags;
@@ -259,6 +291,7 @@ function plan(table) {
         }
       };
       diff('資產名稱', current.name, name);
+      if (customerName !== undefined) diff('客戶', current.customer_name, customerName);
       diff('類別', labels[current.category] || current.category, labels[category] || category);
       diff('位置', current.location, location);
       diff('備註', current.notes, notes);
@@ -275,13 +308,17 @@ function plan(table) {
       row.action = 'create';
     }
     row.apply = {
-      mode, id: current ? current.id : null, name, category, location, notes, values: fields.values, tags, custom,
+      mode, id: current ? current.id : null, name, category, location, notes, values: fields.values, tags, custom, customerId, newCustomer: row.newCustomer || null,
       is_active: isActive, identifier: current ? current.identifier : null, currentActive: current ? !!current.is_active : true,
     };
     if (row.warnings.length) result.summary.warnings += row.warnings.length;
   }
 
   for (const r of result.rows) result.summary[r.action === 'error' ? 'error' : r.action]++;
+  // 只有「會被寫入的列」用到的新客戶才需要建立
+  const needed = new Map();
+  for (const r of result.rows) if ((r.action === 'create' || r.action === 'update') && r.apply && r.apply.newCustomer) needed.set(r.apply.newCustomer.toLowerCase(), r.apply.newCustomer);
+  result.newCustomers = [...needed.values()];
   return result;
 }
 
@@ -290,16 +327,24 @@ function plan(table) {
 function apply(planResult) {
   const out = { created: 0, updated: 0 };
   db.transaction(() => {
+    // 先建立檔案裡新出現的客戶
+    const made = new Map();
+    for (const name of planResult.newCustomers || []) {
+      const existing = Customer.findByName(name);
+      made.set(name.toLowerCase(), existing ? existing.id : Customer.create({ name, code: null, notes: null }).id);
+    }
+    out.customersCreated = made.size;
     for (const row of planResult.rows) {
       if (row.action !== 'create' && row.action !== 'update') continue;
       const a = row.apply;
+      if (a.newCustomer) a.customerId = made.get(a.newCustomer.toLowerCase());
       if (a.mode === 'create') {
-        const asset = Asset.create({ name: a.name, category: a.category, location: a.location, notes: a.notes, ...a.values, custom: a.custom, tags: a.tags });
+        const asset = Asset.create({ name: a.name, category: a.category, customer_id: a.customerId || null, location: a.location, notes: a.notes, ...a.values, custom: a.custom, tags: a.tags });
         if (a.is_active === false) Asset.setActive(asset.id, false);
         out.created++;
       } else {
         Asset.update(a.id, {
-          name: a.name, category: a.category, location: a.location, notes: a.notes, ...a.values,
+          name: a.name, category: a.category, customer_id: a.customerId, location: a.location, notes: a.notes, ...a.values,
           identifier: a.identifier, is_active: a.is_active !== undefined ? a.is_active : a.currentActive,
           custom: a.custom, tags: a.tags,
         });

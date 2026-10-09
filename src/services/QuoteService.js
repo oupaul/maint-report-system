@@ -217,7 +217,7 @@ function capacityExtra(assetId, volumes) {
 
 function assetSnapshot(asset) {
   return JSON.stringify({
-    name: asset.name, categoryLabel: AssetCategory.labelMap()[asset.category] || asset.category, location: asset.location || '',
+    name: asset.name, customerName: asset.customer_name || '', categoryLabel: AssetCategory.labelMap()[asset.category] || asset.category, location: asset.location || '',
     hostname: asset.hostname || '', brand: asset.brand || '', model: asset.model || '', serial_number: asset.serial_number || '',
     purchase_date: asset.purchase_date || '', ip_address: asset.ip_address || '', mac_address: asset.mac_address || '',
     custom: (asset.customDisplay || []).map(c => ({ label: c.label, text: c.text })),
@@ -305,7 +305,7 @@ function create(user, { itemIds, urgency, description }) {
   if (status === 'pending_confirm') {
     const targets = admins(user.id);
     notify(targets, request, {
-      type: 'quote_confirm', title: `待確認報價請求 Q-${requestId}：${asset.name}`,
+      type: 'quote_confirm', title: `待確認報價請求 Q-${requestId}：${asset.customer_name ? `【${asset.customer_name}】` : ''}${asset.name}`,
       message: `${label(user)} 想通知業務為「${asset.name}」報價（${rows.map(r => r.label).join('、')}），需要你確認後才會送出。`,
     });
   } else {
@@ -336,7 +336,8 @@ function notifySales(request, kind) {
     : salesRecipients(request.requested_by);
   const detail = getDetail(request.id);
   const reminder = kind !== 'new';
-  const title = `${reminder ? '【提醒】' : ''}${request.urgency === 'urgent' ? '【緊急】' : ''}報價請求 Q-${request.id}：${detail.asset.name}`;
+  const cust = detail.asset.customerName ? `【${detail.asset.customerName}】` : '';
+  const title = `${reminder ? '【提醒】' : ''}${request.urgency === 'urgent' ? '【緊急】' : ''}報價請求 Q-${request.id}：${cust}${detail.asset.name}`;
   const message = `${request.requested_by_name} 通知業務為「${detail.asset.name}」報價（${detail.items.map(i => i.label).join('、')}）${reminder ? '，這張請求還在等你處理。' : '。'}請登入系統查看並處理。`;
   const notifMap = new Map();
   for (const u of users) {

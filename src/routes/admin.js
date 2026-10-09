@@ -20,6 +20,8 @@ router.use((req, res, next) => {
 
 // 設備類型與檢查項目：管理員，或所屬權限群組有「管理設備類型」權限的人
 router.use('/categories', requirePermission('categories.manage'), require('./adminCategories'));
+// 客戶主檔：「管理資產建檔」權限（設備歸屬客戶是資產建檔的一部分）
+router.use('/customers', requirePermission('assets.manage'), require('./adminCustomers'));
 // 自訂資產欄位：同樣是「管理設備類型」權限
 router.use('/fields', requirePermission('categories.manage'), require('./adminFields'));
 

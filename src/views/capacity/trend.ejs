@@ -1,7 +1,7 @@
 <%- include('../layout', { title: '容量趨勢：' + asset.name }) %>
 
 <div class="page-header">
-  <h1>容量趨勢：<%= asset.name %></h1>
+  <h1>容量趨勢：<%= asset.name %><% if (asset.customer_name) { %> <small class="form-hint">（<%= asset.customer_name %>）</small><% } %></h1>
   <div class="page-actions">
     <a href="/capacity" class="btn btn--secondary btn--md">容量預警</a>
     <a href="/capacity/export.csv" class="btn btn--secondary btn--md">匯出 CSV</a>

@@ -395,6 +395,9 @@ async function generateBatchReport({ batch, assets, itemsByAssetId, signaturesBy
   doc.font(fonts.regular).fontSize(10).fillColor('#64748B');
   doc.text(`巡檢日期：${dayjs(batch.batch_date).format('YYYY-MM-DD')}`);
   doc.text(`報告產生時間：${dayjs(nowTaipei()).format('YYYY-MM-DD HH:mm')}`);
+  // 批次可以涵蓋多家客戶：封面列出客戶，每台設備那一頁也標示所屬客戶
+  const customerNames = [...new Set(assets.map(a => a.customer_name).filter(Boolean))];
+  if (customerNames.length) doc.text(`客戶：${customerNames.join('、')}${assets.some(a => !a.customer_name) ? '（另有設備未指定客戶）' : ''}`);
   if (batch.notes) {
     doc.text(`備註：${batch.notes}`);
   }
@@ -415,6 +418,7 @@ async function generateBatchReport({ batch, assets, itemsByAssetId, signaturesBy
     doc.text(`${asset.name}`, doc.page.margins.left, doc.y);
     doc.font(fonts.regular).fontSize(9).fillColor('#64748B');
     doc.text(
+      (asset.customer_name ? `客戶：${asset.customer_name}　` : '') +
       `類別：${categoryLabels[asset.category] || asset.category}` +
       (asset.location ? `　位置：${asset.location}` : '') +
       (asset.hostname ? `　主機名稱：${asset.hostname}` : '') +

@@ -44,11 +44,12 @@ const OpenIssues = {
                 ROW_NUMBER() OVER (PARTITION BY ii.asset_id, ii.checklist_item_id ORDER BY b.batch_date DESC, b.id DESC) AS rn
          FROM inspection_items ii JOIN inspection_batches b ON b.id = ii.batch_id
        )
-       SELECT r.id AS item_id, r.status, r.asset_id, a.name AS asset_name, a.category, a.location,
+       SELECT r.id AS item_id, r.status, r.asset_id, a.name AS asset_name, a.category, a.location, a.customer_id, cu.name AS customer_name,
               r.checklist_item_id, COALESCE(r.item_label, ci.label) AS label, r.value_text, r.note,
               r.batch_id, r.batch_title, r.batch_date, r.batch_status, r.approval_status
        FROM ranked r
        JOIN assets a ON a.id = r.asset_id AND a.is_active = 1
+       LEFT JOIN customers cu ON cu.id = a.customer_id
        JOIN checklist_items ci ON ci.id = r.checklist_item_id
        WHERE r.rn = 1 AND r.status IN ('warning', 'critical')
        ORDER BY CASE r.status WHEN 'critical' THEN 0 ELSE 1 END, r.batch_date DESC, a.name ASC`
@@ -119,6 +120,7 @@ const OpenIssues = {
       (!f.severity || r.status === f.severity) &&
       (!f.category || r.category === f.category) &&
       (!f.location || r.location === f.location) &&
+      (!f.customer || (f.customer === 'none' ? !r.customer_id : String(r.customer_id) === String(f.customer))) &&
       (!f.tag || r.tags.includes(f.tag)) &&
       (!f.label || r.label === f.label) &&
       (!f.batch || r.batch_id === f.batch) &&

@@ -38,13 +38,32 @@ const InspectionBatch = {
     ).run(batchId, assetId);
   },
 
+  // 每個批次涵蓋哪些客戶（由設備決定）：Map(batchId → { customers: [{id,name}], unassigned: 未指定客戶的設備數, total })
+  customerSummary() {
+    const rows = db.prepare(
+      `SELECT ba.batch_id, a.customer_id, cu.name, COUNT(*) AS n
+       FROM inspection_batch_assets ba JOIN assets a ON a.id = ba.asset_id LEFT JOIN customers cu ON cu.id = a.customer_id
+       GROUP BY ba.batch_id, a.customer_id ORDER BY cu.name COLLATE NOCASE ASC`
+    ).all();
+    const map = new Map();
+    for (const r of rows) {
+      if (!map.has(r.batch_id)) map.set(r.batch_id, { customers: [], unassigned: 0, total: 0 });
+      const m = map.get(r.batch_id);
+      m.total += r.n;
+      if (r.customer_id) m.customers.push({ id: r.customer_id, name: r.name }); else m.unassigned += r.n;
+    }
+    return map;
+  },
+
   getAssets(batchId) {
     return db.prepare(
-      `SELECT a.* FROM inspection_batch_assets ba
+      // 批次可以涵蓋多家客戶：依客戶（未指定客戶排最後）→ 類型 → 名稱排序，填寫頁、摘要頁與 PDF 都用這個順序，同一家客戶的設備會排在一起
+      `SELECT a.*, cu.name AS customer_name FROM inspection_batch_assets ba
        JOIN assets a ON a.id = ba.asset_id
+       LEFT JOIN customers cu ON cu.id = a.customer_id
        LEFT JOIN asset_categories ac ON ac.code = a.category
        WHERE ba.batch_id = ?
-       ORDER BY ac.sort_order ASC, a.category ASC, a.name ASC`
+       ORDER BY (cu.name IS NULL) ASC, cu.name COLLATE NOCASE ASC, ac.sort_order ASC, a.category ASC, a.name ASC`
     ).all(batchId);
   },
 };

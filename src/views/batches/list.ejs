@@ -8,6 +8,17 @@
 </div>
 
 <div class="card">
+  <% if (customerList.length > 0) { %>
+    <form method="GET" action="/batches" class="asset-filter" id="batch-filter">
+      <select class="form-select" name="customer" aria-label="依客戶篩選">
+        <option value="">全部客戶</option>
+        <option value="none" <%= filter === 'none' ? 'selected' : '' %>>含未指定客戶的設備</option>
+        <% customerList.forEach(c => { %><option value="<%= c.id %>" <%= filter === String(c.id) ? 'selected' : '' %>><%= c.name %></option><% }) %>
+      </select>
+      <noscript><button type="submit" class="btn btn--secondary btn--md">篩選</button></noscript>
+      <% if (filter) { %><a href="/batches" class="btn btn--secondary btn--md">清除</a><% } %>
+    </form>
+  <% } %>
   <% if (batches.length === 0) { %>
     <div class="empty-state">尚無巡檢批次。</div>
   <% } else { %>
@@ -17,6 +28,7 @@
           <tr>
             <th>標題</th>
             <th>日期</th>
+            <th>客戶</th>
             <th>狀態</th>
             <th>建立者</th>
             <th></th>
@@ -27,6 +39,12 @@
             <tr>
               <td><%= b.title %></td>
               <td><%= b.batch_date %></td>
+              <td>
+                <% const names = b.cust.customers.map(c => c.name); %>
+                <%= names.slice(0, 2).join('、') %><%= names.length > 2 ? ` 等 ${names.length} 家` : '' %>
+                <% if (b.cust.unassigned > 0) { %><small class="form-hint"><%= names.length ? '・' : '' %>未指定客戶 <%= b.cust.unassigned %> 台</small><% } %>
+                <% if (names.length === 0 && b.cust.unassigned === 0) { %>-<% } %>
+              </td>
               <td>
                 <% if (b.statusInfo.tone === 'draft') { %>
                   <span class="badge" style="color: var(--color-primary); border-color: var(--color-primary);"><%= b.statusInfo.text %></span>
@@ -49,4 +67,5 @@
   <% } %>
 </div>
 
+<script src="/js/issue-filter.js"></script>
 <%- include('../partials/footer') %>

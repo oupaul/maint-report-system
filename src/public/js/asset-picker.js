@@ -8,6 +8,7 @@
   const search = root.querySelector('.ap-search');
   const locSel = root.querySelector('.ap-location');
   const tagSel = root.querySelector('.ap-tag');
+  const custSel = root.querySelector('.ap-customer');
   const chips = Array.prototype.slice.call(root.querySelectorAll('.ap-chip'));
   const groups = Array.prototype.slice.call(root.querySelectorAll('.ap-group'));
   const tiles = Array.prototype.slice.call(root.querySelectorAll('.ap-tile'));
@@ -20,14 +21,14 @@
   let batches = [];
   try { batches = JSON.parse(root.dataset.batches || '[]'); } catch (e) { batches = []; }
 
-  const state = { q: '', cat: '', loc: '', tag: '', only: false };
+  const state = { q: '', cat: '', loc: '', tag: '', cust: '', only: false };
   const tileTags = new Map(); // 每個設備的標籤清單（JSON 存在 data-tags）
   tiles.forEach(function (t) { let a = []; try { a = JSON.parse(t.dataset.tags || '[]'); } catch (e) { a = []; } tileTags.set(t, a); });
   let firstPass = true;     // 第一次整理：套用預設展開規則（設備多就先摺起來）
   let wasFiltering = false; // 剛從「篩選中」回到「沒有篩選」：同樣套用預設規則；其餘時候不去動使用者手動展開／摺疊的狀態
   const box = (tile) => tile.querySelector('input[type=checkbox]');
 
-  function filtersActive() { return !!(state.q || state.cat || state.loc || state.tag || state.only); }
+  function filtersActive() { return !!(state.q || state.cat || state.loc || state.tag || state.cust || state.only); }
 
   function refresh() {
     const tokens = state.q.toLowerCase().split(/\s+/).filter(Boolean);
@@ -36,6 +37,7 @@
       const match = tokens.every(function (t) { return tile.dataset.search.indexOf(t) !== -1; }) &&
         (!state.cat || tile.dataset.cat === state.cat) &&
         (!state.loc || tile.dataset.loc === state.loc) &&
+        (!state.cust || (state.cust === '__none__' ? !tile.dataset.cust : tile.dataset.cust === state.cust)) &&
         (!state.tag || tileTags.get(tile).indexOf(state.tag) !== -1) &&
         (!state.only || box(tile).checked);
       tile.hidden = !match;
@@ -66,6 +68,7 @@
     search.addEventListener('keydown', function (e) { if (e.key === 'Enter') e.preventDefault(); });
   }
   if (locSel) locSel.addEventListener('change', function () { state.loc = locSel.value; refresh(); });
+  if (custSel) custSel.addEventListener('change', function () { state.cust = custSel.value; refresh(); });
   if (tagSel) tagSel.addEventListener('change', function () { state.tag = tagSel.value; refresh(); });
   chips.forEach(function (c) { c.addEventListener('click', function () { state.cat = c.dataset.cat; refresh(); }); });
   if (onlyBox) onlyBox.addEventListener('change', function () { state.only = onlyBox.checked; refresh(); });

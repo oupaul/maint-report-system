@@ -11,7 +11,7 @@
 
 <% if (result) { %>
   <div class="card">
-    <div class="form-success">匯入完成：新增 <strong><%= result.created %></strong> 筆、更新 <strong><%= result.updated %></strong> 筆<%= result.unchanged ? `、無變更 ${result.unchanged} 筆` : '' %><%= result.skipped ? `、因錯誤略過 ${result.skipped} 筆` : '' %>。</div>
+    <div class="form-success">匯入完成：新增 <strong><%= result.created %></strong> 筆、更新 <strong><%= result.updated %></strong> 筆<%= result.unchanged ? `、無變更 ${result.unchanged} 筆` : '' %><%= result.skipped ? `、因錯誤略過 ${result.skipped} 筆` : '' %><%= result.customersCreated ? `；同時建立了 ${result.customersCreated} 個新客戶` : '' %>。</div>
     <a href="/assets" class="btn btn--primary btn--md">到資產管理查看</a>
     <a href="/assets/import" class="btn btn--secondary btn--md">再匯入另一個檔案</a>
   </div>
@@ -34,6 +34,9 @@
         <span class="status-badge status-badge--critical">錯誤（將略過）<%= s.error %></span>
         <% if (s.warnings > 0) { %><span class="form-hint">另有 <%= s.warnings %> 則提醒（不影響匯入）</span><% } %>
       </div>
+      <% if (preview.newCustomers && preview.newCustomers.length > 0) { %>
+        <p class="form-hint">檔案裡有系統還沒有的客戶，確認匯入時會<strong>一併建立</strong>：<%= preview.newCustomers.join('、') %>。</p>
+      <% } %>
       <% if (preview.ignoredColumns.length > 0) { %>
         <p class="form-hint">以下欄位無法對應到系統欄位，已忽略：<%= preview.ignoredColumns.join('、') %></p>
       <% } %>
@@ -105,6 +108,7 @@
       <li>IP／MAC 格式不對、序號／財產編號等與其他設備重複，只會提醒、不擋匯入；日期、數字、下拉選項不對、類別不存在才算錯誤，該列會略過，其他列照常匯入。</li>
       <li><strong>自訂欄位</strong>用欄位名稱當表頭<%= customFields.length ? '（目前有：' + customFields.map(f => f.label).join('、') + '）' : '' %>；下拉選單的值要在選項內，是／否填「是」或「否」。</li>
       <li>用 Excel 開啟、存檔時請選「<strong>CSV UTF-8（逗號分隔）</strong>」（舊版「CSV（逗號分隔）」的 Big5 編碼也能自動辨識）。序號、財產編號這類前面有 0 的資料，請先把該欄設成「文字」格式再存，否則 Excel 會吃掉開頭的 0。</li>
+      <li><strong>客戶</strong>欄填客戶名稱：已有的客戶直接對應，系統還沒有的會在確認匯入時自動建立；欄位存在但儲存格空白＝清除客戶，整欄不存在＝不動。新增設備沒填客戶只會提醒（會是「未指定客戶」）。</li>
       <li>待整理的「舊識別碼」不在匯出／匯入範圍內；開頭是 <code>=</code>、<code>+</code>、<code>-</code>、<code>@</code> 的儲存格匯出時會多一個 <code>'</code> 防止被 Excel 當公式，匯入時會自動拿掉。</li>
     </ul>
   </div>
