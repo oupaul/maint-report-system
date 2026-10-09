@@ -1,0 +1,33 @@
+<%#
+  容量型檢查項目的磁碟區編輯區（填寫頁；就地儲存之後由伺服器重新渲染這一塊交給前端換上）。
+  變數：editor = { volumes: [{ name, used, free, total, lastUsed }], prefilled, legacyText }、checklistItem（warn_pct/crit_pct）。
+  每列的欄位 vol_name / vol_used / vol_free / vol_total（hidden：上次的總容量，只填已用時用來推算剩餘）；
+  行為（新增列、即時算使用率與建議狀態）在 public/js/capacity-editor.js。
+%>
+<div class="vol-editor" data-warn="<%= checklistItem.warn_pct || 85 %>" data-crit="<%= checklistItem.crit_pct || 95 %>">
+  <input type="hidden" name="vol_present" value="1">
+  <div class="vol-editor__head">
+    <span class="form-label">磁碟區容量</span>
+    <span class="form-hint">已用／剩餘填數字（GB，也可加單位，例如 1.2TB）；總容量與使用率自動計算。</span>
+  </div>
+  <% if (editor.legacyText) { %>
+    <p class="vol-editor__legacy form-hint">原本的文字記錄：「<%= editor.legacyText %>」（填入下面的容量後會被取代）</p>
+  <% } %>
+  <% if (editor.prefilled && editor.volumes.length > 0) { %>
+    <p class="form-hint">已帶入上次記錄的磁碟區與總容量，只要填這次的「已用」（剩餘會用總容量推算，磁碟有擴充再填剩餘）。</p>
+  <% } %>
+  <div class="vol-editor__rows">
+    <% editor.volumes.forEach(v => { %>
+      <div class="vol-row">
+        <input class="form-input vol-row__name" type="text" name="vol_name" maxlength="20" value="<%= v.name %>" placeholder="C:" aria-label="磁碟區名稱">
+        <input class="form-input vol-row__num" type="text" inputmode="decimal" name="vol_used" value="<%= v.used %>" placeholder="<%= v.lastUsed ? '上次 ' + v.lastUsed : '已用' %>" aria-label="已用容量（GB）">
+        <input class="form-input vol-row__num" type="text" inputmode="decimal" name="vol_free" value="<%= v.free %>" placeholder="剩餘" aria-label="剩餘容量（GB）">
+        <input type="hidden" name="vol_total" value="<%= v.total %>">
+        <span class="vol-row__calc" aria-live="polite"></span>
+        <button type="button" class="btn btn--secondary btn--sm vol-row__remove" title="移除這個磁碟區" aria-label="移除這個磁碟區">✕</button>
+      </div>
+    <% }) %>
+  </div>
+  <button type="button" class="btn btn--secondary btn--sm vol-editor__add">+ 新增磁碟區</button>
+  <span class="vol-editor__suggest" aria-live="polite"></span>
+</div>

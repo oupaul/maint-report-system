@@ -9,6 +9,7 @@ const { nowTaipei } = require('../utils/time');
 const statusColors = require('../utils/statusColors');
 const { SIGNATURE_ROLES, SIGNATURE_ROLE_LABELS } = require('../utils/validators');
 const AssetCategory = require('../models/AssetCategory');
+const capacity = require('../utils/capacity');
 
 const SIGNATURE_SECTION_HEIGHT = 100; // 標題 + 兩欄簽名（含圖片、簽署人、時間）實際需要的高度上限
 const SIGNATURE_IMG_MAX_HEIGHT = 40;
@@ -125,11 +126,18 @@ function computeImageDisplayHeight(photo, displayWidth, maxHeight) {
  * 第一列照片（兩張以上時一列最多兩張）」，後面幾列改由 drawItemBlock() 自己
  * 逐列檢查換頁，一定會出現在某一頁上，只是不保證跟第一列同頁。
  */
+// 「數值」那一段要印的文字：容量型項目（有磁碟區）一個磁碟區一行；否則是原本的文字數值。
+// 估算高度與實際繪製都用這個函式，兩邊才不會兜不起來。
+function valueTextOf(item) {
+  if (item.volumes && item.volumes.length > 0) return `數值：\n${capacity.volumeLines(item.volumes).join('\n')}`;
+  return item.value_text ? `數值：${item.value_text}` : null;
+}
+
 function estimateItemLeadHeight(doc, item, contentWidth, maxImageHeight, fonts) {
   let height = LABEL_ROW_HEIGHT;
 
   const bodyWidth = contentWidth - 20; // 區塊左右各留一點內距
-  const valueText = item.value_text ? `數值：${item.value_text}` : null;
+  const valueText = valueTextOf(item);
   const noteText = item.note ? `備註：${item.note}` : null;
 
   doc.font(fonts.regular).fontSize(10);
@@ -194,9 +202,10 @@ async function drawItemBlock(doc, item, contentWidth, maxImageHeight, fonts) {
   drawStatusBadge(doc, startX + bodyWidth - 80, cursorY - 2, item.status, fonts);
   cursorY += LABEL_ROW_HEIGHT;
 
-  if (item.value_text) {
+  const valueDisplay = valueTextOf(item);
+  if (valueDisplay) {
     doc.font(fonts.regular).fontSize(10).fillColor('#334155');
-    const text = `數值：${item.value_text}`;
+    const text = valueDisplay;
     doc.text(text, startX, cursorY, { width: bodyWidth });
     cursorY += doc.heightOfString(text, { width: bodyWidth }) + INNER_GAP;
   }

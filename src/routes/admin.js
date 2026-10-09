@@ -32,6 +32,9 @@ router.use('/groups', require('./adminGroups'));
 // 簽核流程設定
 router.use('/approval', require('./adminApproval'));
 
+// 把舊的文字容量記錄解析成磁碟區（讓歷史資料也能畫趨勢）
+router.use('/capacity-import', require('./adminCapacityImport'));
+
 // 系統通知（發送「系統即將更新」這類訊息給使用者）
 router.use('/announcements', require('./adminAnnouncements'));
 

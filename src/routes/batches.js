@@ -13,6 +13,9 @@ const UserSignature = require('../models/UserSignature');
 const sharp = require('sharp');
 const User = require('../models/User');
 const ChecklistItem = require('../models/ChecklistItem');
+const InspectionVolume = require('../models/InspectionVolume');
+const capacity = require('../utils/capacity');
+const db = require('../models/db');
 const Asset = require('../models/Asset');
 const ImageService = require('../services/ImageService');
 const ApprovalService = require('../services/ApprovalService');
@@ -47,6 +50,29 @@ function renderPartial(req, view, locals) {
   return new Promise((resolve, reject) => req.app.render(view, locals, (err, html) => (err ? reject(err) : resolve(html))));
 }
 
+// 容量型項目的磁碟區編輯區資料：已經有存的就用存的；沒有就帶入「上一次」記錄的磁碟區名稱與總容量（已用留空等著填）
+function volumeEditorData(batch, asset, checklistItem, item) {
+  if (checklistItem.input_kind !== 'capacity' && !(item && InspectionVolume.findByItemId(item.id).length)) return null;
+  const round = (n) => Math.round(n * 100) / 100;
+  const saved = item ? InspectionVolume.findByItemId(item.id) : [];
+  if (saved.length > 0) {
+    return {
+      prefilled: false,
+      legacyText: '',
+      volumes: saved.map(v => ({ name: v.name, used: round(v.used_gb), free: round(v.total_gb - v.used_gb), total: round(v.total_gb), lastUsed: '' })),
+    };
+  }
+  const prev = InspectionVolume.previousFor(asset.id, checklistItem.id, batch.id);
+  return {
+    prefilled: prev.length > 0,
+    // 舊的純文字記錄（改成容量型之前填的）：留著顯示，填了容量就會被摘要取代
+    legacyText: item && item.value_text ? item.value_text : '',
+    volumes: prev.length > 0
+      ? prev.map(v => ({ name: v.name, used: '', free: '', total: round(v.total_gb), lastUsed: round(v.used_gb) }))
+      : [{ name: '', used: '', free: '', total: '', lastUsed: '' }],
+  };
+}
+
 async function rowPayload(req, res, batch, asset, checklistItem, item) {
   const photos = InspectionItemPhoto.findByItemId(item.id)
     .filter(p => p.path)
@@ -54,9 +80,11 @@ async function rowPayload(req, res, batch, asset, checklistItem, item) {
   const locals = {
     batch, photos, itemId: item.id, assetName: asset.name, itemLabel: checklistItem.label, csrfToken: res.locals.csrfToken,
   };
-  const [thumbsHtml, deleteFormsHtml] = await Promise.all([
+  const editor = volumeEditorData(batch, asset, checklistItem, item);
+  const [thumbsHtml, deleteFormsHtml, volumesHtml] = await Promise.all([
     renderPartial(req, 'partials/entry-photo-thumbs', locals),
     renderPartial(req, 'partials/entry-photo-delete-forms', locals),
+    editor ? renderPartial(req, 'partials/entry-volumes', { editor, checklistItem }) : Promise.resolve(null),
   ]);
   return {
     ok: true,
@@ -66,6 +94,7 @@ async function rowPayload(req, res, batch, asset, checklistItem, item) {
     photoCount: photos.length,
     thumbsHtml,
     deleteFormsHtml,
+    volumesHtml,
   };
 }
 
@@ -181,6 +210,7 @@ function buildEntryData(batchId) {
         checklistItem: ci,
         existing: existing || null,
         photos: photos.map(p => ({ ...p, filename: path.basename(p.path) })),
+        volumeEditor: volumeEditorData(batch, asset, ci, existing),
       };
     });
     return { asset, rows };
@@ -287,16 +317,31 @@ router.post('/:id/items/:checklistItemId', requireLogin, upload.array('screensho
       return res.redirect(`/batches/${batch.id}/entry${rowAnchor(asset.id, checklistItem.id)}`);
     }
 
-    const item = InspectionItem.upsert({
-      batch_id: batch.id,
-      asset_id: asset.id,
-      checklist_item_id: checklistItem.id,
-      status,
-      value_text: req.body.value_text,
-      note: req.body.note,
-      source: 'manual',
-      recorded_by: req.user.id,
-    });
+    // 容量型項目：解析磁碟區列，數值文字改由摘要自動產生（沒填任何磁碟區就保留原本的文字記錄）
+    let valueText = req.body.value_text;
+    let volumes = null;
+    if (checklistItem.input_kind === 'capacity' && req.body.vol_present === '1') {
+      const parsed = capacity.parseVolumes(req.body);
+      if (parsed.error) return sendError(req, res, 400, '磁碟容量資料不正確', parsed.error);
+      volumes = parsed.volumes;
+      const prior = InspectionItem.findOne(batch.id, asset.id, checklistItem.id);
+      valueText = volumes.length > 0 ? capacity.summaryText(volumes) : (prior ? prior.value_text : null);
+    }
+
+    const item = db.transaction(() => {
+      const saved = InspectionItem.upsert({
+        batch_id: batch.id,
+        asset_id: asset.id,
+        checklist_item_id: checklistItem.id,
+        status,
+        value_text: valueText,
+        note: req.body.note,
+        source: 'manual',
+        recorded_by: req.user.id,
+      });
+      if (volumes) InspectionVolume.replaceForItem(saved.id, volumes);
+      return saved;
+    })();
 
     // 每張照片先插入佔位列取得 id（檔名需要用到），轉檔完成後再回填實際路徑/尺寸
     if (req.files && req.files.length > 0) {
@@ -447,7 +492,7 @@ router.get('/:id', requireLogin, (req, res) => {
   }
 
   const assets = InspectionBatch.getAssets(batch.id);
-  const items = InspectionItem.findByBatch(batch.id);
+  const items = InspectionVolume.attach(InspectionItem.findByBatch(batch.id)); // 容量型項目的磁碟區
   const photosByItemId = InspectionItemPhoto.findByItemIds(items.map(i => i.id));
 
   const itemsByAssetId = new Map();

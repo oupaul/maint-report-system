@@ -38,6 +38,7 @@ const assetFields = require('../utils/assetFields');
 const AssetCategory = require('../models/AssetCategory');
 const AssetField = require('../models/AssetField');
 const AssetTag = require('../models/AssetTag');
+const InspectionVolume = require('../models/InspectionVolume');
 
 const SORT_KEYS = ['category', 'name', 'location', 'ip_address', 'hostname', 'brand', 'serial_number', 'asset_tag', 'purchase_date', 'is_active'];
 const PER_PAGE = [50, 100, 200];
@@ -89,6 +90,7 @@ router.get('/', requireLogin, (req, res) => {
     locations: Asset.locations(),
     tagList: AssetTag.inUse(),
     perOptions: PER_PAGE,
+    capacityAssets: InspectionVolume.assetIdsWithData(),
     listFields: AssetField.findAll({ activeOnly: true }).filter(f => f.show_in_list),
   });
 });

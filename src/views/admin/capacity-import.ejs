@@ -1,0 +1,69 @@
+<%- include('../layout', { title: '容量資料匯入' }) %>
+
+<div class="page-header">
+  <h1>容量資料匯入</h1>
+  <div class="page-actions">
+    <a href="/capacity" class="btn btn--secondary btn--md">容量預警</a>
+  </div>
+</div>
+
+<% if (done !== null) { %><div class="form-success">已匯入 <%= done %> 筆。</div><% } %>
+
+<div class="card">
+  <p class="form-hint">「磁碟空間」改成容量型之前，記錄的是自由文字（例如「C已用55.2GB剩餘243GB D已用736GB剩餘826GB」），沒辦法畫趨勢。這裡把能看懂的舊文字<strong>盡力解析成磁碟區</strong>，讓歷史記錄也能用在趨勢與預測上。</p>
+  <ul class="form-hint">
+    <li>支援「名稱 已用 X 剩餘 Y」或「名稱 剩餘 Y 已用 X」，數字可加 MB／GB／TB（沒寫單位視為 GB）；整段文字必須完全看得懂才會解析，<strong>寧可略過也不猜</strong>。</li>
+    <li>只會<strong>新增磁碟區資料</strong>，不會修改原本的數值文字、狀態、備註，也不影響已簽核的報告內容；已經有磁碟區的記錄不會被動到。</li>
+    <li>請先看下面的預覽，確認解析結果正確再匯入。</li>
+  </ul>
+
+  <p><strong>可解析：<%= parsableCount %> 筆</strong>　<span class="form-hint">無法解析：<%= unparsableCount %> 筆（維持原樣）</span></p>
+
+  <% if (parsableCount > 0) { %>
+    <form method="POST" action="/admin/capacity-import" data-confirm="確定要把 <%= parsableCount %> 筆舊記錄解析成磁碟區嗎？（只新增資料，不會修改原本的文字記錄）">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button type="submit" class="btn btn--primary btn--md">匯入全部 <%= parsableCount %> 筆可解析的記錄</button>
+    </form>
+
+    <h2 style="margin-top: var(--space-6);">解析預覽<%= parsableCount > sampleLimit ? '（前 ' + sampleLimit + ' 筆）' : '' %></h2>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>日期</th><th>設備</th><th>批次</th><th>原本的文字</th><th>解析結果</th></tr></thead>
+        <tbody>
+          <% samples.forEach(r => { %>
+            <tr>
+              <td><%= r.batch_date %></td>
+              <td><%= r.asset_name %></td>
+              <td><a href="/batches/<%= r.batch_id %>">#<%= r.batch_id %></a></td>
+              <td><%= r.value_text %></td>
+              <td>
+                <% r.volumes.forEach(v => { %><div><%= v.name %>：已用 <%= fmt.fmtGb(v.used_gb) %> / 總容量 <%= fmt.fmtGb(v.total_gb) %> GB（<%= fmt.fmtPct(fmt.pct(v)) %>）</div><% }) %>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } else { %>
+    <div class="empty-state">沒有可以解析的舊記錄。</div>
+  <% } %>
+
+  <% if (unparsableCount > 0) { %>
+    <details style="margin-top: var(--space-6);">
+      <summary>無法解析的記錄（<%= unparsableCount %> 筆<%= unparsableCount > unparsedLimit ? '，列出前 ' + unparsedLimit + ' 筆' : '' %>）</summary>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>日期</th><th>設備</th><th>批次</th><th>原本的文字</th></tr></thead>
+          <tbody>
+            <% unparsed.forEach(r => { %>
+              <tr><td><%= r.batch_date %></td><td><%= r.asset_name %></td><td><a href="/batches/<%= r.batch_id %>">#<%= r.batch_id %></a></td><td><%= r.value_text %></td></tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <p class="form-hint">這些請在填寫頁（批次還沒鎖定時）手動改成磁碟區，或維持原樣。</p>
+    </details>
+  <% } %>
+</div>
+
+<%- include('../partials/footer') %>

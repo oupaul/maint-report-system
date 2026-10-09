@@ -889,3 +889,39 @@ html:has(.saveall-bar:not([hidden])) { scroll-padding-bottom: 6rem; } /* 聚焦�
 .signature-saved__img { height: 50px; max-width: 200px; object-fit: contain; background: #fff; border: 1px solid var(--color-border); border-radius: var(--radius-sm); }
 .signature-save-default { display: block; margin-top: var(--space-4); }
 .signature-save-default[hidden] { display: none; }
+
+/* ---- 容量型檢查項目：磁碟區編輯、摘要長條、趨勢頁 ---- */
+.vol-editor { margin-top: var(--space-4); padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-soft); }
+.vol-editor__head { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: baseline; margin-bottom: var(--space-2); }
+.vol-editor__rows { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-2); }
+.vol-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.vol-row__name { width: 7rem; }
+.vol-row__num { width: 8rem; }
+.vol-row__calc { flex: 1 1 12rem; font-size: var(--text-sm); color: var(--color-text-muted); }
+.vol-row__calc.is-warning { color: var(--color-status-warning); font-weight: 600; }
+.vol-row__calc.is-critical { color: var(--color-status-critical); font-weight: 600; }
+.vol-editor__suggest { margin-left: var(--space-2); font-size: var(--text-sm); color: var(--color-text-muted); }
+.vol-summary__row { display: flex; align-items: center; gap: var(--space-2); margin-bottom: 2px; flex-wrap: wrap; }
+.vol-summary__name { min-width: 2.5rem; font-weight: 600; }
+.vol-summary__text { font-size: var(--text-sm); }
+.vol-bar { display: inline-block; width: 120px; height: 8px; border-radius: 4px; background: var(--color-border); overflow: hidden; }
+.vol-bar__fill { display: block; height: 100%; background: var(--color-status-normal); }
+.vol-bar__fill--warning { background: var(--color-status-warning); }
+.vol-bar__fill--critical { background: var(--color-status-critical); }
+.trend-card { margin-bottom: var(--space-6); }
+.trend-chart { width: 100%; height: auto; max-width: 760px; display: block; }
+.trend-chart text { font-size: 11px; fill: var(--color-text-muted); }
+.trend-chart .grid { stroke: var(--color-border); stroke-width: 1; }
+.trend-chart .th-warn { stroke: var(--color-status-warning); stroke-dasharray: 4 3; stroke-width: 1; }
+.trend-chart .th-crit { stroke: var(--color-status-critical); stroke-dasharray: 4 3; stroke-width: 1; }
+.trend-chart .line { fill: none; stroke: var(--color-primary); stroke-width: 2; }
+.trend-chart .proj { fill: none; stroke: var(--color-primary); stroke-width: 2; stroke-dasharray: 5 4; opacity: 0.7; }
+.trend-chart .dot { fill: var(--color-primary); }
+.cap-pct { font-weight: 600; }
+.cap-pct--warning { color: var(--color-status-warning); }
+.cap-pct--critical { color: var(--color-status-critical); }
+.kind-form { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); font-size: var(--text-sm); }
+.kind-form .form-select { width: auto; }
+.kind-form__pct { display: inline-flex; align-items: center; gap: var(--space-2); }
+.kind-form__pct[hidden] { display: none; }
+.kind-form__pct .form-input { width: 4.5rem; }

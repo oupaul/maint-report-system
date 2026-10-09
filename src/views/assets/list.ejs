@@ -8,7 +8,7 @@
     return `<a href="${link({ sort: key, dir: next, page: 1 })}" class="sort-link${active ? ' is-active' : ''}" title="依${label}排序">${label}${active ? (params.dir === 'asc' ? ' ▲' : ' ▼') : ''}</a>`;
   };
   const filtered = !!(params.q || params.category || params.location || params.status || params.tag);
-  const colCount = 10 + (params.grouped ? 0 : 1) + listFields.length + (can('assets.manage') ? 1 : 0);
+  const colCount = 10 + (params.grouped ? 0 : 1) + listFields.length + 1;
 %>
 
 <div class="page-header">
@@ -17,6 +17,7 @@
     <% if (can('assets.manage')) { %>
       <a href="/assets/new" class="btn btn--primary btn--md">新增資產</a>
     <% } %>
+    <a href="/capacity" class="btn btn--secondary btn--md">容量預警</a>
   </div>
 </div>
 
@@ -85,7 +86,7 @@
             <% listFields.forEach(f => { %><th><%= f.label %></th><% }) %>
             <th>標籤</th>
             <th><%- sortHead('is_active', '狀態') %></th>
-            <% if (can('assets.manage')) { %><th></th><% } %>
+            <th></th>
           </tr>
         </thead>
         <%
@@ -130,7 +131,9 @@
                 <% } %>
               </td>
               <% if (can('assets.manage')) { %>
-                <td><a href="/assets/<%= a.id %>/edit">編輯</a></td>
+                <td><a href="/assets/<%= a.id %>/edit">編輯</a><% if (capacityAssets.has(a.id)) { %> ・ <a href="/capacity/assets/<%= a.id %>">容量趨勢</a><% } %></td>
+              <% } else if (capacityAssets.has(a.id)) { %>
+                <td><a href="/capacity/assets/<%= a.id %>">容量趨勢</a></td>
               <% } %>
             </tr>
           <% }) %>

@@ -160,6 +160,7 @@ try {
   // 需要登入的路由
   app.use('/', dashboardRoutes);
   app.use('/assets', assetRoutes);
+  app.use('/capacity', require('./routes/capacity'));
   app.use('/users', userRoutes);
   app.use('/account', accountRoutes);
   app.use('/admin', adminRoutes);

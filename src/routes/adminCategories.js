@@ -15,6 +15,7 @@ const FLASH_OK = {
   moved: '已調整排序',
   added: '已新增檢查項目',
   copied: '已複製檢查項目',
+  kind: '已更新輸入方式',
 };
 const FLASH_ERR = {
   notfound: '找不到指定的項目',
@@ -91,6 +92,7 @@ function renderDetail(req, res, category, { error = null, itemError = null, form
     otherCategories: AssetCategory.findAll().filter(c => c.id !== category.id),
     maxLabel: AssetCategory.MAX_LABEL,
     maxItemLabel: ChecklistItem.MAX_LABEL,
+    kinds: ChecklistItem.KINDS,
     form,
     ok: f.ok,
     error: error || f.err,
@@ -175,6 +177,26 @@ router.post('/:id/items/:itemId/rename', (req, res) => {
   if (itemError) return renderDetail(req, res, category, { itemError, status: 400 });
   ChecklistItem.rename(item.id, req.body.label);
   res.redirect(`/admin/categories/${category.id}?ok=renamed`);
+});
+
+router.post('/:id/items/:itemId/kind', (req, res) => {
+  const category = loadCategory(req, res);
+  if (!category) return;
+  const item = loadItem(req, res, category);
+  if (!item) return;
+  const kind = req.body.input_kind;
+  if (!Object.prototype.hasOwnProperty.call(ChecklistItem.KINDS, kind)) return res.redirect(`/admin/categories/${category.id}?err=notfound`);
+  let warn = null;
+  let crit = null;
+  if (kind === 'capacity') {
+    const t = ChecklistItem.parseThresholds(req.body.warn_pct, req.body.crit_pct);
+    if (t.error) return renderDetail(req, res, category, { itemError: t.error, status: 400 });
+    warn = t.warn;
+    crit = t.crit;
+  }
+  ChecklistItem.setKind(item.id, kind, warn, crit);
+  console.log(`[設備類型] ${req.user.username} 將「${category.label}」的檢查項目「${item.label}」輸入方式改為 ${kind}`);
+  res.redirect(`/admin/categories/${category.id}?ok=kind`);
 });
 
 router.post('/:id/items/:itemId/move', (req, res) => {

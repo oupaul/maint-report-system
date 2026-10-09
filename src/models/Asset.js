@@ -115,6 +115,10 @@ const Asset = {
     return { rows: enrich(rows), total, groupCounts, page: current, pages, pageSize };
   },
 
+  countActive() {
+    return db.prepare('SELECT COUNT(*) AS n FROM assets WHERE is_active = 1').get().n;
+  },
+
   count() {
     return db.prepare('SELECT COUNT(*) AS n FROM assets').get().n;
   },

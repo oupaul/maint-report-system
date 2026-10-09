@@ -122,7 +122,19 @@
               <tr>
                 <td><%= item.checklist_label %></td>
                 <td><span class="status-badge status-badge--<%= item.status %>"><%= item.status === 'normal' ? '正常' : (item.status === 'warning' ? '警告' : '異常') %></span></td>
-                <td><%= item.value_text || '-' %></td>
+                <td>
+                  <% if (item.volumes && item.volumes.length > 0) { %>
+                    <div class="vol-summary">
+                      <% item.volumes.forEach(v => { const p = v.total_gb > 0 ? v.used_gb / v.total_gb * 100 : 0; const lvl = p >= 95 ? 'critical' : (p >= 85 ? 'warning' : 'normal'); %>
+                        <div class="vol-summary__row">
+                          <span class="vol-summary__name"><%= v.name %></span>
+                          <span class="vol-bar" role="img" aria-label="<%= v.name %> 使用率 <%= p.toFixed(1) %>%"><span class="vol-bar__fill vol-bar__fill--<%= lvl %>" style="width: <%= Math.min(100, p).toFixed(1) %>%"></span></span>
+                          <span class="vol-summary__text"><%= v.used_gb.toLocaleString('en-US', { maximumFractionDigits: 2 }) %> / <%= v.total_gb.toLocaleString('en-US', { maximumFractionDigits: 2 }) %> GB（<%= p.toFixed(1) %>%）</span>
+                        </div>
+                      <% }) %>
+                    </div>
+                  <% } else { %><%= item.value_text || '-' %><% } %>
+                </td>
                 <td><%= item.note || '-' %></td>
                 <td>
                   <% if (item.photos && item.photos.length > 0) { %>

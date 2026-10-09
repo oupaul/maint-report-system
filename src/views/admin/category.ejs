@@ -34,6 +34,7 @@
 
 <div class="card">
   <h2>檢查項目（<%= items.filter(i => i.is_active).length %> 項啟用中）</h2>
+  <p class="form-hint"><strong>輸入方式</strong>：「文字」是原本的狀態＋數值文字；「容量型」讓一個項目底下可以記錄多個磁碟區（C:、D:…）的已用／剩餘容量，系統會自動算使用率、依門檻建議狀態，並可畫出容量成長趨勢、預估多久會滿（門檻只是建議，填寫的人仍可自己決定狀態）。改輸入方式不會動到已記錄的資料。</p>
   <p class="form-hint">建立巡檢批次時，每個這個類型的設備都會依序帶出這些項目。<strong>改名稱只影響之後的記錄</strong>：已經寫好的報告維持當時的項目名稱。已有檢查紀錄的項目只能停用，不能刪除。</p>
   <% if (itemError) { %><div class="form-error"><%= itemError %></div><% } %>
 
@@ -43,7 +44,7 @@
     <div class="table-wrap">
       <table class="data-table">
         <thead>
-          <tr><th>名稱</th><th>狀態</th><th>已記錄</th><th></th></tr>
+          <tr><th>名稱</th><th>輸入方式</th><th>狀態</th><th>已記錄</th><th></th></tr>
         </thead>
         <tbody>
           <% items.forEach((item, i) => { %>
@@ -52,6 +53,19 @@
                 <form method="POST" action="/admin/categories/<%= category.id %>/items/<%= item.id %>/rename" class="inline-edit">
                   <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                   <input class="form-input" type="text" name="label" maxlength="<%= maxItemLabel %>" value="<%= item.label %>" required aria-label="檢查項目名稱">
+                  <button type="submit" class="btn btn--secondary btn--sm">儲存</button>
+                </form>
+              </td>
+              <td>
+                <form method="POST" action="/admin/categories/<%= category.id %>/items/<%= item.id %>/kind" class="kind-form">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <select class="form-select" name="input_kind" aria-label="輸入方式">
+                    <% Object.keys(kinds).forEach(k => { %><option value="<%= k %>" <%= item.input_kind === k ? 'selected' : '' %>><%= kinds[k] %></option><% }) %>
+                  </select>
+                  <span class="kind-form__pct" <%= item.input_kind === 'capacity' ? '' : 'hidden' %>>
+                    警告 ≥ <input class="form-input" type="number" name="warn_pct" min="1" max="100" value="<%= item.warn_pct || 85 %>" aria-label="建議警告使用率（%）">%
+                    異常 ≥ <input class="form-input" type="number" name="crit_pct" min="1" max="100" value="<%= item.crit_pct || 95 %>" aria-label="建議異常使用率（%）">%
+                  </span>
                   <button type="submit" class="btn btn--secondary btn--sm">儲存</button>
                 </form>
               </td>
@@ -121,4 +135,5 @@
   <% } %>
 </div>
 
+<script src="/js/kind-form.js"></script>
 <%- include('../partials/footer') %>

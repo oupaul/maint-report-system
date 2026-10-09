@@ -1,0 +1,59 @@
+<%- include('../layout', { title: '容量預警' }) %>
+
+<div class="page-header">
+  <h1>容量預警</h1>
+  <div class="page-actions">
+    <a href="/capacity/export.csv" class="btn btn--secondary btn--md">匯出容量歷史 CSV</a>
+    <a href="/assets" class="btn btn--secondary btn--md">回到資產管理</a>
+  </div>
+</div>
+
+<div class="card">
+  <p class="form-hint">彙整所有「容量型」檢查項目（磁碟空間）的記錄。<strong>需要注意</strong>＝目前使用率已達警告門檻，或依成長趨勢預估 6 個月內會達 90%。預測用最近幾次巡檢的線性趨勢推算（至少 3 次、跨 28 天以上才會預測；磁碟擴充後從擴充後的記錄重新算），僅供規劃參考。</p>
+  <div class="asset-toolbar">
+    <span class="form-hint">共 <%= total %> 個磁碟區，其中 <%= attentionCount %> 個需要注意</span>
+    <span class="asset-toolbar__right">
+      <a href="/capacity" class="btn btn--sm <%= showAll ? 'btn--secondary' : 'btn--primary' %>">只看需要注意</a>
+      <a href="/capacity?view=all" class="btn btn--sm <%= showAll ? 'btn--primary' : 'btn--secondary' %>">全部</a>
+    </span>
+  </div>
+
+  <% if (total === 0) { %>
+    <div class="empty-state">還沒有容量記錄。在填寫巡檢的「磁碟空間」項目輸入各磁碟區的已用／剩餘容量後，這裡就會開始彙整。</div>
+  <% } else if (rows.length === 0) { %>
+    <div class="empty-state">目前沒有需要注意的磁碟區 👍</div>
+  <% } else { %>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr><th>設備</th><th>磁碟區</th><th>最新記錄</th><th>使用率</th><th>已用 / 總容量</th><th>預測</th><th></th></tr>
+        </thead>
+        <tbody>
+          <% rows.forEach(s => { const p = s.last.pct; const lvl = p >= s.crit_pct ? 'critical' : (p >= s.warn_pct ? 'warning' : 'normal'); %>
+            <tr>
+              <td><a href="/capacity/assets/<%= s.asset_id %>"><%= s.asset_name %></a><% if (s.location) { %><br><small class="form-hint"><%= s.location %></small><% } %></td>
+              <td><%= s.volume %></td>
+              <td><%= s.last.date %></td>
+              <td>
+                <span class="vol-bar" aria-hidden="true"><span class="vol-bar__fill vol-bar__fill--<%= lvl %>" style="width: <%= Math.min(100, p).toFixed(1) %>%"></span></span>
+                <span class="cap-pct cap-pct--<%= lvl %>"><%= fmt.fmtPct(p) %></span>
+              </td>
+              <td><%= fmt.fmtGb(s.last.used_gb) %> / <%= fmt.fmtGb(s.last.total_gb) %> GB</td>
+              <td><small><%= s.text %></small></td>
+              <td><a class="btn btn--secondary btn--sm" href="/capacity/assets/<%= s.asset_id %>">趨勢</a></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% if (pages > 1) { %>
+      <nav class="pager" aria-label="分頁">
+        <% if (page > 1) { %><a class="btn btn--secondary btn--sm" href="/capacity?view=<%= showAll ? 'all' : 'attention' %>&page=<%= page - 1 %>">上一頁</a><% } %>
+        <span class="form-hint">第 <%= page %> / <%= pages %> 頁</span>
+        <% if (page < pages) { %><a class="btn btn--secondary btn--sm" href="/capacity?view=<%= showAll ? 'all' : 'attention' %>&page=<%= page + 1 %>">下一頁</a><% } %>
+      </nav>
+    <% } %>
+  <% } %>
+</div>
+
+<%- include('../partials/footer') %>

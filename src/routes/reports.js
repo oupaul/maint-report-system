@@ -7,6 +7,7 @@ const { requireLogin } = require('../middleware/auth');
 const AssetField = require('../models/AssetField');
 const InspectionBatch = require('../models/InspectionBatch');
 const InspectionItem = require('../models/InspectionItem');
+const InspectionVolume = require('../models/InspectionVolume');
 const InspectionItemPhoto = require('../models/InspectionItemPhoto');
 const BatchSignature = require('../models/BatchSignature');
 const PdfReportService = require('../services/PdfReportService');
@@ -20,7 +21,7 @@ router.get('/batches/:id/report.pdf', requireLogin, async (req, res) => {
   }
 
   const assets = AssetField.attach(InspectionBatch.getAssets(batch.id)); // 補上自訂欄位的值（報告設備頁會印）
-  const items = InspectionItem.findByBatch(batch.id);
+  const items = InspectionVolume.attach(InspectionItem.findByBatch(batch.id));
   const photosByItemId = InspectionItemPhoto.findByItemIds(items.map(i => i.id));
 
   const itemsByAssetId = new Map();

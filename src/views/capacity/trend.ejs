@@ -1,0 +1,41 @@
+<%- include('../layout', { title: '容量趨勢：' + asset.name }) %>
+
+<div class="page-header">
+  <h1>容量趨勢：<%= asset.name %></h1>
+  <div class="page-actions">
+    <a href="/capacity" class="btn btn--secondary btn--md">容量預警</a>
+    <a href="/capacity/export.csv" class="btn btn--secondary btn--md">匯出 CSV</a>
+  </div>
+</div>
+
+<% if (series.length === 0) { %>
+  <div class="card"><div class="empty-state">這台設備還沒有容量記錄。在填寫巡檢的「磁碟空間」項目輸入各磁碟區的已用／剩餘容量後，就會開始累積趨勢。</div></div>
+<% } %>
+
+<% series.forEach(s => { const p = s.last.pct; const lvl = p >= s.crit_pct ? 'critical' : (p >= s.warn_pct ? 'warning' : 'normal'); %>
+  <div class="card trend-card">
+    <h2><%= s.volume %> <small class="form-hint">（<%= s.item_label %>）</small></h2>
+    <p>
+      最新（<%= s.last.date %>）：<%= fmt.fmtGb(s.last.used_gb) %> / <%= fmt.fmtGb(s.last.total_gb) %> GB，
+      使用率 <span class="cap-pct cap-pct--<%= lvl %>"><%= fmt.fmtPct(p) %></span>
+    </p>
+    <p class="form-hint"><%= s.text %></p>
+    <%- s.svg %>
+    <p class="form-hint">橘色線＝實際使用率（游標移到圓點可看當次數值）；虛線＝預測；橫向虛線＝警告 <%= s.warn_pct %>%／異常 <%= s.crit_pct %>% 門檻。共 <%= s.points.length %> 筆記錄。</p>
+    <details>
+      <summary class="form-hint">看歷次記錄</summary>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>日期</th><th>已用 (GB)</th><th>總容量 (GB)</th><th>使用率</th><th>批次</th></tr></thead>
+          <tbody>
+            <% s.points.slice().reverse().forEach(pt => { %>
+              <tr><td><%= pt.date %></td><td><%= fmt.fmtGb(pt.used_gb) %></td><td><%= fmt.fmtGb(pt.total_gb) %></td><td><%= fmt.fmtPct(pt.pct) %></td><td><a href="/batches/<%= pt.batch_id %>">#<%= pt.batch_id %></a></td></tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </details>
+  </div>
+<% }) %>
+
+<%- include('../partials/footer') %>

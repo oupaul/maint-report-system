@@ -53,6 +53,12 @@ const ChecklistItem = {
     db.prepare('UPDATE checklist_items SET label = ? WHERE id = ?').run(label.trim(), id);
   },
 
+  // 輸入方式：text（狀態＋數值文字）或 capacity（容量型：多個磁碟區，記已用／總容量）；門檻只對容量型有意義
+  setKind(id, kind, warnPct, critPct) {
+    db.prepare('UPDATE checklist_items SET input_kind = ?, warn_pct = ?, crit_pct = ? WHERE id = ?')
+      .run(kind, kind === 'capacity' ? warnPct : null, kind === 'capacity' ? critPct : null, id);
+  },
+
   setActive(id, active) {
     db.prepare('UPDATE checklist_items SET is_active = ? WHERE id = ?').run(active ? 1 : 0, id);
   },
@@ -99,5 +105,16 @@ const ChecklistItem = {
     return added;
   },
 };
+
+// 驗證容量型門檻：整數、1–100、警告要小於異常。回傳 { warn, crit, error }
+ChecklistItem.parseThresholds = function parseThresholds(warnInput, critInput) {
+  const warn = warnInput === '' || warnInput == null ? 85 : Number(warnInput);
+  const crit = critInput === '' || critInput == null ? 95 : Number(critInput);
+  if (!Number.isInteger(warn) || !Number.isInteger(crit) || warn < 1 || crit > 100 || warn >= crit) {
+    return { warn, crit, error: '門檻請輸入 1–100 的整數，而且「警告」要小於「異常」（例如 85 與 95）' };
+  }
+  return { warn, crit, error: null };
+};
+ChecklistItem.KINDS = { text: '文字（狀態＋數值）', capacity: '容量型（多個磁碟區）' };
 
 module.exports = ChecklistItem;

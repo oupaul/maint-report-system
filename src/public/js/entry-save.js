@@ -207,6 +207,15 @@
     // 縮圖區與刪除用表單由伺服器用同一份範本渲染，直接換上去，檢視區（photo-viewer.js）用事件代理，不用重新綁定
     row.querySelector('.photo-thumbs').innerHTML = data.thumbsHtml;
     row.querySelector('.photo-delete-forms').innerHTML = data.deleteFormsHtml;
+    // 容量型項目：磁碟區編輯區由伺服器重新渲染（名稱整理成 C: 之類、剩餘／總容量算好）。
+    // 儲存期間如果使用者又改了這一列就不換，免得蓋掉他剛輸入的內容。
+    if (opts.replaceVolumes && data.volumesHtml) {
+      const host = row.querySelector('.vol-editor-host');
+      if (host) {
+        host.innerHTML = data.volumesHtml;
+        document.dispatchEvent(new CustomEvent('capacity:refresh', { detail: row }));
+      }
+    }
     if (opts.clearFile) {
       const f = row.querySelector('input[type=file]');
       if (f) f.value = '';
@@ -258,7 +267,7 @@
           finish();
           const okStatus = xhr.status >= 200 && xhr.status < 300;
           if (okStatus && data && data.ok) {
-            applyRow(row, data, { clearFile: true });
+            applyRow(row, data, { clearFile: true, replaceVolumes: (row._ver || 0) === sentVer });
             dropPending(row, sent);
             if ((row._ver || 0) === sentVer) {
               dirty.delete(row.id);
@@ -270,7 +279,7 @@
             resolve(true);
           } else if (data && data.savedPartial && data.thumbsHtml) {
             // 文字欄位與沒問題的截圖已經存了，只有某幾張圖片失敗：照實更新這一列並說明原因
-            applyRow(row, data, { clearFile: true });
+            applyRow(row, data, { clearFile: true, replaceVolumes: (row._ver || 0) === sentVer });
             dropPending(row, sent);
             if ((row._ver || 0) === sentVer) { dirty.delete(row.id); row.classList.remove('is-dirty'); }
             say(row, '其他內容已儲存。' + data.error, 'err');
