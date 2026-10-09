@@ -9,7 +9,22 @@
   };
   const filtered = !!(params.q || params.category || params.location || params.status || params.tag || params.customer);
   const manage = can('assets.manage');
-  const colCount = 11 + (params.grouped ? 0 : 1) + listFields.length + 1 + (manage ? 1 : 0);
+  // 可顯示／隱藏的欄位（名稱、勾選、編輯固定顯示）；on＝預設顯示，使用者的選擇記在瀏覽器（localStorage）
+  const colDefs = [
+    { key: 'customer', label: '客戶', on: true },
+    ...(params.grouped ? [] : [{ key: 'category', label: '類別', on: true }]),
+    { key: 'location', label: '位置', on: true },
+    { key: 'ip', label: 'IP / MAC', on: true },
+    { key: 'hostname', label: '主機名稱', on: false },
+    { key: 'brand', label: '廠牌 / 型號', on: false },
+    { key: 'serial', label: '序號', on: false },
+    { key: 'asset_tag', label: '財產編號', on: false },
+    { key: 'purchase', label: '購置日期', on: false },
+    ...listFields.map(f => ({ key: 'cf' + f.id, label: f.label, on: false })),
+    { key: 'tags', label: '標籤', on: false },
+    { key: 'status', label: '狀態', on: true },
+  ];
+  const colCount = 1 + colDefs.length + (manage ? 2 : 0);
 %>
 
 <div class="page-header">
@@ -67,6 +82,19 @@
     <div class="asset-toolbar">
       <span class="form-hint"><%= filtered ? `符合 ${total} / 全部 ${totalAll} 筆` : `共 ${totalAll} 筆` %><%= pages > 1 ? `・第 ${page} / ${pages} 頁` : '' %></span>
       <span class="asset-toolbar__right">
+        <% if (params.grouped) { %>
+          <button type="button" class="btn btn--secondary btn--sm" id="groups-expand" hidden>全部展開</button>
+          <button type="button" class="btn btn--secondary btn--sm" id="groups-collapse" hidden>全部收合</button>
+        <% } %>
+        <details class="col-chooser" id="col-chooser" hidden>
+          <summary class="btn btn--secondary btn--sm">顯示欄位</summary>
+          <div class="col-chooser__panel">
+            <% colDefs.forEach(c => { %>
+              <label class="col-chooser__item"><input type="checkbox" data-col-toggle="<%= c.key %>" data-default="<%= c.on ? '1' : '0' %>"> <%= c.label %></label>
+            <% }) %>
+            <button type="button" class="btn btn--secondary btn--sm" id="col-reset">恢復預設</button>
+          </div>
+        </details>
         <a href="<%= link({ group: params.grouped ? '0' : '1', page: 1 }) %>" class="btn btn--secondary btn--sm"><%= params.grouped ? '改成平面列表' : '改成依類別分組' %></a>
         <span class="form-hint">每頁</span>
         <% perOptions.forEach(n => { %>
@@ -96,24 +124,24 @@
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
       <% ['q', 'category', 'location', 'status', 'tag', 'customer'].forEach(k => { if (params[k]) { %><input type="hidden" name="<%= k %>" value="<%= params[k] %>"><% } }) %>
     <div class="table-wrap">
-      <table class="data-table asset-table">
+      <table class="data-table asset-table<%= manage ? ' has-sel' : '' %>">
         <thead>
           <tr>
-            <% if (manage) { %><th><input type="checkbox" id="select-all" aria-label="全選本頁"></th><% } %>
-            <th><%- sortHead('name', '名稱') %></th>
-            <th><%- sortHead('customer', '客戶') %></th>
-            <% if (!params.grouped) { %><th><%- sortHead('category', '類別') %></th><% } %>
-            <th><%- sortHead('location', '位置') %></th>
-            <th><%- sortHead('ip_address', 'IP') %> / MAC</th>
-            <th><%- sortHead('hostname', '主機名稱') %></th>
-            <th><%- sortHead('brand', '廠牌 / 型號') %></th>
-            <th><%- sortHead('serial_number', '序號') %></th>
-            <th><%- sortHead('asset_tag', '財產編號') %></th>
-            <th><%- sortHead('purchase_date', '購置日期') %></th>
-            <% listFields.forEach(f => { %><th><%= f.label %></th><% }) %>
-            <th>標籤</th>
-            <th><%- sortHead('is_active', '狀態') %></th>
-            <th></th>
+            <% if (manage) { %><th class="col-sel col-sticky"><input type="checkbox" id="select-all" aria-label="全選本頁"></th><% } %>
+            <th class="col-name col-sticky"><%- sortHead('name', '名稱') %></th>
+            <th data-col="customer"><%- sortHead('customer', '客戶') %></th>
+            <% if (!params.grouped) { %><th data-col="category"><%- sortHead('category', '類別') %></th><% } %>
+            <th data-col="location"><%- sortHead('location', '位置') %></th>
+            <th data-col="ip"><%- sortHead('ip_address', 'IP') %> / MAC</th>
+            <th data-col="hostname"><%- sortHead('hostname', '主機名稱') %></th>
+            <th data-col="brand"><%- sortHead('brand', '廠牌 / 型號') %></th>
+            <th data-col="serial"><%- sortHead('serial_number', '序號') %></th>
+            <th data-col="asset_tag"><%- sortHead('asset_tag', '財產編號') %></th>
+            <th data-col="purchase"><%- sortHead('purchase_date', '購置日期') %></th>
+            <% listFields.forEach(f => { %><th data-col="cf<%= f.id %>"><%= f.label %></th><% }) %>
+            <th data-col="tags">標籤</th>
+            <th data-col="status"><%- sortHead('is_active', '狀態') %></th>
+            <% if (manage) { %><th class="col-actions col-sticky"></th><% } %>
           </tr>
         </thead>
         <%
@@ -136,33 +164,34 @@
               </tr>
             <% } %>
             <tr data-g="<%= a.category %>">
-              <% if (manage) { %><td><input type="checkbox" class="row-check" name="ids" value="<%= a.id %>" aria-label="選取 <%= a.name %>"></td><% } %>
-              <td><%= a.name %></td>
-              <td><%= a.customer_name || '-' %></td>
-              <% if (!params.grouped) { %><td><%= categoryLabels[a.category] || a.category %></td><% } %>
-              <td><%= a.location || '-' %></td>
-              <td><%= a.ip_address || '-' %><% if (a.mac_address) { %><br><small class="form-hint"><%= a.mac_address %></small><% } %></td>
-              <td><%= a.hostname || '-' %></td>
-              <td><%= [a.brand, a.model].filter(Boolean).join(' ') || '-' %></td>
-              <td><%= a.serial_number || '-' %></td>
-              <td><%= a.asset_tag || '-' %><% if (a.identifier) { %> <span class="status-badge status-badge--warning" title="舊識別碼尚未整理：<%= a.identifier %>">待整理</span><% } %></td>
-              <td><%= a.purchase_date || '-' %></td>
-              <% listFields.forEach(f => { const cd = a.customDisplay.find(x => x.id === f.id); %><td><%= cd ? cd.text : '-' %></td><% }) %>
-              <td>
+              <% if (manage) { %><td class="col-sel col-sticky"><input type="checkbox" class="row-check" name="ids" value="<%= a.id %>" aria-label="選取 <%= a.name %>"></td><% } %>
+              <td class="col-name col-sticky">
+                <% if (manage) { %><a href="/assets/<%= a.id %>/edit" class="asset-name" title="編輯 <%= a.name %>"><%= a.name %></a><% } else { %><span class="asset-name"><%= a.name %></span><% } %>
+                <% if (capacityAssets.has(a.id)) { %><a href="/capacity/assets/<%= a.id %>" class="tag-chip trend-chip" title="查看 <%= a.name %> 的容量趨勢">容量趨勢</a><% } %>
+              </td>
+              <td data-col="customer"><%= a.customer_name || '-' %></td>
+              <% if (!params.grouped) { %><td data-col="category"><%= categoryLabels[a.category] || a.category %></td><% } %>
+              <td data-col="location"><%= a.location || '-' %></td>
+              <td data-col="ip"><%= a.ip_address || '-' %><% if (a.mac_address) { %><br><small class="form-hint"><%= a.mac_address %></small><% } %></td>
+              <td data-col="hostname"><%= a.hostname || '-' %></td>
+              <td data-col="brand"><%= [a.brand, a.model].filter(Boolean).join(' ') || '-' %></td>
+              <td data-col="serial"><%= a.serial_number || '-' %></td>
+              <td data-col="asset_tag"><%= a.asset_tag || '-' %><% if (a.identifier) { %> <span class="status-badge status-badge--warning" title="舊識別碼尚未整理：<%= a.identifier %>">待整理</span><% } %></td>
+              <td data-col="purchase"><%= a.purchase_date || '-' %></td>
+              <% listFields.forEach(f => { const cd = a.customDisplay.find(x => x.id === f.id); %><td data-col="cf<%= f.id %>"><%= cd ? cd.text : '-' %></td><% }) %>
+              <td data-col="tags">
                 <% if (a.tags.length === 0) { %>-<% } %>
                 <% a.tags.forEach(t => { %><a class="tag-chip" href="<%= link({ tag: t, page: 1 }) %>" title="只看這個標籤"><%= t %></a> <% }) %>
               </td>
-              <td>
+              <td data-col="status">
                 <% if (a.is_active) { %>
                   <span class="status-badge status-badge--normal">啟用</span>
                 <% } else { %>
                   <span class="status-badge status-badge--critical">停用</span>
                 <% } %>
               </td>
-              <% if (can('assets.manage')) { %>
-                <td><a href="/assets/<%= a.id %>/edit">編輯</a><% if (capacityAssets.has(a.id)) { %> ・ <a href="/capacity/assets/<%= a.id %>">容量趨勢</a><% } %></td>
-              <% } else if (capacityAssets.has(a.id)) { %>
-                <td><a href="/capacity/assets/<%= a.id %>">容量趨勢</a></td>
+              <% if (manage) { %>
+                <td class="col-actions col-sticky"><a href="/assets/<%= a.id %>/edit" class="btn btn--secondary btn--sm">編輯</a></td>
               <% } %>
             </tr>
           <% }) %>

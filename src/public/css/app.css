@@ -876,6 +876,24 @@ html:has(.saveall-bar:not([hidden])) { scroll-padding-bottom: 6rem; } /* 聚焦�
 .group-row ~ tr[hidden] { display: none; }
 .tag-chip { display: inline-block; padding: 0 var(--space-2); margin: 1px 0; border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-bg-soft); color: var(--color-text); font-size: var(--text-sm); text-decoration: none; white-space: nowrap; }
 .tag-chip:hover { border-color: var(--color-primary); color: var(--color-primary); }
+/* 資產列表：名稱欄固定在左、編輯欄固定在右（橫向捲動時不會不見）；欄位顯示由 assets-list.js 控制 */
+.asset-table .col-sticky { position: sticky; z-index: 2; background: var(--color-bg); }
+.asset-table thead .col-sticky { background: var(--color-bg-soft); }
+.asset-table tbody tr:hover .col-sticky { background: var(--color-bg-soft); }
+.asset-table .col-sel { left: 0; width: 2.5rem; min-width: 2.5rem; }
+.asset-table .col-name { left: 0; max-width: 18rem; overflow: hidden; text-overflow: ellipsis; box-shadow: 1px 0 0 var(--color-border); }
+.asset-table.has-sel .col-name { left: 2.5rem; }
+.asset-table .col-actions { right: 0; box-shadow: -1px 0 0 var(--color-border); }
+.asset-name { font-weight: 600; color: var(--color-text); text-decoration: none; }
+a.asset-name:hover { color: var(--color-primary); text-decoration: underline; }
+.trend-chip { margin-left: var(--space-2); }
+.group-row .group-toggle { position: sticky; left: var(--space-4); }
+.col-chooser { position: relative; }
+.col-chooser[hidden] { display: none; }
+.col-chooser > summary { list-style: none; cursor: pointer; }
+.col-chooser > summary::-webkit-details-marker { display: none; }
+.col-chooser__panel { position: absolute; right: 0; top: calc(100% + var(--space-2)); z-index: 10; min-width: 13rem; max-height: 70vh; overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4); background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-md); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12); }
+.col-chooser__item { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); cursor: pointer; white-space: nowrap; }
 .pager { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; justify-content: center; margin-top: var(--space-4); }
 .form-section { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-4); margin: 0 0 var(--space-6); }
 .form-section > legend { padding: 0 var(--space-2); font-weight: 600; color: var(--color-text-muted); }
