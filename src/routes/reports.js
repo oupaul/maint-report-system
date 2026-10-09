@@ -11,15 +11,14 @@ const InspectionVolume = require('../models/InspectionVolume');
 const InspectionItemPhoto = require('../models/InspectionItemPhoto');
 const BatchSignature = require('../models/BatchSignature');
 const PdfReportService = require('../services/PdfReportService');
+const ReportScope = require('../services/ReportScope');
+const { ZipStream } = require('../utils/zipStream');
+const { Writable } = require('stream');
 const ApprovalService = require('../services/ApprovalService');
 const config = require('../config');
 
-router.get('/batches/:id/report.pdf', requireLogin, async (req, res) => {
-  const batch = InspectionBatch.findById(req.params.id);
-  if (!batch) {
-    return res.status(404).render('error', { title: '找不到批次', message: '找不到指定的巡檢批次' });
-  }
-
+// 載入報告需要的資料（含所有客戶）；呼叫端再依選取的客戶過濾設備
+function loadReportData(batch) {
   const assets = AssetField.attach(InspectionBatch.getAssets(batch.id)); // 補上自訂欄位的值（報告設備頁會印）
   const items = InspectionVolume.attach(InspectionItem.findByBatch(batch.id));
   const photosByItemId = InspectionItemPhoto.findByItemIds(items.map(i => i.id));
@@ -31,17 +30,55 @@ router.get('/batches/:id/report.pdf', requireLogin, async (req, res) => {
     itemsByAssetId.get(item.asset_id).push(item);
   }
 
-  const signatures = BatchSignature.findByBatchId(batch.id);
   const signaturesByRole = {};
-  for (const sig of signatures) {
+  for (const sig of BatchSignature.findByBatchId(batch.id)) {
     signaturesByRole[sig.role] = sig;
+  }
+  return { assets, itemsByAssetId, signaturesByRole, approval: ApprovalService.approvalSummary(batch) };
+}
+
+const notFound = (res) => res.status(404).render('error', { title: '找不到批次', message: '找不到指定的巡檢批次' });
+const badSelection = (res) => res.status(400).render('error', { title: '請選擇客戶', message: '請至少選一家這個批次涵蓋的客戶，再下載報告。' });
+
+// 產生一份 PDF 並回傳 Buffer（打包 ZIP 用；一次只放一份在記憶體）
+function pdfBuffer(args) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    const sink = new Writable({ write(chunk, enc, cb) { chunks.push(chunk); cb(); } });
+    sink.on('finish', () => resolve(Buffer.concat(chunks)));
+    sink.on('error', reject);
+    PdfReportService.generateBatchReport(args, sink).catch(reject);
+  });
+}
+
+// ?customer=<客戶id|none>（可重複）：只輸出選到的客戶；沒帶＝全部；全選等同全部（不加「僅含部分客戶」的註記）
+router.get('/batches/:id/report.pdf', requireLogin, async (req, res) => {
+  const batch = InspectionBatch.findById(req.params.id);
+  if (!batch) return notFound(res);
+
+  const data = loadReportData(batch);
+  const groups = ReportScope.groupsOf(data.assets, data.itemsByAssetId);
+  const selected = ReportScope.parseSelection(req.query, groups);
+  let partial = false;
+  let assets = data.assets;
+  let utf8Name = `batch-${batch.id}-report.pdf`;
+  let asciiName = utf8Name;
+  if (selected && selected.size < groups.length) {
+    if (selected.size === 0) return badSelection(res);
+    partial = true;
+    assets = ReportScope.pick(data.assets, selected);
+    const names = groups.filter(g => selected.has(g.key)).map(g => g.name);
+    utf8Name = `batch-${batch.id}-${names.length === 1 ? ReportScope.fileSafe(names[0]) : '多家客戶'}-report.pdf`;
+    asciiName = `batch-${batch.id}-partial-report.pdf`;
+  } else if (selected && selected.size === 0) {
+    return badSelection(res); // 批次沒有任何設備
   }
 
   res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `inline; filename="batch-${batch.id}-report.pdf"`);
+  res.setHeader('Content-Disposition', ReportScope.contentDisposition('inline', asciiName, utf8Name));
 
   try {
-    await PdfReportService.generateBatchReport({ batch, assets, itemsByAssetId, signaturesByRole, approval: ApprovalService.approvalSummary(batch) }, res);
+    await PdfReportService.generateBatchReport({ batch, assets, itemsByAssetId: data.itemsByAssetId, signaturesByRole: data.signaturesByRole, approval: data.approval, partial }, res);
   } catch (err) {
     console.error('[reports] PDF 產生失敗:', err);
     if (!res.headersSent) {
@@ -52,6 +89,45 @@ router.get('/batches/:id/report.pdf', requireLogin, async (req, res) => {
       // 避免用戶端卡在等待一個永遠不會 doc.end() 的回應。
       res.end();
     }
+  }
+});
+
+// 每家客戶各一份 PDF，打包成 ZIP（?customer= 可只選部分客戶；沒帶＝這個批次的每一家客戶）
+router.get('/batches/:id/reports.zip', requireLogin, async (req, res) => {
+  const batch = InspectionBatch.findById(req.params.id);
+  if (!batch) return notFound(res);
+
+  const data = loadReportData(batch);
+  const groups = ReportScope.groupsOf(data.assets, data.itemsByAssetId);
+  const selected = ReportScope.parseSelection(req.query, groups);
+  const chosen = selected ? groups.filter(g => selected.has(g.key)) : groups;
+  if (chosen.length === 0) return badSelection(res);
+
+  res.setHeader('Content-Type', 'application/zip');
+  res.setHeader('Content-Disposition', ReportScope.contentDisposition('attachment', `batch-${batch.id}-reports.zip`, `batch-${batch.id}-各客戶報告.zip`));
+
+  try {
+    const zip = new ZipStream(res);
+    const used = new Set();
+    for (const g of chosen) {
+      const buf = await pdfBuffer({
+        batch,
+        assets: ReportScope.pick(data.assets, new Set([g.key])),
+        itemsByAssetId: data.itemsByAssetId,
+        signaturesByRole: data.signaturesByRole,
+        approval: data.approval,
+        partial: groups.length > 1, // 批次只有一家客戶時，這份就是完整報告
+      });
+      let name = `batch-${batch.id}-${ReportScope.fileSafe(g.name)}.pdf`;
+      if (used.has(name)) name = `batch-${batch.id}-${ReportScope.fileSafe(g.name)}-${g.key}.pdf`;
+      used.add(name);
+      await zip.addFile(name, buf);
+    }
+    await zip.finish();
+  } catch (err) {
+    console.error('[reports] 打包 ZIP 失敗:', err);
+    if (!res.headersSent) res.status(500).send('ZIP 產生失敗');
+    else res.destroy();
   }
 });
 

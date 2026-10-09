@@ -7,6 +7,30 @@
       <a href="/batches/<%= batch.id %>/entry" class="btn btn--secondary btn--md"><%= batch.status === 'draft' ? '繼續填寫' : '編輯內容' %></a>
     <% } %>
     <a href="/batches/<%= batch.id %>/report.pdf" class="btn btn--primary btn--md" target="_blank">下載 PDF 報告</a>
+    <% if (reportGroups.length > 1) { %>
+      <details class="report-picker" id="report-picker">
+        <summary class="btn btn--secondary btn--md">選擇客戶…</summary>
+        <form method="GET" action="/batches/<%= batch.id %>/report.pdf" class="report-picker__panel" id="report-picker-form">
+          <p class="form-hint">這個批次涵蓋 <%= reportGroups.length %> 組客戶，勾選要輸出的客戶：</p>
+          <% reportGroups.forEach(g => { %>
+            <label class="report-picker__item">
+              <input type="checkbox" name="customer" value="<%= g.key %>" checked>
+              <span><%= g.name %><% if (g.taxId) { %><small class="form-hint">（<%= g.taxId %>）</small><% } %></span>
+              <small class="form-hint"><%= g.assetCount %> 台<%= g.abnormal ? `・${g.abnormal} 項異常／警告` : '' %></small>
+            </label>
+          <% }) %>
+          <div class="report-picker__links">
+            <button type="button" class="link-button" id="report-pick-all">全選</button>
+            <button type="button" class="link-button" id="report-pick-none">全不選</button>
+          </div>
+          <div class="page-actions">
+            <button type="submit" class="btn btn--primary btn--sm" formtarget="_blank" id="report-pdf-btn">下載選取客戶的 PDF</button>
+            <button type="submit" class="btn btn--secondary btn--sm" formaction="/batches/<%= batch.id %>/reports.zip" id="report-zip-btn" title="選到的每一家客戶各產生一份 PDF，打包成一個 ZIP">每家客戶各一份（ZIP）</button>
+          </div>
+          <p class="form-hint">只選部分客戶時，報告封面只列出這些客戶並註明不是完整內容；簽名與簽核紀錄每份都保留。<strong>批次標題與備註會原樣印出</strong>，請確認其中沒有其他客戶的資訊。</p>
+        </form>
+      </details>
+    <% } %>
     <a href="/batches/export/records.csv?batch=<%= batch.id %>" class="btn btn--secondary btn--md" title="把這個批次的每個檢查項目匯出成 CSV">匯出本批次紀錄</a>
   </div>
 </div>
@@ -240,6 +264,7 @@
   </div>
 </section>
 
+<script src="/js/report-picker.js"></script>
 <script src="/js/signature-pad.js"></script>
 <script src="/js/photo-viewer.js"></script>
 

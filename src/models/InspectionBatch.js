@@ -58,7 +58,7 @@ const InspectionBatch = {
   getAssets(batchId) {
     return db.prepare(
       // 批次可以涵蓋多家客戶：依客戶（未指定客戶排最後）→ 類型 → 名稱排序，填寫頁、摘要頁與 PDF 都用這個順序，同一家客戶的設備會排在一起
-      `SELECT a.*, cu.name AS customer_name FROM inspection_batch_assets ba
+      `SELECT a.*, cu.name AS customer_name, cu.tax_id AS customer_tax_id FROM inspection_batch_assets ba
        JOIN assets a ON a.id = ba.asset_id
        LEFT JOIN customers cu ON cu.id = a.customer_id
        LEFT JOIN asset_categories ac ON ac.code = a.category

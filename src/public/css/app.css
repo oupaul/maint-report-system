@@ -991,3 +991,13 @@ a.asset-name:hover { color: var(--color-primary); text-decoration: underline; }
 .bulk-bar { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; padding: var(--space-2) var(--space-4); margin-bottom: var(--space-4); border: 1px dashed var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-soft); }
 .bulk-bar .form-select { width: auto; min-width: 12rem; }
 .customer-heading { margin: var(--space-8) 0 var(--space-2); padding: var(--space-2) var(--space-4); border-left: 4px solid var(--color-primary); background: var(--color-primary-soft-bg); font-size: var(--text-lg); }
+
+/* 批次摘要頁：選擇要輸出報告的客戶 */
+.report-picker { position: relative; }
+.report-picker > summary { list-style: none; cursor: pointer; }
+.report-picker > summary::-webkit-details-marker { display: none; }
+.report-picker__panel { position: absolute; right: 0; top: calc(100% + var(--space-2)); z-index: 10; width: 24rem; max-width: 90vw; max-height: 75vh; overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4); background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-md); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12); }
+.report-picker__panel .form-hint { margin: 0; }
+.report-picker__item { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: var(--space-2); font-size: var(--text-sm); cursor: pointer; }
+.report-picker__links { display: flex; gap: var(--space-4); }
+.link-button { background: none; border: none; padding: 0; color: var(--color-primary); font: inherit; font-size: var(--text-sm); cursor: pointer; text-decoration: underline; }

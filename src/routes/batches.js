@@ -117,6 +117,7 @@ router.get('/', requireLogin, (req, res) => {
 
 // ---- 匯出（要放在 /:id 之前）----
 const BatchExportService = require('../services/BatchExportService');
+const ReportScope = require('../services/ReportScope');
 
 function csvDownload(res, name, result) {
   res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${name}-${new Date().toISOString().slice(0, 10)}.csv"` });
@@ -574,6 +575,7 @@ router.get('/:id', requireLogin, (req, res) => {
     batch,
     assets,
     itemsByAssetId,
+    reportGroups: ReportScope.groupsOf(assets, itemsByAssetId), // 涵蓋多家客戶時，讓使用者選要輸出哪些客戶的報告
     categoryLabels: AssetCategory.labelMap(),
     statusColors,
     signatureRoles: SIGNATURE_ROLES,

@@ -379,7 +379,8 @@ function drawApprovalSection(doc, approval, fonts) {
  * @param {Map<number, Array<object>>} params.itemsByAssetId asset_id -> inspection_items（含 join 欄位）
  * @param {import('stream').Writable} outputStream 目標輸出串流（例如 Express res）
  */
-async function generateBatchReport({ batch, assets, itemsByAssetId, signaturesByRole, approval }, outputStream) {
+// partial＝只含部分客戶的設備（選客戶下載、或每家客戶各一份）：封面只寫這些客戶，並註明不是完整內容
+async function generateBatchReport({ batch, assets, itemsByAssetId, signaturesByRole, approval, partial = false }, outputStream) {
   // 含已停用的類型：舊報告仍要顯示得出類型名稱
   const categoryLabels = AssetCategory.labelMap();
   const doc = new PDFDocument({ size: 'A4', margin: 50, bufferPages: true });
@@ -397,7 +398,16 @@ async function generateBatchReport({ batch, assets, itemsByAssetId, signaturesBy
   doc.text(`報告產生時間：${dayjs(nowTaipei()).format('YYYY-MM-DD HH:mm')}`);
   // 批次可以涵蓋多家客戶：封面列出客戶，每台設備那一頁也標示所屬客戶
   const customerNames = [...new Set(assets.map(a => a.customer_name).filter(Boolean))];
-  if (customerNames.length) doc.text(`客戶：${customerNames.join('、')}${assets.some(a => !a.customer_name) ? '（另有設備未指定客戶）' : ''}`);
+  const hasUnassigned = assets.some(a => !a.customer_name);
+  if (customerNames.length) {
+    // 只有一家客戶時一併印統一編號
+    const taxId = customerNames.length === 1 ? (assets.find(a => a.customer_name) || {}).customer_tax_id : null;
+    const unassignedText = hasUnassigned ? (partial ? '（含未指定客戶的設備）' : '（另有設備未指定客戶）') : '';
+    doc.text(`客戶：${customerNames.join('、')}${taxId ? `（統一編號 ${taxId}）` : ''}${unassignedText}`);
+  } else if (partial && hasUnassigned) {
+    doc.text('客戶：未指定客戶');
+  }
+  if (partial) doc.text('本報告僅含上列客戶的設備，不是整張巡檢單的完整內容。');
   if (batch.notes) {
     doc.text(`備註：${batch.notes}`);
   }
