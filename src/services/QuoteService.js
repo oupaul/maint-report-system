@@ -217,7 +217,7 @@ function capacityExtra(assetId, volumes) {
 
 function assetSnapshot(asset) {
   return JSON.stringify({
-    name: asset.name, customerName: asset.customer_name || '', categoryLabel: AssetCategory.labelMap()[asset.category] || asset.category, location: asset.location || '',
+    name: asset.name, customerName: asset.customer_name || '', customerTaxId: asset.customer_tax_id || '', categoryLabel: AssetCategory.labelMap()[asset.category] || asset.category, location: asset.location || '',
     hostname: asset.hostname || '', brand: asset.brand || '', model: asset.model || '', serial_number: asset.serial_number || '',
     purchase_date: asset.purchase_date || '', ip_address: asset.ip_address || '', mac_address: asset.mac_address || '',
     custom: (asset.customDisplay || []).map(c => ({ label: c.label, text: c.text })),

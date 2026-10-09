@@ -19,11 +19,12 @@
   <% } else { %>
     <div class="table-wrap">
       <table class="data-table">
-        <thead><tr><th>客戶</th><th>簡稱／代碼</th><th>設備數</th><th>備註</th><th>狀態</th><th></th></tr></thead>
+        <thead><tr><th>客戶</th><th>統一編號</th><th>簡稱／代碼</th><th>設備數</th><th>備註</th><th>狀態</th><th></th></tr></thead>
         <tbody>
           <% customers.forEach(c => { %>
             <tr>
               <td><strong><%= c.name %></strong></td>
+              <td><%= c.tax_id || '-' %></td>
               <td><%= c.code || '-' %></td>
               <td><a href="/assets?customer=<%= c.id %>"><%= c.asset_count %></a></td>
               <td><small class="form-hint"><%= c.notes || '' %></small></td>
@@ -58,6 +59,10 @@
     <div class="form-group">
       <label class="form-label" for="name">客戶名稱</label>
       <input class="form-input" type="text" id="name" name="name" maxlength="<%= max.name %>" value="<%= form.name %>" required placeholder="例如：A 公司">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="tax_id">統一編號（選填）</label>
+      <input class="form-input" type="text" id="tax_id" name="tax_id" maxlength="8" inputmode="numeric" pattern="[0-9]{8}" value="<%= form.tax_id %>" style="max-width: 12rem;" placeholder="8 碼數字">
     </div>
     <div class="form-group">
       <label class="form-label" for="code">簡稱／代碼（選填）</label>

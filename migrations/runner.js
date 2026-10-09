@@ -35,6 +35,7 @@ const MIGRATIONS = [
   'migrate_0020_quote_notify_group',
   'migrate_0021_issue_triage',
   'migrate_0022_customers',
+  'migrate_0023_customer_tax_id',
 ];
 
 async function run() {

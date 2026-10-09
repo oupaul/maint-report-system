@@ -11,7 +11,7 @@ const URGENCY_TEXT = { normal: '一般', urgent: '緊急' };
 // 設備資料要印哪些欄位由 visibleAssetLines 決定（設定頁可以關掉 IP、MAC 等），畫面與 Email 共用
 function visibleAssetLines(snap, settings) {
   const lines = [];
-  if (snap.customerName) lines.push(`客戶：${snap.customerName}`); // 客戶永遠顯示，業務才知道是哪一家的設備
+  if (snap.customerName) lines.push(`客戶：${snap.customerName}${snap.customerTaxId ? `（統編 ${snap.customerTaxId}）` : ''}`); // 客戶永遠顯示，業務才知道是哪一家的設備
   const line1 = [snap.categoryLabel && `類別：${snap.categoryLabel}`, snap.location && `位置：${snap.location}`, snap.hostname && `主機名稱：${snap.hostname}`].filter(Boolean);
   if (line1.length) lines.push(line1.join('　'));
   const brandModel = [snap.brand, snap.model].filter(Boolean).join(' ');

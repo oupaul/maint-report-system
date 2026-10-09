@@ -16,7 +16,7 @@ const parseId = (v) => { const n = parseInt(v, 10); return Number.isInteger(n) &
 function render(req, res, { error = null, form = null, editId = null, status = 200 } = {}) {
   res.status(status).render('admin/customers', {
     customers: Customer.findAll(),
-    form: form || { name: '', code: '', notes: '' },
+    form: form || { name: '', code: '', notes: '', tax_id: '' },
     editId,
     max: { name: Customer.MAX_NAME, code: Customer.MAX_CODE, notes: Customer.MAX_NOTES },
     ok: FLASH_OK[req.query.ok] || null,
@@ -27,7 +27,7 @@ function render(req, res, { error = null, form = null, editId = null, status = 2
 router.get('/', (req, res) => {
   const id = parseId(req.query.edit);
   const c = id ? Customer.findById(id) : null;
-  render(req, res, c ? { editId: c.id, form: { name: c.name, code: c.code || '', notes: c.notes || '' } } : {});
+  render(req, res, c ? { editId: c.id, form: { name: c.name, code: c.code || '', notes: c.notes || '', tax_id: c.tax_id || '' } } : {});
 });
 
 router.post('/', (req, res) => {

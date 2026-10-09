@@ -8,10 +8,14 @@ function enrich(rows) {
   AssetField.attach(rows);
   AssetTag.attach(rows);
   if (rows.some(r => r.customer_id)) {
-    const names = new Map(db.prepare('SELECT id, name FROM customers').all().map(c => [c.id, c.name]));
-    rows.forEach(r => { r.customer_name = r.customer_id ? (names.get(r.customer_id) || null) : null; });
+    const cs = new Map(db.prepare('SELECT id, name, tax_id FROM customers').all().map(c => [c.id, c]));
+    rows.forEach(r => {
+      const c = r.customer_id ? cs.get(r.customer_id) : null;
+      r.customer_name = c ? c.name : null;
+      r.customer_tax_id = c ? c.tax_id : null;
+    });
   } else {
-    rows.forEach(r => { r.customer_name = null; });
+    rows.forEach(r => { r.customer_name = null; r.customer_tax_id = null; });
   }
   return rows;
 }

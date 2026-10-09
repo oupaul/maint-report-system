@@ -6,7 +6,12 @@ const MAX_NAME = 40;
 const MAX_CODE = 20;
 const MAX_NOTES = 300;
 
-function validate({ name, code, notes }, excludeId = null) {
+// 統一編號：8 碼數字。全形數字轉半形；Excel 會吃掉前導 0（變成 7 碼）時由匯入端補回，這裡只收 8 碼
+function normalizeTaxId(v) {
+  return String(v == null ? '' : v).replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0)).replace(/[\s-]/g, '');
+}
+
+function validate({ name, code, notes, tax_id }, excludeId = null) {
   const n = String(name == null ? '' : name).replace(/\s+/g, ' ').trim();
   if (!n) return { error: '請輸入客戶名稱' };
   if (n.length > MAX_NAME) return { error: `客戶名稱不能超過 ${MAX_NAME} 個字` };
@@ -16,13 +21,19 @@ function validate({ name, code, notes }, excludeId = null) {
   const c = String(code == null ? '' : code).trim();
   if (c.length > MAX_CODE) return { error: `簡稱／代碼不能超過 ${MAX_CODE} 個字` };
   if (/[\u0000-\u001f<>]/.test(c)) return { error: '簡稱／代碼含有不允許的字元' };
+  const tax = normalizeTaxId(tax_id);
+  if (tax) {
+    if (!/^\d{8}$/.test(tax)) return { error: '統一編號要是 8 碼數字' };
+    const td = db.prepare('SELECT id, name FROM customers WHERE tax_id = ?').get(tax);
+    if (td && td.id !== excludeId) return { error: `統一編號 ${tax} 已經是客戶「${td.name}」的了` };
+  }
   const note = String(notes == null ? '' : notes).replace(/\r\n/g, '\n').trim();
   if (note.length > MAX_NOTES) return { error: `備註不能超過 ${MAX_NOTES} 個字` };
-  return { value: { name: n, code: c || null, notes: note || null } };
+  return { value: { name: n, code: c || null, notes: note || null, tax_id: tax || null } };
 }
 
 const Customer = {
-  MAX_NAME, MAX_CODE, MAX_NOTES, validate,
+  MAX_NAME, MAX_CODE, MAX_NOTES, validate, normalizeTaxId,
 
   findAll({ activeOnly = false } = {}) {
     return db.prepare(
@@ -43,13 +54,17 @@ const Customer = {
     return db.prepare('SELECT COUNT(*) AS n FROM customers WHERE is_active = 1').get().n;
   },
 
-  create({ name, code, notes }) {
-    const r = db.prepare('INSERT INTO customers (name, code, notes, is_active, created_at) VALUES (?, ?, ?, 1, ?)').run(name, code || null, notes || null, nowTaipei());
+  findByTaxId(taxId) {
+    return db.prepare('SELECT * FROM customers WHERE tax_id = ?').get(normalizeTaxId(taxId));
+  },
+
+  create({ name, code, notes, tax_id }) {
+    const r = db.prepare('INSERT INTO customers (name, code, notes, tax_id, is_active, created_at) VALUES (?, ?, ?, ?, 1, ?)').run(name, code || null, notes || null, tax_id || null, nowTaipei());
     return Customer.findById(r.lastInsertRowid);
   },
 
-  update(id, { name, code, notes }) {
-    db.prepare('UPDATE customers SET name = ?, code = ?, notes = ? WHERE id = ?').run(name, code || null, notes || null, id);
+  update(id, { name, code, notes, tax_id }) {
+    db.prepare('UPDATE customers SET name = ?, code = ?, notes = ?, tax_id = ? WHERE id = ?').run(name, code || null, notes || null, tax_id || null, id);
   },
 
   setActive(id, active) {
