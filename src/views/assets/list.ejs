@@ -51,10 +51,10 @@
         <% }) %>
       </select>
       <% if (customerList.length > 0) { %>
-        <select class="form-select" name="customer" aria-label="依客戶篩選">
+        <select class="form-select" name="customer" aria-label="依客戶篩選" data-searchable>
           <option value="">全部客戶</option>
           <option value="none" <%= params.customer === 'none' ? 'selected' : '' %>>未指定客戶（<%= unassignedCount %>）</option>
-          <% customerList.forEach(c => { %><option value="<%= c.id %>" <%= params.customer === String(c.id) ? 'selected' : '' %>><%= c.name %>（<%= c.asset_count %>）<%= c.is_active ? '' : '・已停用' %></option><% }) %>
+          <% customerList.forEach(c => { %><option value="<%= c.id %>" data-search="<%= [c.tax_id, c.code].filter(Boolean).join(' ') %>" <%= params.customer === String(c.id) ? 'selected' : '' %>><%= c.name %>（<%= c.asset_count %>）<%= c.is_active ? '' : '・已停用' %></option><% }) %>
         </select>
       <% } %>
       <select class="form-select" name="location" aria-label="依位置篩選">
@@ -112,9 +112,9 @@
     <% if (manage && customerList.some(c => c.is_active)) { %>
       <div class="bulk-bar" id="bulk-bar">
         <span class="form-hint">批次設定客戶：先勾選下面的設備，</span>
-        <select class="form-select" name="customer_id" form="bulk-form" id="bulk-customer" aria-label="要設定的客戶">
+        <select class="form-select" name="customer_id" form="bulk-form" id="bulk-customer" aria-label="要設定的客戶" data-searchable>
           <option value="">（清除客戶＝未指定）</option>
-          <% customerList.filter(c => c.is_active).forEach(c => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %>
+          <% customerList.filter(c => c.is_active).forEach(c => { %><option value="<%= c.id %>" data-search="<%= [c.tax_id, c.code].filter(Boolean).join(' ') %>"><%= c.name %></option><% }) %>
         </select>
         <button type="submit" form="bulk-form" class="btn btn--secondary btn--sm" id="bulk-apply" disabled>套用到已選的 <span id="bulk-count">0</span> 台</button>
         <label class="form-hint"><input type="checkbox" name="scope" value="all" form="bulk-form" id="bulk-all"> 改成套用到「目前篩選條件下的全部 <%= total %> 台」</label>

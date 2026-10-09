@@ -80,7 +80,7 @@ const Customer = {
 
   // 設備可以選的客戶：啟用中的，另外加上這台設備目前正在用的（即使已停用也要保留）
   selectable(alsoInclude = null) {
-    return db.prepare('SELECT id, name FROM customers WHERE is_active = 1 OR id = ? ORDER BY name COLLATE NOCASE ASC').all(alsoInclude || 0);
+    return db.prepare('SELECT id, name, code, tax_id FROM customers WHERE is_active = 1 OR id = ? ORDER BY name COLLATE NOCASE ASC').all(alsoInclude || 0);
   },
 
   // 批次設定客戶：一次把一批設備指到某個客戶（customerId 為 null＝清除）。回傳更新台數

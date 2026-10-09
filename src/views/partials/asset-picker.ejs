@@ -44,7 +44,7 @@
       </select>
     <% } %>
     <% if (custNames.length > 0) { %>
-      <select class="form-select ap-customer" aria-label="依客戶篩選">
+      <select class="form-select ap-customer" aria-label="依客戶篩選" data-searchable>
         <option value="">全部客戶</option>
         <% custNames.forEach(n => { %><option value="<%= n %>"><%= n %>（<%= custCounts[n] %>）</option><% }) %>
         <% if (custCounts['']) { %><option value="__none__">未指定客戶（<%= custCounts[''] %>）</option><% } %>

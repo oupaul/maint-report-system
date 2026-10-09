@@ -14,7 +14,7 @@
   <% if (customerOptions.length > 0) { %>
     <form method="GET" action="/capacity" class="asset-filter" id="cap-filter">
       <input type="hidden" name="view" value="<%= showAll ? 'all' : 'attention' %>">
-      <select class="form-select" name="customer" aria-label="依客戶篩選">
+      <select class="form-select" name="customer" aria-label="依客戶篩選" data-searchable>
         <option value="">全部客戶</option>
         <% customerOptions.forEach(c => { %><option value="<%= c.id %>" <%= customerFilter === String(c.id) ? 'selected' : '' %>><%= c.name %></option><% }) %>
         <% if (hasUnassigned) { %><option value="none" <%= customerFilter === 'none' ? 'selected' : '' %>>未指定客戶</option><% } %>

@@ -11,7 +11,7 @@
 <div class="card">
   <% if (customerList.length > 0) { %>
     <form method="GET" action="/batches" class="asset-filter" id="batch-filter">
-      <select class="form-select" name="customer" aria-label="依客戶篩選">
+      <select class="form-select" name="customer" aria-label="依客戶篩選" data-searchable>
         <option value="">全部客戶</option>
         <option value="none" <%= filter === 'none' ? 'selected' : '' %>>含未指定客戶的設備</option>
         <% customerList.forEach(c => { %><option value="<%= c.id %>" <%= filter === String(c.id) ? 'selected' : '' %>><%= c.name %></option><% }) %>

@@ -17,7 +17,7 @@
       <% categoryCodes.forEach(c => { %><option value="<%= c %>" <%= f.category === c ? 'selected' : '' %>><%= categoryLabels[c] || c %></option><% }) %>
     </select>
     <% if (customerOptions.length > 0) { %>
-      <select class="form-select" name="customer" aria-label="依客戶篩選">
+      <select class="form-select" name="customer" aria-label="依客戶篩選" data-searchable>
         <option value="">全部客戶</option>
         <% customerOptions.forEach(c => { %><option value="<%= c.id %>" <%= f.customer === String(c.id) ? 'selected' : '' %>><%= c.name %></option><% }) %>
         <% if (hasUnassigned) { %><option value="none" <%= f.customer === 'none' ? 'selected' : '' %>>未指定客戶</option><% } %>

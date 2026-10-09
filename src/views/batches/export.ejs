@@ -23,7 +23,7 @@
     <div class="checklist-row__grid">
       <div class="form-group">
         <label class="form-label" for="customer">客戶</label>
-        <select class="form-select" id="customer" name="customer">
+        <select class="form-select" id="customer" name="customer" data-searchable>
           <option value="">全部客戶</option>
           <option value="none" <%= f.customer === 'none' ? 'selected' : '' %>>未指定客戶</option>
           <% customerList.forEach(c => { %><option value="<%= c.id %>" <%= f.customer === String(c.id) ? 'selected' : '' %>><%= c.name %></option><% }) %>
