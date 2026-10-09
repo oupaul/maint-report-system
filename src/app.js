@@ -161,6 +161,8 @@ try {
   app.use('/', dashboardRoutes);
   app.use('/assets', assetRoutes);
   app.use('/capacity', require('./routes/capacity'));
+  app.use('/issues', require('./routes/issues'));
+  app.use('/quotes', require('./routes/quotes'));
   app.use('/users', userRoutes);
   app.use('/account', accountRoutes);
   app.use('/admin', adminRoutes);
@@ -231,6 +233,7 @@ const server = app.listen(config.PORT, () => {
   console.log(`   運行於 http://localhost:${config.PORT}`);
   console.log(`   環境: ${config.NODE_ENV}\n`);
   BackupService.startScheduler();
+  require('./services/QuoteService').startReminders(); // 報價請求超過幾天沒人處理就自動提醒業務
   // 已讀超過 90 天的通知定期清掉（啟動時一次，之後每天一次）
   try { Notification.prune(); } catch (e) { /* 清不掉不影響服務 */ }
   setInterval(() => { try { Notification.prune(); } catch (e) { /* ignore */ } }, 24 * 60 * 60 * 1000).unref();

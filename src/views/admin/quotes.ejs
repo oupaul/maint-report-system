@@ -1,0 +1,59 @@
+<%- include('../layout', { title: '報價請求設定' }) %>
+
+<div class="page-header">
+  <h1>報價請求設定</h1>
+  <div class="page-actions"><a href="/quotes" class="btn btn--secondary btn--md">報價請求清單</a></div>
+</div>
+
+<% if (ok) { %><div class="form-success"><%= ok %></div><% } %>
+<% if (error) { %><div class="form-error"><%= error %></div><% } %>
+
+<div class="card" style="max-width: 720px;">
+  <p class="form-hint">工程師在異常／警告的檢查項目上按「通知業務報價」，系統會建立一張有追蹤狀態的報價請求並通知業務。誰是「業務」由<strong>權限群組</strong>決定：有「接收與處理報價請求」權限的群組成員（預設已建立「業務」群組）。</p>
+
+  <div class="form-group">
+    <span class="form-label">目前收得到通知的業務</span>
+    <p class="form-hint">
+      <% if (salesGroups.length === 0) { %><span class="import-warn">沒有任何群組有「接收與處理報價請求」權限，請到「權限群組」設定。</span><% } else { %>
+        群組：<%= salesGroups.map(g => g.name + '（' + g.member_count + ' 人）').join('、') %><br>
+      <% } %>
+      <% if (sales.length === 0) { %><span class="import-warn">目前沒有可通知的業務，請求會改通知管理員。請到「權限群組」把人加進群組。</span><% } else { %>成員：<%= sales.map(u => u.display_name || u.username).join('、') %><% } %>
+      <a href="/admin/groups">前往權限群組</a>
+    </p>
+  </div>
+
+  <form method="POST" action="/admin/quotes">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <div class="form-group form-checkbox-row"><input type="checkbox" id="enabled" name="enabled" <%= form.enabled ? 'checked' : '' %>><label class="form-label" for="enabled" style="margin:0;">啟用報價請求功能（關閉後不能建立新的請求，既有的照常處理）</label></div>
+
+    <div class="form-group">
+      <label class="form-label" for="sales_email">固定業務信箱（選填）</label>
+      <input class="form-input" type="email" id="sales_email" name="sales_email" maxlength="200" value="<%= form.sales_email || '' %>" placeholder="sales@example.com">
+      <p class="form-hint">每張請求另外寄一封到這個信箱（業務不是系統使用者、或想用共用信箱時用）。需要先在「Email 通知」設定好寄信。</p>
+    </div>
+
+    <div class="form-group form-checkbox-row"><input type="checkbox" id="attach_pdf" name="attach_pdf" <%= form.attach_pdf ? 'checked' : '' %>><label class="form-label" for="attach_pdf" style="margin:0;">Email 附上這張請求的 PDF（含截圖，沒有系統帳號的人也看得到；超過 2.5MB 會自動不附）</label></div>
+
+    <div class="form-group">
+      <span class="form-label">業務看得到的設備欄位</span>
+      <p class="form-hint">設備名稱、類別、位置、主機名稱、廠牌型號固定會顯示；以下可以決定要不要給業務看：</p>
+      <label class="form-checkbox-row"><input type="checkbox" name="show_serial" <%= form.show_serial ? 'checked' : '' %>> 序號</label>
+      <label class="form-checkbox-row"><input type="checkbox" name="show_purchase" <%= form.show_purchase ? 'checked' : '' %>> 購置日期</label>
+      <label class="form-checkbox-row"><input type="checkbox" name="show_custom" <%= form.show_custom ? 'checked' : '' %>> 自訂欄位（例如保固到期日）</label>
+      <label class="form-checkbox-row"><input type="checkbox" name="show_ip" <%= form.show_ip ? 'checked' : '' %>> IP 位址</label>
+      <label class="form-checkbox-row"><input type="checkbox" name="show_mac" <%= form.show_mac ? 'checked' : '' %>> MAC 位址</label>
+    </div>
+
+    <div class="form-group form-checkbox-row"><input type="checkbox" id="require_confirm" name="require_confirm" <%= form.require_confirm ? 'checked' : '' %>><label class="form-label" for="require_confirm" style="margin:0;">送出前需要主管（管理員）確認：工程師送出後先通知管理員，確認後才通知業務；管理員也可以退回</label></div>
+
+    <div class="form-group">
+      <label class="form-label" for="remind_days">自動提醒天數</label>
+      <input class="form-input" type="number" id="remind_days" name="remind_days" min="0" max="30" value="<%= form.remind_days %>" style="max-width: 8rem;">
+      <p class="form-hint">「已送出」超過這麼多天沒人接手、或「處理中」超過這麼多天沒進展，系統自動提醒業務（每張最多 3 次）。0＝不自動提醒。</p>
+    </div>
+
+    <button type="submit" class="btn btn--primary btn--md">儲存</button>
+  </form>
+</div>
+
+<%- include('../partials/footer') %>

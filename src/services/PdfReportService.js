@@ -474,4 +474,4 @@ async function generateBatchReport({ batch, assets, itemsByAssetId, signaturesBy
   });
 }
 
-module.exports = { generateBatchReport };
+module.exports = { generateBatchReport, registerFonts };

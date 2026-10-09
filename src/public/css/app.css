@@ -932,3 +932,20 @@ html:has(.saveall-bar:not([hidden])) { scroll-padding-bottom: 6rem; } /* 聚焦�
 .import-change { font-size: var(--text-sm); }
 .import-warn { font-size: var(--text-sm); color: var(--color-status-warning); }
 .import-rules li { margin-bottom: var(--space-2); }
+
+/* ---- 待處理項目 ---- */
+.issue-chips { display: inline-flex; gap: var(--space-2); flex-wrap: wrap; }
+.issue-value { white-space: pre-line; }
+.data-table tr:target > td { background: var(--color-primary-soft-bg); }
+.data-table tr[id^="item-"] { scroll-margin-top: 5rem; }
+.issue-actions { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); margin-top: var(--space-2); font-size: var(--text-sm); }
+
+/* ---- 報價請求 ---- */
+.quote-item { display: flex; gap: var(--space-2); align-items: flex-start; padding: var(--space-2) var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-md); margin-bottom: var(--space-2); cursor: pointer; }
+.quote-item.is-disabled { opacity: 0.7; cursor: default; background: var(--color-bg-soft); }
+.quote-item > span { display: flex; flex-direction: column; gap: 2px; }
+.quote-actions { display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: center; margin-bottom: var(--space-4); }
+.quote-timeline { list-style: none; padding: 0; }
+.quote-timeline li { padding: var(--space-2) 0; border-bottom: 1px solid var(--color-border); font-size: var(--text-sm); }
+.quote-timeline time { color: var(--color-text-muted); margin-right: var(--space-2); }
+.inline-edit { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; }

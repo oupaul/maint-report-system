@@ -4,6 +4,7 @@ const router = express.Router();
 const { requireLogin } = require('../middleware/auth');
 const Notification = require('../models/Notification');
 const Announcement = require('../models/Announcement');
+const { safeReturnPath } = require('../utils/safeRedirect');
 
 router.use(requireLogin);
 
@@ -33,7 +34,7 @@ router.post('/:id/open', (req, res) => {
   const n = Notification.findForUser(parseInt(req.params.id, 10), req.user.id);
   if (!n) return res.redirect('/notifications');
   Notification.markRead(n.id, req.user.id);
-  res.redirect(n.batch_id ? `/batches/${n.batch_id}` : '/notifications');
+  res.redirect(safeReturnPath(n.link) || (n.batch_id ? `/batches/${n.batch_id}` : '/notifications'));
 });
 
 module.exports = router;

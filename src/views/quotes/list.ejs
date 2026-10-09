@@ -1,0 +1,70 @@
+<%- include('../layout', { title: '報價請求' }) %>
+<%
+  const tone = { pending_confirm: 'warning', sent: 'warning', processing: 'warning', quoted: 'normal', closed: '', cancelled: 'critical' };
+  const link = (over = {}) => {
+    const m = { view: params.view, q: params.q, mine: params.mine ? '1' : '', page: '', ...over };
+    const qs = new URLSearchParams();
+    Object.entries(m).forEach(([k, v]) => { if (v && !(k === 'view' && v === 'open')) qs.set(k, v); });
+    const t = qs.toString();
+    return '/quotes' + (t ? '?' + t : '');
+  };
+%>
+
+<div class="page-header">
+  <h1>報價請求</h1>
+  <div class="page-actions">
+    <% if (handler) { %><a href="/quotes/stats" class="btn btn--secondary btn--md">統計</a><% } %>
+    <a href="/issues" class="btn btn--primary btn--md">到待處理項目送出請求</a>
+  </div>
+</div>
+
+<div class="card">
+  <p class="form-hint"><%= handler ? '你可以看到全部的報價請求。' : '這裡是你送出的報價請求。' %>要新增請到「待處理項目」，在異常或警告的項目上按「通知業務報價」。</p>
+  <div class="asset-toolbar">
+    <span class="issue-chips">
+      <a class="btn btn--sm <%= params.view === 'open' ? 'btn--primary' : 'btn--secondary' %>" href="<%= link({ view: 'open', page: '' }) %>">進行中 <%= counts.open %></a>
+      <% ['pending_confirm', 'sent', 'processing', 'quoted', 'closed', 'cancelled'].forEach(s => { if (s === 'pending_confirm' && !(counts.map[s] || params.view === s)) return; %>
+        <a class="btn btn--sm <%= params.view === s ? 'btn--primary' : 'btn--secondary' %>" href="<%= link({ view: s, page: '' }) %>"><%= STATUS[s] %> <%= counts.map[s] || 0 %></a>
+      <% }) %>
+      <a class="btn btn--sm <%= params.view === 'all' ? 'btn--primary' : 'btn--secondary' %>" href="<%= link({ view: 'all', page: '' }) %>">全部</a>
+    </span>
+    <form method="GET" action="/quotes" class="asset-filter" style="margin:0;">
+      <input type="hidden" name="view" value="<%= params.view %>">
+      <% if (handler) { %><label class="form-hint"><input type="checkbox" name="mine" value="1" <%= params.mine ? 'checked' : '' %>> 只看我送出的</label><% } %>
+      <input type="search" class="form-input" name="q" value="<%= params.q %>" placeholder="搜尋設備、項目、單號、Q-編號" aria-label="搜尋">
+      <button type="submit" class="btn btn--secondary btn--md">搜尋</button>
+    </form>
+  </div>
+
+  <% if (rows.length === 0) { %>
+    <div class="empty-state">沒有符合的報價請求。</div>
+  <% } else { %>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>編號</th><th>設備</th><th>項目</th><th>狀態</th><th>送出</th><th>處理人</th><th>報價</th></tr></thead>
+        <tbody>
+          <% rows.forEach(r => { %>
+            <tr>
+              <td><a href="/quotes/<%= r.id %>"><strong>Q-<%= r.id %></strong></a><% if (r.urgency === 'urgent') { %><br><span class="status-badge status-badge--critical">緊急</span><% } %></td>
+              <td><a href="/quotes/<%= r.id %>"><%= r.asset.name %></a><br><small class="form-hint"><%= r.asset.location %></small></td>
+              <td><small><%= r.item_labels %></small></td>
+              <td><span class="status-badge <%= tone[r.status] ? 'status-badge--' + tone[r.status] : '' %>"><%= STATUS[r.status] %></span></td>
+              <td><%= r.requested_by_name %><br><small class="form-hint"><%= (r.sent_at || r.requested_at).slice(0, 16) %></small></td>
+              <td><%= r.assigned_to_name || '-' %></td>
+              <td><%= r.quote_no || '-' %><% if (r.quote_amount != null) { %><br><small class="form-hint"><%= r.quote_amount.toLocaleString('en-US') %></small><% } %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% if (pages > 1) { %>
+      <nav class="pager" aria-label="分頁">
+        <% if (page > 1) { %><a class="btn btn--secondary btn--sm" href="<%= link({ page: page - 1 }) %>">上一頁</a><% } %>
+        <span class="form-hint">第 <%= page %> / <%= pages %> 頁（共 <%= total %> 筆）</span>
+        <% if (page < pages) { %><a class="btn btn--secondary btn--sm" href="<%= link({ page: page + 1 }) %>">下一頁</a><% } %>
+      </nav>
+    <% } %>
+  <% } %>
+</div>
+
+<%- include('../partials/footer') %>

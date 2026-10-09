@@ -1,0 +1,55 @@
+<%- include('../layout', { title: '報價統計' }) %>
+<%
+  const pct = (v) => (v == null ? '-' : (v * 100).toFixed(0) + '%');
+  const hrs = (v) => (v == null ? '-' : (v < 48 ? v.toFixed(1) + ' 小時' : (v / 24).toFixed(1) + ' 天'));
+%>
+<div class="page-header">
+  <h1>報價統計</h1>
+  <div class="page-actions"><a href="/quotes" class="btn btn--secondary btn--md">回到報價請求</a></div>
+</div>
+
+<div class="stat-row">
+  <div class="card stat-card"><div class="stat-card__value"><%= s.effective %></div><div class="stat-card__label">請求總數（不含已取消）</div></div>
+  <div class="card stat-card"><div class="stat-card__value"><%= pct(s.quotedRate) %></div><div class="stat-card__label">已報價比例（<%= s.quotedCount %> / <%= s.effective %>）</div></div>
+  <div class="card stat-card"><div class="stat-card__value"><%= hrs(s.avgFirstResponseHours) %></div><div class="stat-card__label">平均首次回應時間</div></div>
+  <div class="card stat-card"><div class="stat-card__value"><%= s.avgDaysToQuote == null ? '-' : s.avgDaysToQuote.toFixed(1) + ' 天' %></div><div class="stat-card__label">平均送出到報價</div></div>
+  <div class="card stat-card"><div class="stat-card__value"><%= s.overdue %></div><div class="stat-card__label">逾期未接手（超過 <%= s.remindDays %> 天）</div></div>
+  <div class="card stat-card"><div class="stat-card__value"><%= s.totalAmount.toLocaleString('en-US') %></div><div class="stat-card__label">已報價金額合計</div></div>
+</div>
+
+<div class="card">
+  <h2>各狀態件數</h2>
+  <p>
+    <% Object.keys(STATUS).forEach(k => { %><span class="status-badge"><%= STATUS[k] %> <%= s.byStatus[k] || 0 %></span> <% }) %>
+  </p>
+</div>
+
+<div class="card">
+  <h2>最近 6 個月</h2>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead><tr><th>月份</th><th>送出</th><th>已報價</th><th>報價金額合計</th></tr></thead>
+      <tbody>
+        <% s.byMonth.forEach(m => { %><tr><td><%= m.month %></td><td><%= m.created %></td><td><%= m.quoted %></td><td><%= m.amount ? m.amount.toLocaleString('en-US') : '-' %></td></tr><% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <div class="checklist-row__grid">
+    <div>
+      <h2>送出最多的工程師</h2>
+      <% if (s.topRequesters.length === 0) { %><p class="form-hint">尚無資料</p><% } %>
+      <ol><% s.topRequesters.forEach(r => { %><li><%= r.name %>：<%= r.n %> 張</li><% }) %></ol>
+    </div>
+    <div>
+      <h2>處理最多的業務</h2>
+      <% if (s.topHandlers.length === 0) { %><p class="form-hint">尚無資料</p><% } %>
+      <ol><% s.topHandlers.forEach(r => { %><li><%= r.name %>：<%= r.n %> 張</li><% }) %></ol>
+    </div>
+  </div>
+  <p class="form-hint">「已報價比例」＝有填過報價的請求 ÷ 全部請求（不含已取消、待確認）；時間以「送出」為起點。</p>
+</div>
+
+<%- include('../partials/footer') %>

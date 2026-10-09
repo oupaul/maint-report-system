@@ -40,6 +40,40 @@
   </div>
 <% } %>
 
+<% if ((quotes.handler && quotes.waiting + quotes.processing + quotes.confirm > 0) || (!quotes.handler && quotes.open > 0)) { %>
+  <div class="card card--accent">
+    <h2>報價請求</h2>
+    <% if (quotes.handler) { %>
+      <p>待接手 <strong><%= quotes.waiting %></strong>・處理中 <strong><%= quotes.processing %></strong><%= quotes.confirm ? '・待主管確認 ' + quotes.confirm : '' %>・已報價待結案 <%= quotes.quoted %>　<a href="/quotes">前往處理</a></p>
+    <% } else { %>
+      <p>你有 <strong><%= quotes.open %></strong> 張報價請求進行中　<a href="/quotes">查看進度</a></p>
+    <% } %>
+  </div>
+<% } %>
+
+<% if (issues.critical + issues.warning > 0) { %>
+  <div class="card">
+    <h2>待處理項目（異常 <%= issues.critical %>・警告 <%= issues.warning %>）</h2>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>嚴重度</th><th>設備</th><th>檢查項目</th><th>數值 / 備註</th><th>最新巡檢</th></tr></thead>
+        <tbody>
+          <% issues.top.forEach(r => { %>
+            <tr>
+              <td><span class="status-badge status-badge--<%= r.status %>"><%= r.status === 'critical' ? '異常' : '警告' %></span></td>
+              <td><%= r.asset_name %></td>
+              <td><a href="/batches/<%= r.batch_id %>#item-<%= r.item_id %>"><%= r.label %></a></td>
+              <td><small><%= (r.display || r.note || '-').split('\n')[0] %></small></td>
+              <td><small><%= r.batch_date %></small></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top: var(--space-2);"><a href="/issues">查看全部待處理項目<%= issues.critical + issues.warning > issues.top.length ? '（另有 ' + (issues.critical + issues.warning - issues.top.length) + ' 筆）' : '' %></a></p>
+  </div>
+<% } %>
+
 <% if (capacityAlerts.length > 0) { %>
   <div class="card">
     <h2>容量預警（<%= capacityAlertTotal %>）</h2>

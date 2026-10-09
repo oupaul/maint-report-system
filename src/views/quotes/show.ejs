@@ -1,0 +1,106 @@
+<%- include('../layout', { title: '報價請求 Q-' + request.id }) %>
+<%
+  const tone = { pending_confirm: 'warning', sent: 'warning', processing: 'warning', quoted: 'normal', closed: '', cancelled: 'critical' };
+  const evLabel = { created: '建立', confirmed: '確認', rejected: '退回', claimed: '接手', quoted: '報價', closed: '結案', cancelled: '取消', reminder: '提醒', auto_reminder: '自動提醒', note: '留言', email: 'Email', warn: '注意' };
+%>
+
+<div class="page-header">
+  <h1>報價請求 Q-<%= request.id %>
+    <span class="status-badge <%= tone[request.status] ? 'status-badge--' + tone[request.status] : '' %>"><%= STATUS[request.status] %></span>
+    <% if (request.urgency === 'urgent') { %><span class="status-badge status-badge--critical">緊急</span><% } %>
+  </h1>
+  <div class="page-actions">
+    <a href="/quotes/<%= request.id %>/pdf" class="btn btn--secondary btn--md" target="_blank" rel="noopener">開啟 PDF</a>
+    <a href="/quotes" class="btn btn--secondary btn--md">回到報價請求</a>
+  </div>
+</div>
+
+<% if (ok) { %><div class="form-success"><%= ok %></div><% } %>
+<% if (error) { %><div class="form-error"><%= error %></div><% } %>
+<% if (recovered && ['pending_confirm', 'sent', 'processing', 'quoted'].includes(request.status)) { %>
+  <div class="form-warning" role="status">這些項目在後來的巡檢裡<strong>已經恢復正常</strong>，如果不需要報價了，建議取消或結案。</div>
+<% } %>
+
+<div class="card">
+  <h2><%= asset.name %></h2>
+  <% visibleLines.forEach(l => { %><p class="form-hint" style="margin:0;"><%= l %></p><% }) %>
+  <p class="form-hint">送出：<%= request.requested_by_name %>・<%= (request.sent_at || request.requested_at).slice(0, 16) %><% if (request.assigned_to_name) { %>・處理人：<%= request.assigned_to_name %><% } %></p>
+  <% if (request.description) { %><p><strong>工程師說明</strong><br><span class="issue-value"><%= request.description %></span></p><% } %>
+  <% if (request.quote_no || request.quote_amount != null || request.sales_note) { %>
+    <p><strong>報價</strong>：<%= request.quote_no ? '單號 ' + request.quote_no : '' %><%= request.quote_amount != null ? '　金額 ' + request.quote_amount.toLocaleString('en-US') : '' %><%= request.sales_note ? '　備註：' + request.sales_note : '' %></p>
+  <% } %>
+</div>
+
+<% items.forEach(i => { %>
+  <div class="card">
+    <h3><span class="status-badge status-badge--<%= i.status %>"><%= i.status === 'critical' ? '異常' : '警告' %></span> <%= i.label %></h3>
+    <% if (i.display) { %><p class="issue-value"><%= i.display %></p><% } %>
+    <% if (i.extra) { %><p class="issue-value import-warn">預測：<%= i.extra %></p><% } %>
+    <% if (i.note) { %><p class="form-hint">備註：<%= i.note %></p><% } %>
+    <p class="form-hint">來源：<a href="/batches/<%= i.batch_id %>#item-<%= i.inspection_item_id %>"><%= i.batch_date %> <%= i.batch_title %></a>（送出當下的內容）</p>
+    <% if (i.photos.length > 0) { %>
+      <div class="photo-thumb-list">
+        <% i.photos.forEach(p => { %>
+          <div class="photo-thumb-list__item"><a href="/quotes/<%= request.id %>/photo/<%= p.id %>" target="_blank" rel="noopener"><img class="screenshot-thumb" src="/quotes/<%= request.id %>/photo/<%= p.id %>" alt="<%= i.label %> 截圖"></a></div>
+        <% }) %>
+      </div>
+    <% } %>
+  </div>
+<% }) %>
+
+<% if (perm.confirm || perm.claim || perm.quote || perm.close || perm.cancel || perm.remind) { %>
+<div class="card">
+  <h2>處理</h2>
+  <% if (perm.confirm) { %>
+    <div class="quote-actions">
+      <form method="POST" action="/quotes/<%= request.id %>/confirm"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="btn btn--primary btn--md" type="submit">確認送出給業務</button></form>
+      <form method="POST" action="/quotes/<%= request.id %>/reject" class="inline-edit"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><input class="form-input" name="reason" maxlength="500" placeholder="退回原因（必填）" required><button class="btn btn--secondary btn--md" type="submit">退回</button></form>
+    </div>
+  <% } %>
+  <% if (perm.claim) { %>
+    <form method="POST" action="/quotes/<%= request.id %>/claim" style="margin-bottom: var(--space-4);"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="btn btn--primary btn--md" type="submit">接手處理</button></form>
+  <% } %>
+  <% if (perm.quote) { %>
+    <form method="POST" action="/quotes/<%= request.id %>/quote" style="margin-bottom: var(--space-4);">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <div class="checklist-row__grid">
+        <div class="form-group"><label class="form-label" for="quote_no">報價單號（選填）</label><input class="form-input" id="quote_no" name="quote_no" maxlength="50"></div>
+        <div class="form-group"><label class="form-label" for="amount">金額（選填）</label><input class="form-input" id="amount" name="amount" inputmode="decimal" placeholder="例如 35000"></div>
+        <div class="form-group"><label class="form-label" for="qnote">備註（選填）</label><input class="form-input" id="qnote" name="note" maxlength="1000"></div>
+      </div>
+      <button class="btn btn--primary btn--md" type="submit">記錄已報價</button>
+    </form>
+  <% } %>
+  <% if (perm.close) { %>
+    <form method="POST" action="/quotes/<%= request.id %>/close" class="inline-edit" style="margin-bottom: var(--space-4);">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input class="form-input" name="note" maxlength="1000" placeholder="<%= request.status === 'quoted' ? '結案說明（選填，例如客戶已簽回）' : '結案原因（必填，例如客戶不需要）' %>" <%= request.status === 'quoted' ? '' : 'required' %>>
+      <button class="btn btn--secondary btn--md" type="submit">結案</button>
+    </form>
+  <% } %>
+  <div class="quote-actions">
+    <% if (perm.remind) { %><form method="POST" action="/quotes/<%= request.id %>/remind"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="btn btn--secondary btn--md" type="submit">再次提醒業務<%= request.reminder_count ? '（已提醒 ' + request.reminder_count + ' 次）' : '' %></button></form><% } %>
+    <% if (perm.cancel) { %>
+      <form method="POST" action="/quotes/<%= request.id %>/cancel" class="inline-edit" data-confirm="確定要取消這張報價請求嗎？">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>"><input class="form-input" name="reason" maxlength="500" placeholder="取消原因（選填）"><button class="btn btn--secondary btn--md" type="submit">取消請求</button>
+      </form>
+    <% } %>
+  </div>
+</div>
+<% } %>
+
+<div class="card">
+  <h2>處理紀錄與留言</h2>
+  <ul class="plain-list quote-timeline">
+    <% events.forEach(e => { %>
+      <li><time><%= e.created_at.slice(0, 16) %></time> <span class="status-badge"><%= evLabel[e.action] || e.action %></span> <%= e.detail %><% if (!e.detail || (e.action !== 'note' && !e.detail.includes(e.who))) { %> <small class="form-hint">（<%= e.who %>）</small><% } %></li>
+    <% }) %>
+  </ul>
+  <form method="POST" action="/quotes/<%= request.id %>/note" class="inline-edit">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <input class="form-input" name="text" maxlength="1000" placeholder="留言給對方（對方會收到通知）" required>
+    <button class="btn btn--secondary btn--md" type="submit">送出留言</button>
+  </form>
+</div>
+
+<%- include('../partials/footer') %>

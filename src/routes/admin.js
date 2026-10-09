@@ -38,6 +38,9 @@ router.use('/capacity-import', require('./adminCapacityImport'));
 // 系統通知（發送「系統即將更新」這類訊息給使用者）
 router.use('/announcements', require('./adminAnnouncements'));
 
+// 報價請求設定（固定業務信箱、附 PDF、可見欄位、主管確認、自動提醒）
+router.use('/quotes', require('./adminQuotes'));
+
 // Email 通知設定與寄送紀錄
 router.use('/mail', require('./adminMail'));
 

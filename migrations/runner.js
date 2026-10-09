@@ -31,6 +31,7 @@ const MIGRATIONS = [
   'migrate_0016_asset_tags',
   'migrate_0017_user_signatures',
   'migrate_0018_capacity_volumes',
+  'migrate_0019_quote_requests',
 ];
 
 async function run() {

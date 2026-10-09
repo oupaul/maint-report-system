@@ -5,10 +5,11 @@ const RETENTION_DAYS = 90;
 
 const Notification = {
   // 回傳新通知的 id（Email 寄送要用它把結果寫回同一筆）
-  create(userId, { batchId = null, type, title, message }) {
+  // link：點通知要前往的站內路徑（例如 /quotes/12）；沒有就依 batchId 前往批次
+  create(userId, { batchId = null, type, title, message, link = null }) {
     return db.prepare(
-      `INSERT INTO notifications (user_id, batch_id, type, title, message, created_at) VALUES (?, ?, ?, ?, ?, ?)`
-    ).run(userId, batchId, type, title, message, nowTaipei()).lastInsertRowid;
+      `INSERT INTO notifications (user_id, batch_id, type, title, message, link, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(userId, batchId, type, title, message, link, nowTaipei()).lastInsertRowid;
   },
 
   findById(id) {

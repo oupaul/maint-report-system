@@ -17,6 +17,8 @@
     <div class="app-nav__links">
       <a href="/" class="<%= currentPath === '/' ? 'is-active' : '' %>">儀表板</a>
       <a href="/batches" class="<%= currentPath && currentPath.startsWith('/batches') ? 'is-active' : '' %>">巡檢批次</a>
+      <a href="/issues" class="<%= currentPath && currentPath.startsWith('/issues') ? 'is-active' : '' %>">待處理項目</a>
+      <a href="/quotes" class="<%= currentPath && currentPath.startsWith('/quotes') ? 'is-active' : '' %>">報價請求</a>
       <a href="/assets" class="<%= currentPath && currentPath.startsWith('/assets') ? 'is-active' : '' %>">資產管理</a>
       <% if (currentUser) {
         const isAdmin = currentUser.role === 'admin';
@@ -29,6 +31,7 @@
           ['/admin/approval', '簽核流程', isAdmin],
           ['/admin/mail', 'Email 通知', isAdmin],
           ['/admin/announcements', '系統通知', isAdmin],
+          ['/admin/quotes', '報價請求設定', isAdmin],
           ['/admin/categories', '設備類型', can('categories.manage')],
           ['/admin/fields', '資產欄位', can('categories.manage')],
           ['/admin/capacity-import', '容量資料匯入', isAdmin],

@@ -119,8 +119,8 @@
           </thead>
           <tbody>
             <% items.forEach(item => { %>
-              <tr>
-                <td><%= item.checklist_label %></td>
+              <tr id="item-<%= item.id %>">
+                <td><%= item.checklist_label %><% if (item.status !== 'normal') { %> <a class="form-hint" href="/quotes/new?item=<%= item.id %>" title="把這個異常項目通知業務報價">通知業務報價</a><% } %></td>
                 <td><span class="status-badge status-badge--<%= item.status %>"><%= item.status === 'normal' ? '正常' : (item.status === 'warning' ? '警告' : '異常') %></span></td>
                 <td>
                   <% if (item.volumes && item.volumes.length > 0) { %>

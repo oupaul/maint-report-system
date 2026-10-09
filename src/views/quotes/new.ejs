@@ -1,0 +1,59 @@
+<%- include('../layout', { title: '通知業務報價' }) %>
+
+<div class="page-header">
+  <h1>通知業務報價</h1>
+  <div class="page-actions"><a href="/issues" class="btn btn--secondary btn--md">回到待處理項目</a></div>
+</div>
+
+<div class="card" style="max-width: 760px;">
+  <% if (error) { %><div class="form-error"><%= error %></div><% } %>
+  <p>設備：<strong><%= assetName %></strong></p>
+  <p class="form-hint">系統會把這些項目<strong>送出當下</strong>的狀態、數值、備註與截圖（每項最多 3 張）做成一張報價請求，通知業務<%= settings.attach_pdf ? '，Email 另附一份 PDF' : '' %>。之後項目被修改不會影響這張請求。</p>
+
+  <form method="POST" action="/quotes/new">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <input type="hidden" name="first" value="<%= firstItemId %>">
+
+    <div class="form-group">
+      <span class="form-label">要報價的項目（同一台設備，最多 <%= max %> 個）</span>
+      <% candidates.forEach(c => { %>
+        <label class="quote-item <%= c.blocked || !c.allowed ? 'is-disabled' : '' %>">
+          <input type="checkbox" name="items" value="<%= c.id %>" <%= picked.has(c.id) && !c.blocked && c.allowed ? 'checked' : '' %> <%= c.blocked || !c.allowed ? 'disabled' : '' %>>
+          <span>
+            <span class="status-badge status-badge--<%= c.status %>"><%= c.status === 'critical' ? '異常' : (c.status === 'warning' ? '警告' : '正常') %></span>
+            <strong><%= c.label %></strong>
+            <small class="form-hint">（<%= c.batch_date %> <%= c.batch_title %>）</small>
+            <% if (c.display) { %><span class="issue-value form-hint"><%= c.display %></span><% } %>
+            <% if (c.note) { %><span class="form-hint">備註：<%= c.note %></span><% } %>
+            <% if (c.blocked) { %><span class="import-warn">已經有進行中的報價請求 <a href="/quotes/<%= c.blocked.id %>">Q-<%= c.blocked.id %></a>，不能重複送出</span><% } %>
+          </span>
+        </label>
+      <% }) %>
+    </div>
+
+    <div class="form-group">
+      <span class="form-label">緊急程度</span>
+      <label class="form-checkbox-row"><input type="radio" name="urgency" value="normal" <%= urgency !== 'urgent' ? 'checked' : '' %>> 一般</label>
+      <label class="form-checkbox-row"><input type="radio" name="urgency" value="urgent" <%= urgency === 'urgent' ? 'checked' : '' %>> 緊急（業務清單會排在前面，通知標題帶【緊急】）</label>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="description">問題說明與建議處理方式（選填）</label>
+      <textarea class="form-textarea" id="description" name="description" rows="4" maxlength="1000" placeholder="例如：磁碟已有壞軌，建議更換 2 顆 4TB 硬碟並重建 RAID，預計需停機 1 小時。"><%= description %></textarea>
+    </div>
+
+    <div class="form-group">
+      <span class="form-label">會通知誰</span>
+      <% if (settings.require_confirm) { %><p class="form-hint">目前設定為<strong>需要主管確認</strong>：送出後先通知管理員，確認後才會通知業務。</p><% } %>
+      <p class="form-hint">
+        <% if (recipients.length > 0) { %>業務：<%= recipients.map(u => u.display_name || u.username).join('、') %><% } else { %><span class="import-warn">目前沒有可以通知的業務（請管理員在「權限群組」把人加進「業務」群組）</span><% } %>
+        <% if (settings.sales_email) { %>　另外會寄到業務信箱。<% } %>
+      </p>
+    </div>
+
+    <button type="submit" class="btn btn--primary btn--md"><%= settings.require_confirm ? '送出（待主管確認）' : '送出並通知業務' %></button>
+    <a href="/issues" class="btn btn--secondary btn--md">取消</a>
+  </form>
+</div>
+
+<%- include('../partials/footer') %>

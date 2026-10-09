@@ -4,6 +4,7 @@ const db = require('../models/db');
 const Notification = require('../models/Notification');
 const secretBox = require('../utils/secretBox');
 const { nowTaipei } = require('../utils/time');
+const { safeReturnPath } = require('../utils/safeRedirect');
 
 // Email 通知（比照 expense-platform）：寄信方式有兩種——SMTP（帳號密碼），或 Microsoft 365 Graph
 // （應用程式權限，client credentials）。設定放資料庫、在網頁上維護，機密加密儲存。
@@ -199,7 +200,7 @@ async function getGraphToken(cfg) {
   return graphToken.token;
 }
 
-async function sendViaGraph(cfg, { to, subject, text, html }) {
+async function sendViaGraph(cfg, { to, subject, text, html, attachments }) {
   const token = await getGraphToken(cfg);
   const res = await fetch(`https://graph.microsoft.com/v1.0/users/${encodeURIComponent(cfg.from)}/sendMail`, {
     method: 'POST',
@@ -209,6 +210,7 @@ async function sendViaGraph(cfg, { to, subject, text, html }) {
         subject,
         body: html ? { contentType: 'HTML', content: html } : { contentType: 'Text', content: text },
         toRecipients: [{ emailAddress: { address: to } }],
+        ...(attachments && attachments.length ? { attachments: attachments.map(a => ({ '@odata.type': '#microsoft.graph.fileAttachment', name: a.filename, contentType: a.contentType || 'application/octet-stream', contentBytes: a.content.toString('base64') })) } : {}),
       },
       saveToSentItems: false,
     }),
@@ -224,7 +226,7 @@ async function sendViaGraph(cfg, { to, subject, text, html }) {
   throw new Error(`Microsoft Graph 寄信失敗${hint}：${String(err).slice(0, 200)}`);
 }
 
-async function sendViaSmtp(cfg, { to, subject, text, html }) {
+async function sendViaSmtp(cfg, { to, subject, text, html, attachments }) {
   const transporter = nodemailer.createTransport({
     host: cfg.host,
     port: cfg.port,
@@ -238,7 +240,7 @@ async function sendViaSmtp(cfg, { to, subject, text, html }) {
     socketTimeout: 60000,
   });
   try {
-    await transporter.sendMail({ from: cfg.from, to, subject, text, ...(html ? { html } : {}) });
+    await transporter.sendMail({ from: cfg.from, to, subject, text, ...(html ? { html } : {}), ...(attachments && attachments.length ? { attachments } : {}) });
   } finally {
     transporter.close();
   }
@@ -298,7 +300,8 @@ async function deliverNotification(id) {
     return;
   }
   const appUrl = getRow().app_url;
-  const linkUrl = appUrl ? `${appUrl}${n.batch_id ? `/batches/${n.batch_id}` : '/notifications'}` : null;
+  const target = safeReturnPath(n.link) || (n.batch_id ? `/batches/${n.batch_id}` : '/notifications');
+  const linkUrl = appUrl ? `${appUrl}${target}` : null;
   const { text, html } = renderEmail({ title: n.title, message: n.message, linkUrl });
   // 標題裡含批次名稱（使用者輸入），換行一律換成空白：避免信件標頭被截斷或夾帶額外標頭
   const subject = `【${SITE_NAME}】${String(n.title).replace(/[\r\n]+/g, ' ')}`;
@@ -341,7 +344,13 @@ function recentFailures(hours = 24) {
   return db.prepare("SELECT COUNT(*) AS n FROM notifications WHERE email_status = 'failed' AND created_at >= ?").get(cutoff).n;
 }
 
+// 系統網址（Email 設定頁填的，信件連結用）；沒設定回傳空字串
+function appBaseUrl() {
+  return (getRow().app_url || '').replace(/\/+$/, '');
+}
+
 module.exports = {
+  appBaseUrl,
   isValidEmail, isValidFrom, recipientFor,
   settingsForView, validateSettings, saveSettings, isReady,
   sendMail, deliverNotification, queueNotificationEmail, resend, sendTest, recentFailures, renderEmail,

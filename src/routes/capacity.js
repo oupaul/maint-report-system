@@ -98,4 +98,5 @@ router.get('/export.csv', requireLogin, (req, res) => {
 });
 
 module.exports = router;
+module.exports.forecastText = forecastText;
 module.exports.allAttention = () => allSeries().filter(needsAttention).sort(compareRank).map(s => ({ ...s, text: forecastText(s) }));
