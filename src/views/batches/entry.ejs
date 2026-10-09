@@ -20,6 +20,15 @@
   </div>
 </div>
 
+<%# 「儲存全部」固定列：有任何項目還沒儲存時才會出現（桌面版黏在畫面上方，手機版固定在畫面下方）；Ctrl/Cmd+S 也是儲存全部 %>
+<div class="saveall-bar" id="saveall-bar" role="region" aria-label="儲存全部" hidden>
+  <div class="saveall-bar__main">
+    <span class="saveall-bar__text" id="saveall-text" aria-live="polite"></span>
+    <button type="button" class="btn btn--primary btn--sm" id="saveall-btn">儲存全部</button>
+  </div>
+  <ul class="saveall-bar__errors" id="saveall-errors" hidden></ul>
+</div>
+
 <% if (typeof returnNote !== 'undefined' && returnNote) { %>
   <div class="form-error">
     這個批次被<%= returnNote.kind === 'returned' ? '退回' : (returnNote.kind === 'withdrawn' ? '撤回' : '重新開啟') %>了（<%= returnNote.text %>，<%= returnNote.who %>）。<% if (returnNote.comment) { %><br>意見：<%= returnNote.comment %><% } %><br>修改完成後，請再按「送出審核」。
@@ -76,6 +85,9 @@
           <div class="form-group checklist-row__photos">
             <label class="form-label">截圖（可多選）</label>
             <input class="form-input" type="file" name="screenshots" multiple accept="image/jpeg,image/png,image/webp,image/gif">
+            <%# 貼上區：截圖後（Win+Shift+S／Cmd+Shift+4）點這裡或點這一列的任何欄位，按 Ctrl/Cmd+V 就能貼上；也可以把圖片拖進來。貼上的圖先顯示在下面「待儲存」，按儲存才上傳（public/js/entry-save.js） %>
+            <div class="paste-zone" tabindex="0" role="button" aria-label="貼上或拖曳截圖">點這裡後按 <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>V</kbd> 貼上截圖，或把圖片拖進來</div>
+            <div class="paste-pending"></div>
             <div class="photo-thumbs"><% if (row.photos && row.photos.length > 0) { %><%- include('../partials/entry-photo-thumbs', { batch, photos: row.photos, itemId: row.existing.id, assetName: section.asset.name, itemLabel: row.checklistItem.label }) %><% } %></div>
           </div>
         </form>

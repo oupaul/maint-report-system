@@ -299,6 +299,7 @@ router.post('/:id/items/:checklistItemId', requireLogin, upload.array('screensho
     // 每張照片先插入佔位列取得 id（檔名需要用到），轉檔完成後再回填實際路徑/尺寸
     if (req.files && req.files.length > 0) {
       const existingCount = InspectionItemPhoto.findByItemId(item.id).length;
+      const failures = []; // 一張壞圖不要擋住後面的圖：每張各自處理，最後統一回報哪幾張失敗
       for (let i = 0; i < req.files.length; i++) {
         const file = req.files[i];
         const photo = InspectionItemPhoto.create({ inspection_item_id: item.id, sort_order: existingCount + i });
@@ -307,19 +308,23 @@ router.post('/:id/items/:checklistItemId', requireLogin, upload.array('screensho
         try {
           result = await ImageService.processScreenshot(file.buffer, file.mimetype, destPath);
         } catch (err) {
-          // 這張處理失敗：清掉佔位列，並告訴使用者是「哪一個檔案」的問題（前面已處理成功的檔案會保留）
+          // 這張處理失敗：清掉佔位列，記下是「哪一個檔案」的問題，繼續處理後面的檔案
           InspectionItemPhoto.remove(photo.id);
           if (err.userFacing) {
-            const message = `「${upload.decodeFilename(file.originalname)}」：${err.message}`;
-            if (isAjax(req)) {
-              // 文字欄位與前面處理成功的截圖已經存起來了：連同最新的這一列內容一起回傳，畫面才能如實顯示
-              return res.status(400).json({ ...(await rowPayload(req, res, batch, asset, checklistItem, item)), ok: false, savedPartial: true, error: `圖片上傳失敗，${message}` });
-            }
-            return res.status(400).render('error', { title: '圖片上傳失敗', message });
+            failures.push(`「${upload.decodeFilename(file.originalname)}」：${err.message}`);
+            continue;
           }
           throw err;
         }
         InspectionItemPhoto.updateFile(photo.id, result);
+      }
+      if (failures.length > 0) {
+        const message = failures.join('；');
+        if (isAjax(req)) {
+          // 文字欄位與處理成功的截圖已經存起來了：連同最新的這一列內容一起回傳，畫面才能如實顯示
+          return res.status(400).json({ ...(await rowPayload(req, res, batch, asset, checklistItem, item)), ok: false, savedPartial: true, failedCount: failures.length, error: `${failures.length} 張圖片上傳失敗：${message}` });
+        }
+        return res.status(400).render('error', { title: '圖片上傳失敗', message });
       }
     }
 
