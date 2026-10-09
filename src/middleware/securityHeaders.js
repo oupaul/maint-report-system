@@ -23,6 +23,11 @@ function securityHeaders(req, res, next) {
   if (!req.path.endsWith('.pdf')) {
     res.setHeader('Content-Security-Policy', CSP);
   }
+  // 登入後才能下載的 CSV／PDF（匯出、範本、報告）不可被任何快取留存：Cloudflare 等 CDN 預設會依副檔名
+  // 快取 .csv／.pdf，結果是使用者拿到舊內容（甚至別人的資料）。路由若自己設了更明確的值（例如報告截圖）會蓋過去
+  if (/\.(csv|pdf)$/i.test(req.path)) {
+    res.setHeader('Cache-Control', 'private, no-store');
+  }
   // 只有確定是 HTTPS（經由 TRUST_PROXY 信任反向代理的 X-Forwarded-Proto，或直接 TLS）才送 HSTS
   if (req.secure) {
     res.setHeader('Strict-Transport-Security', 'max-age=15552000');

@@ -52,6 +52,7 @@ Node.js + Express + SQLite（`better-sqlite3`）的 IT 例行維護巡檢紀錄�
 - 自訂分頁圖示（`BrandingService`、`routes/branding.js`、`/admin/branding`）：圖示以 PNG BLOB 存在資料庫 `branding` 表（所以備份會帶走），圖示網址是公開的且掛在 session 之前（瀏覽器抓 favicon 不一定帶登入資訊）。**上傳只接受點陣圖，不可放寬成 SVG**（伺服器端解碼不明 SVG 有安全風險）；所有頁面 `<head>` 都要 `include('partials/head-icons')`，新增獨立頁面時別漏掉
 - 「系統狀態」（`HealthService`）與線上使用者（`ActivityTracker`，只存記憶體）僅限管理員；`GET /healthz` 是唯一公開的健康端點，只能回極簡資訊，不要加任何系統細節
 - M365 SSO 是「SPA + 瀏覽器端 MSAL.js」：不使用 Client Secret，也不能改回伺服器端換 token（Azure 會把 Web 平台的 redirect 視為需要 secret）。MSAL.js 由 `/vendor/msal-browser.min.js` 從 node_modules 提供，CSP `connect-src` 需允許 `login.microsoftonline.com`；伺服器端驗證 ID token（iss/aud/exp/tid、10 分鐘 maxAge、單次使用）在 `src/services/M365AuthService.js`，改動時要保留這些檢查——ID token 是瀏覽器送來的，不可信
+- **CSV／PDF 下載一律不可被快取**（`middleware/securityHeaders.js` 對路徑結尾 `.csv`／`.pdf` 送 `Cache-Control: private, no-store`）：Cloudflare 等 CDN 預設依副檔名快取 .csv／.pdf，曾造成使用者下載到舊範本與空的匯出檔。新增下載路由時網址請維持 `.csv`／`.pdf` 結尾（或自己明確設 `Cache-Control`）；有人說「匯出內容不對／太舊」但主機上的程式是對的，先懷疑 CDN／瀏覽器快取（網址加 `?v=1` 可繞過）
 - `src/app.js` 每個請求都會重新讀取登入者（停用／角色變更立即生效）；`TRUST_PROXY` 環境變數預設關閉，只在確定前面有反向代理時設定，否則 `X-Forwarded-For` 可偽造來繞過登入限流
 - `src/services/PdfReportService.js` 的換頁保護邏輯（估算高度 → 判斷是否 `doc.addPage()` → 才畫區塊）刻意把「估算」與「畫」分成兩步；修改任一步時要同步檢查另一步有沒有跟著失準（尤其是圖片顯示高度的估算依據是 DB 存的 `screenshot_width`/`screenshot_height`，跟畫的時候重新解碼出來的實際尺寸可能不完全一致）
 - pdfkit 不支援原生畫 WebP，`PdfReportService` 無論 `screenshot_format` 是什麼都會先用 `sharp` 重新解碼成 PNG buffer 再畫；改動截圖儲存格式邏輯（`src/services/ImageService.js`）時要記得這個假設沒變
