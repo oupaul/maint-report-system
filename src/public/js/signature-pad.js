@@ -13,6 +13,9 @@
     const clearBtn = form.querySelector('.signature-clear');
     const typeInput = form.querySelector('.signature-type-input');
     const fileInput = form.querySelector('.signature-file-input');
+    const dialog = form.closest('dialog');
+    const useSaved = dialog && dialog.querySelector('.signature-use-saved');
+    const saveBox = form.querySelector('.signature-save-default');
     if (!canvas || !input) return;
 
     const ctx = canvas.getContext('2d');
@@ -23,6 +26,15 @@
 
     let drawing = false;
     let hasDrawn = false;
+    // 目前畫布上的內容是不是「原封不動套用已儲存的簽名」：是的話不用再問要不要存成預設
+    let fromSaved = false;
+    function setFromSaved(v) {
+      fromSaved = v;
+      if (saveBox) {
+        saveBox.hidden = v;
+        if (v) saveBox.querySelector('input').checked = false;
+      }
+    }
     let points = [];
 
     function pos(evt) {
@@ -38,6 +50,7 @@
     }
 
     function beginStroke(evt) {
+      if (fromSaved) { clearCanvas(); setFromSaved(false); } // 在套用的簽名上繼續畫＝改成新簽名，先清掉舊的避免疊在一起
       drawing = true;
       hasDrawn = true;
       // 用 pointer capture 讓這根手指/游標即使畫出畫布範圍（觸控板移動常常
@@ -93,6 +106,7 @@
       clearBtn.addEventListener('click', function () {
         clearCanvas();
         hasDrawn = false;
+        setFromSaved(false);
         if (typeInput) typeInput.value = '';
         if (fileInput) fileInput.value = '';
       });
@@ -103,6 +117,7 @@
     // 後端完全不用區分是手寫還是輸入姓名。
     if (typeInput) {
       typeInput.addEventListener('input', function () {
+        setFromSaved(false);
         clearCanvas();
         const name = typeInput.value.trim();
         if (!name) {
@@ -126,6 +141,7 @@
       fileInput.addEventListener('change', function () {
         const file = fileInput.files[0];
         if (!file) return;
+        setFromSaved(false);
         const reader = new FileReader();
         reader.onload = function (loadEvt) {
           const img = new Image();
@@ -140,6 +156,26 @@
           img.src = loadEvt.target.result;
         };
         reader.readAsDataURL(file);
+      });
+    }
+
+    // 套用已儲存的簽名：畫進同一塊畫布，之後的送出流程和手寫完全一樣
+    if (useSaved) {
+      useSaved.addEventListener('click', function () {
+        const img = new Image();
+        img.onload = function () {
+          clearCanvas();
+          if (typeInput) typeInput.value = '';
+          if (fileInput) fileInput.value = '';
+          const scale = Math.min(canvas.width / img.width, canvas.height / img.height, 1);
+          const w = img.width * scale;
+          const h = img.height * scale;
+          ctx.drawImage(img, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
+          hasDrawn = true;
+          setFromSaved(true);
+        };
+        img.onerror = function () { alert('讀取已儲存的簽名失敗，請重新手寫簽名。'); };
+        img.src = useSaved.dataset.src;
       });
     }
 

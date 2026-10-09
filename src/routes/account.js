@@ -3,6 +3,8 @@ const router = express.Router();
 
 const { requireLogin } = require('../middleware/auth');
 const User = require('../models/User');
+const UserSignature = require('../models/UserSignature');
+const { safeReturnPath } = require('../utils/safeRedirect');
 const AuthService = require('../services/AuthService');
 const { establishSession } = require('../utils/session');
 const { validatePasswordStrength, MIN_LENGTH } = require('../utils/password');
@@ -41,6 +43,19 @@ router.post('/password', requireLogin, async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+// 我的預設簽名（簽名視窗裡「使用這個簽名」用）：只有本人取得到自己的，沒有任何依 id 取別人簽名的網址
+router.get('/signature.png', requireLogin, (req, res) => {
+  const row = UserSignature.get(req.user.id);
+  if (!row) return res.status(404).end();
+  res.set({ 'Content-Type': 'image/png', 'Cache-Control': 'private, no-cache' });
+  res.send(row.image);
+});
+
+router.post('/signature/delete', requireLogin, (req, res) => {
+  UserSignature.remove(req.user.id);
+  res.redirect(safeReturnPath(req.body.return) || '/');
 });
 
 module.exports = router;

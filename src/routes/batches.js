@@ -9,6 +9,8 @@ const InspectionBatch = require('../models/InspectionBatch');
 const InspectionItem = require('../models/InspectionItem');
 const InspectionItemPhoto = require('../models/InspectionItemPhoto');
 const BatchSignature = require('../models/BatchSignature');
+const UserSignature = require('../models/UserSignature');
+const sharp = require('sharp');
 const User = require('../models/User');
 const ChecklistItem = require('../models/ChecklistItem');
 const Asset = require('../models/Asset');
@@ -493,12 +495,14 @@ router.get('/:id', requireLogin, (req, res) => {
     signatureRoles: SIGNATURE_ROLES,
     signatureRoleLabels: SIGNATURE_ROLE_LABELS,
     signaturesByRole,
+    savedSignatureVersion: UserSignature.version(req.user.id), // 有存過預設簽名就在簽名視窗提供「使用這個簽名」
   });
 });
 
 // 簽名畫布送出的是 canvas.toDataURL() 產生的 base64 PNG（data:image/png;base64,....），
 // 簽署者一律用目前登入帳號，不開放自由填名——簽名紀錄才有稽核意義。
-router.post('/:id/signatures/:role', requireLogin, (req, res) => {
+router.post('/:id/signatures/:role', requireLogin, async (req, res, next) => {
+  try {
   const batch = InspectionBatch.findById(req.params.id);
   if (!batch) {
     return res.status(404).render('error', { title: '找不到批次', message: '找不到指定的巡檢批次' });
@@ -530,6 +534,13 @@ router.post('/:id/signatures/:role', requireLogin, (req, res) => {
   }
 
   const buffer = Buffer.from(match[1], 'base64');
+  // 真的解碼一次確認是 PNG 圖檔（只檢查開頭字串的話，亂塞的資料會被寫成簽名檔、之後報告與畫面都顯示不出來）
+  try {
+    const meta = await sharp(buffer, { limitInputPixels: 4_000_000 }).metadata();
+    if (meta.format !== 'png' || buffer.length > 2 * 1024 * 1024) throw new Error('not png');
+  } catch (err) {
+    return res.status(400).render('error', { title: '無效的簽名資料', message: '簽名圖檔無法辨識，請重新簽名後再送出' });
+  }
   const destPath = path.join(config.UPLOADS_DIR, String(batch.id), `signature-${role}.png`);
   fs.mkdirSync(path.dirname(destPath), { recursive: true });
   fs.writeFileSync(destPath, buffer);
@@ -541,7 +552,19 @@ router.post('/:id/signatures/:role', requireLogin, (req, res) => {
     signature_path: destPath,
   });
 
+  // 勾了「存為我的預設簽名」：另外存一份在自己帳號底下（失敗只記錄、不影響這次簽署）
+  if (req.body.save_as_default === 'on') {
+    try {
+      await UserSignature.saveFromPng(req.user.id, buffer);
+    } catch (err) {
+      console.warn(`[簽名] 無法儲存 ${req.user.username} 的預設簽名：${err.message}`);
+    }
+  }
+
   res.redirect(`/batches/${batch.id}`);
+  } catch (err) {
+    next(err);
+  }
 });
 
 module.exports = router;

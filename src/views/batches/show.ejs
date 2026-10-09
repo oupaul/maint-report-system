@@ -171,6 +171,20 @@
           </button>
 
           <dialog id="signature-dialog-<%= role %>" class="signature-dialog">
+            <% if (savedSignatureVersion) { %>
+              <%# 我儲存過的簽名：按「使用這個簽名」才會帶進下面的畫布（不是自動帶入，仍要自己按「確認簽署」）。
+                  刪除用獨立的表單（HTML 不允許表單巢狀，所以放在簽名表單外面）。 %>
+              <div class="signature-saved">
+                <strong class="form-hint">你儲存的簽名</strong>
+                <img class="signature-saved__img" src="/account/signature.png?v=<%= encodeURIComponent(savedSignatureVersion) %>" alt="我儲存的簽名">
+                <button type="button" class="btn btn--primary btn--sm signature-use-saved" data-src="/account/signature.png?v=<%= encodeURIComponent(savedSignatureVersion) %>">使用這個簽名</button>
+                <form method="POST" action="/account/signature/delete" data-confirm="確定要刪除你儲存的預設簽名嗎？（已經簽署的批次不受影響，之後可以重新儲存）">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <input type="hidden" name="return" value="/batches/<%= batch.id %>">
+                  <button type="submit" class="btn btn--secondary btn--sm">刪除儲存的簽名</button>
+                </form>
+              </div>
+            <% } %>
             <form class="signature-form" method="POST" action="/batches/<%= batch.id %>/signatures/<%= role %>">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>">
               <h3 class="signature-dialog__title"><%= signatureRoleLabels[role] %>簽名</h3>
@@ -185,6 +199,10 @@
                 <label class="form-label">或上傳簽名圖檔（例如用 Mac 預覽程式／Word 的觸控板簽名功能簽好後匯出的圖片）</label>
                 <input class="form-input signature-file-input" type="file" accept="image/*">
               </div>
+              <label class="signature-save-default form-hint">
+                <input type="checkbox" name="save_as_default">
+                把這個簽名存為我的預設簽名（之後簽名時可以直接選用）
+              </label>
               <div class="signature-form__actions">
                 <button type="button" class="btn btn--secondary btn--sm signature-clear">清除</button>
                 <button type="button" class="btn btn--secondary btn--sm signature-cancel">取消</button>
