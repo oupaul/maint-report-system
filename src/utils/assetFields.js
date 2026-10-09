@@ -69,24 +69,38 @@ const norm = (s) => String(s || '').trim().toLowerCase();
 
 // 找出和這台設備重複的其他設備：serial / asset_tag / hostname 以全文比對（不分大小寫）；IP 逐個比對。
 // allAssets 傳入所有設備（資料量小，直接在記憶體比對，也能涵蓋已停用的設備）
-function findDuplicates(asset, allAssets) {
-  const out = [];
-  const others = allAssets.filter(a => a.id !== asset.id);
+// 大量比對（CSV 匯入一次幾千列）用的索引：欄位 → 值（小寫）→ 擁有這個值的設備。比逐列掃全部設備快得多
+function buildDuplicateIndex(allAssets) {
+  const byField = {};
   for (const f of FIELDS.filter(x => DUPLICATE_CHECKED.includes(x.key))) {
-    if (MULTI.includes(f.key)) {
-      for (const val of splitMulti(asset[f.key])) {
-        const hit = others.filter(a => splitMulti(a[f.key]).some(x => norm(x) === norm(val)));
-        if (hit.length) out.push({ field: f.label, value: val, names: hit.map(a => a.name) });
+    const map = new Map();
+    for (const a of allAssets) {
+      const vals = MULTI.includes(f.key) ? splitMulti(a[f.key]) : (norm(a[f.key]) ? [a[f.key]] : []);
+      for (const v of new Set(vals.map(norm))) {
+        if (!map.has(v)) map.set(v, []);
+        map.get(v).push({ id: a.id, name: a.name });
       }
-    } else if (norm(asset[f.key])) {
-      const hit = others.filter(a => norm(a[f.key]) === norm(asset[f.key]));
-      if (hit.length) out.push({ field: f.label, value: asset[f.key], names: hit.map(a => a.name) });
+    }
+    byField[f.key] = map;
+  }
+  return { byField };
+}
+
+function findDuplicates(asset, allAssetsOrIndex) {
+  const index = allAssetsOrIndex && allAssetsOrIndex.byField ? allAssetsOrIndex : buildDuplicateIndex(allAssetsOrIndex);
+  const out = [];
+  for (const f of FIELDS.filter(x => DUPLICATE_CHECKED.includes(x.key))) {
+    const vals = MULTI.includes(f.key) ? splitMulti(asset[f.key]) : (norm(asset[f.key]) ? [asset[f.key]] : []);
+    for (const val of vals) {
+      const hit = (index.byField[f.key].get(norm(val)) || []).filter(x => x.id !== asset.id);
+      if (hit.length) out.push({ field: f.label, value: val, names: hit.map(x => x.name) });
     }
   }
   return out;
 }
 
 // 給畫面用的提示文字清單
+// allAssets 可以是設備陣列，也可以是 buildDuplicateIndex 的結果
 function warningsFor(asset, allAssets) {
   const w = [];
   const bad = invalidIps(asset);
@@ -99,4 +113,4 @@ function warningsFor(asset, allAssets) {
   return w;
 }
 
-module.exports = { FIELDS, normalize, legacyIdentifier, invalidIps, invalidMacs, formatMac, findDuplicates, warningsFor, splitIps };
+module.exports = { FIELDS, normalize, legacyIdentifier, invalidIps, invalidMacs, formatMac, findDuplicates, warningsFor, splitIps, buildDuplicateIndex };

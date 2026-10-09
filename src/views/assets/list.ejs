@@ -17,6 +17,8 @@
     <% if (can('assets.manage')) { %>
       <a href="/assets/new" class="btn btn--primary btn--md">新增資產</a>
     <% } %>
+    <a href="<%= exportUrl %>" class="btn btn--secondary btn--md" title="匯出目前篩選條件下的全部設備（不分頁）">匯出 CSV</a>
+    <% if (can('assets.manage')) { %><a href="/assets/import" class="btn btn--secondary btn--md">匯入 CSV</a><% } %>
     <a href="/capacity" class="btn btn--secondary btn--md">容量預警</a>
   </div>
 </div>

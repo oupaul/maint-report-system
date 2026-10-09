@@ -925,3 +925,10 @@ html:has(.saveall-bar:not([hidden])) { scroll-padding-bottom: 6rem; } /* 聚焦�
 .kind-form__pct { display: inline-flex; align-items: center; gap: var(--space-2); }
 .kind-form__pct[hidden] { display: none; }
 .kind-form__pct .form-input { width: 4.5rem; }
+
+/* ---- 資產 CSV 匯入預覽 ---- */
+.import-summary { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; margin: var(--space-4) 0; }
+.import-err { color: var(--color-status-critical); font-weight: 600; }
+.import-change { font-size: var(--text-sm); }
+.import-warn { font-size: var(--text-sm); color: var(--color-status-warning); }
+.import-rules li { margin-bottom: var(--space-2); }

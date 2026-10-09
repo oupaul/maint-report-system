@@ -39,6 +39,9 @@ const AssetCategory = require('../models/AssetCategory');
 const AssetField = require('../models/AssetField');
 const AssetTag = require('../models/AssetTag');
 const InspectionVolume = require('../models/InspectionVolume');
+const AssetCsvService = require('../services/AssetCsvService');
+const csv = require('../utils/csv');
+const multer = require('multer');
 
 const SORT_KEYS = ['category', 'name', 'location', 'ip_address', 'hostname', 'brand', 'serial_number', 'asset_tag', 'purchase_date', 'is_active'];
 const PER_PAGE = [50, 100, 200];
@@ -48,9 +51,11 @@ function cleanLocation(value) {
   return String(value || '').replace(/\s+/g, ' ').trim().slice(0, 100);
 }
 
-router.get('/', requireLogin, (req, res) => {
+// 列表與匯出共用的查詢參數解析（全部夾在合法範圍內）
+function parseListParams(query) {
   const str = (v, max = 100) => String(v || '').slice(0, max);
-  const params = {
+  const req = { query };
+  return {
     q: str(req.query.q),
     category: str(req.query.category, 60),
     location: str(req.query.location),
@@ -62,6 +67,10 @@ router.get('/', requireLogin, (req, res) => {
     per: PER_PAGE.includes(parseInt(req.query.per, 10)) ? parseInt(req.query.per, 10) : 50,
     page: parseInt(req.query.page, 10) || 1,
   };
+}
+
+router.get('/', requireLogin, (req, res) => {
+  const params = parseListParams(req.query);
   const result = Asset.query(params);
   // 組出保留目前篩選／排序條件的網址（換頁、換排序、切換分組時用）
   const link = (over = {}) => {
@@ -91,8 +100,75 @@ router.get('/', requireLogin, (req, res) => {
     tagList: AssetTag.inUse(),
     perOptions: PER_PAGE,
     capacityAssets: InspectionVolume.assetIdsWithData(),
+    exportUrl: link({ page: 1 }).replace('/assets', '/assets/export.csv'), // 匯出目前篩選條件下的全部設備（不分頁）
     listFields: AssetField.findAll({ activeOnly: true }).filter(f => f.show_in_list),
   });
+});
+
+// ---- CSV 匯出／匯入（路徑要放在 /:id/... 之前）----
+
+router.get('/export.csv', requireLogin, (req, res) => {
+  const { rows } = Asset.query({ ...parseListParams(req.query), all: true });
+  res.set({
+    'Content-Type': 'text/csv; charset=utf-8',
+    'Content-Disposition': `attachment; filename="assets-${new Date().toISOString().slice(0, 10)}.csv"`,
+  });
+  res.send(AssetCsvService.exportCsv(rows));
+});
+
+router.get('/import-template.csv', requireLogin, (req, res) => {
+  res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="assets-import-template.csv"' });
+  res.send(AssetCsvService.templateCsv());
+});
+
+const csvUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024, files: 1 } });
+
+function renderImport(res, extra = {}) {
+  res.status(extra.status || 200).render('assets/import', {
+    columns: AssetCsvService.FIXED,
+    customFields: AssetField.findAll({ activeOnly: true }),
+    maxRows: AssetCsvService.MAX_ROWS,
+    categories: AssetCategory.findAll({ activeOnly: true }),
+    error: null, preview: null, result: null, token: null, filename: '', encoding: '',
+    ...extra,
+  });
+}
+
+router.get('/import', requirePermission('assets.manage'), (req, res) => renderImport(res));
+
+// 上傳（multipart：CSRF token 在網址 ?_csrf=，因為 CSRF 檢查在解析 multipart 之前）→ 解析、規劃、顯示預覽（還沒寫入任何資料）
+router.post('/import', requirePermission('assets.manage'), (req, res, next) => {
+  csvUpload.single('file')(req, res, (err) => {
+    if (err) return renderImport(res, { status: 400, error: err.code === 'LIMIT_FILE_SIZE' ? '檔案太大（上限 2MB）' : '上傳失敗，請再試一次' });
+    if (!req.file) return renderImport(res, { status: 400, error: '請選擇要上傳的 CSV 檔案' });
+    try {
+      const { text, encoding } = csv.decodeCsv(req.file.buffer);
+      const table = csv.parseCsv(text, { maxRows: AssetCsvService.MAX_ROWS + 200 });
+      const preview = AssetCsvService.plan(table);
+      const filename = Buffer.from(req.file.originalname || '', 'latin1').toString('utf8').slice(0, 100);
+      const token = preview.fileErrors.length ? null : AssetCsvService.savePending(req.user.id, { table, filename, encoding });
+      renderImport(res, { preview, token, filename, encoding });
+    } catch (e) {
+      if (e.userFacing) return renderImport(res, { status: 400, error: e.message });
+      next(e);
+    }
+  });
+});
+
+// 確認匯入：用保存的資料重新規劃一次（預覽之後資料庫可能又變了），只寫有效的列
+router.post('/import/confirm', requirePermission('assets.manage'), (req, res, next) => {
+  try {
+    const pending = AssetCsvService.getPending(req.user.id, req.body.token);
+    if (!pending) return renderImport(res, { status: 400, error: '預覽已經過期（或已經匯入過了），請重新上傳檔案' });
+    const planResult = AssetCsvService.plan(pending.table);
+    if (planResult.fileErrors.length) return renderImport(res, { status: 400, error: planResult.fileErrors.join('；') });
+    const done = AssetCsvService.apply(planResult);
+    AssetCsvService.dropPending(req.body.token);
+    console.log(`[資產匯入] ${req.user.username} 匯入「${pending.filename}」：新增 ${done.created}、更新 ${done.updated}、略過錯誤 ${planResult.summary.error}`);
+    renderImport(res, { result: { ...done, skipped: planResult.summary.error, unchanged: planResult.summary.unchanged } });
+  } catch (e) {
+    next(e);
+  }
 });
 
 router.get('/new', requirePermission('assets.manage'), (req, res) => {

@@ -60,7 +60,7 @@ const Asset = {
   // q 以空白分隔多個關鍵字（全部都要符合），比對名稱、位置、IP、MAC、主機名稱、序號、財產編號、廠牌、型號、購置日期、
   // 舊識別碼、標籤與啟用中自訂欄位的值。
   // 回傳 { rows, total, groupCounts }：total＝符合條件的總數（分頁前）、groupCounts＝各類別的符合台數（分組標題用）。
-  query({ q = '', category = '', location = '', status = '', tag = '', sort = 'category', dir = 'asc', grouped = true, page = 1, per = 50 } = {}) {
+  query({ q = '', category = '', location = '', status = '', tag = '', sort = 'category', dir = 'asc', grouped = true, page = 1, per = 50, all = false } = {}) {
     const where = [];
     const params = [];
     String(q).trim().toLowerCase().split(/\s+/).filter(Boolean).slice(0, 8).forEach(token => {
@@ -110,13 +110,19 @@ const Asset = {
     const pageSize = Math.min(Math.max(parseInt(per, 10) || 50, 10), 200);
     const pages = Math.max(1, Math.ceil(total / pageSize));
     const current = Math.min(Math.max(parseInt(page, 10) || 1, 1), pages);
-    const rows = db.prepare(`SELECT a.* ${from} ${whereSql} ORDER BY ${orderBy.join(', ')} LIMIT ? OFFSET ?`)
-      .all(...params, pageSize, (current - 1) * pageSize);
+    // all：匯出用，不分頁
+    const rows = all
+      ? db.prepare(`SELECT a.* ${from} ${whereSql} ORDER BY ${orderBy.join(', ')}`).all(...params)
+      : db.prepare(`SELECT a.* ${from} ${whereSql} ORDER BY ${orderBy.join(', ')} LIMIT ? OFFSET ?`).all(...params, pageSize, (current - 1) * pageSize);
     return { rows: enrich(rows), total, groupCounts, page: current, pages, pageSize };
   },
 
   countActive() {
     return db.prepare('SELECT COUNT(*) AS n FROM assets WHERE is_active = 1').get().n;
+  },
+
+  setActive(id, active) {
+    db.prepare('UPDATE assets SET is_active = ? WHERE id = ?').run(active ? 1 : 0, id);
   },
 
   count() {

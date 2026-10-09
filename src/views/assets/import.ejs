@@ -1,0 +1,113 @@
+<%- include('../layout', { title: '匯入資產 CSV' }) %>
+
+<div class="page-header">
+  <h1>匯入資產 CSV</h1>
+  <div class="page-actions">
+    <a href="/assets" class="btn btn--secondary btn--md">回到資產管理</a>
+  </div>
+</div>
+
+<% if (error) { %><div class="form-error"><%= error %></div><% } %>
+
+<% if (result) { %>
+  <div class="card">
+    <div class="form-success">匯入完成：新增 <strong><%= result.created %></strong> 筆、更新 <strong><%= result.updated %></strong> 筆<%= result.unchanged ? `、無變更 ${result.unchanged} 筆` : '' %><%= result.skipped ? `、因錯誤略過 ${result.skipped} 筆` : '' %>。</div>
+    <a href="/assets" class="btn btn--primary btn--md">到資產管理查看</a>
+    <a href="/assets/import" class="btn btn--secondary btn--md">再匯入另一個檔案</a>
+  </div>
+<% } else if (preview) { %>
+  <div class="card">
+    <p class="form-hint">檔案：<strong><%= filename %></strong>（編碼：<%= encoding %>）。<strong>下面只是預覽，還沒有寫入任何資料。</strong></p>
+
+    <% if (preview.fileErrors.length > 0) { %>
+      <div class="form-error">
+        <strong>這個檔案無法匯入：</strong>
+        <ul><% preview.fileErrors.forEach(e => { %><li><%= e %></li><% }) %></ul>
+      </div>
+      <a href="/assets/import" class="btn btn--secondary btn--md">重新選擇檔案</a>
+    <% } else { %>
+      <% const s = preview.summary; %>
+      <div class="import-summary">
+        <span class="status-badge status-badge--normal">新增 <%= s.create %></span>
+        <span class="status-badge status-badge--warning">更新 <%= s.update %></span>
+        <span class="status-badge">無變更 <%= s.unchanged %></span>
+        <span class="status-badge status-badge--critical">錯誤（將略過）<%= s.error %></span>
+        <% if (s.warnings > 0) { %><span class="form-hint">另有 <%= s.warnings %> 則提醒（不影響匯入）</span><% } %>
+      </div>
+      <% if (preview.ignoredColumns.length > 0) { %>
+        <p class="form-hint">以下欄位無法對應到系統欄位，已忽略：<%= preview.ignoredColumns.join('、') %></p>
+      <% } %>
+      <% if (s.clears > 0) { %>
+        <div class="form-warning" role="status"><strong>注意：</strong>有 <%= s.clears %> 個欄位原本有資料、但檔案裡的儲存格是空白，匯入後會被<strong>清空</strong>（下方「更新」的差異裡以「→（清空）」標示）。如果不是你要的，請先修改檔案，或把那一欄整個刪掉（整欄不存在就完全不動）。</div>
+      <% } %>
+
+      <% if (s.create + s.update > 0) { %>
+        <form method="POST" action="/assets/import/confirm" data-confirm="確定要匯入嗎？將新增 <%= s.create %> 筆、更新 <%= s.update %> 筆<%= s.error ? '，另外 ' + s.error + ' 筆有錯誤的會略過' : '' %>。">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <input type="hidden" name="token" value="<%= token %>">
+          <button type="submit" class="btn btn--primary btn--md">確認匯入（新增 <%= s.create %>、更新 <%= s.update %>）</button>
+          <a href="/assets/import" class="btn btn--secondary btn--md">取消，重新選擇檔案</a>
+        </form>
+      <% } else { %>
+        <p class="form-hint">沒有可以匯入的資料。</p>
+        <a href="/assets/import" class="btn btn--secondary btn--md">重新選擇檔案</a>
+      <% } %>
+
+      <%
+        const shown = preview.rows.slice(0, 300);
+        const label = { create: '新增', update: '更新', unchanged: '無變更', error: '錯誤' };
+      %>
+      <h2 style="margin-top: var(--space-6);">逐列結果<%= preview.rows.length > shown.length ? `（前 ${shown.length} 列，共 ${preview.rows.length} 列；錯誤的列都會列出）` : '' %></h2>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>列</th><th>結果</th><th>資產</th><th>內容</th></tr></thead>
+          <tbody>
+            <% preview.rows.filter((r, i) => i < 300 || r.action === 'error').forEach(r => { %>
+              <tr>
+                <td><%= r.line %></td>
+                <td><span class="status-badge <%= r.action === 'create' ? 'status-badge--normal' : (r.action === 'update' ? 'status-badge--warning' : (r.action === 'error' ? 'status-badge--critical' : '')) %>"><%= label[r.action] %></span></td>
+                <td><%= r.name || '-' %><% if (r.id) { %> <small class="form-hint">（ID <%= r.id %>）</small><% } %></td>
+                <td>
+                  <% r.errors.forEach(e => { %><div class="import-err"><%= e %></div><% }) %>
+                  <% r.changes.forEach(c => { %><div class="import-change"><strong><%= c.label %></strong>：<%= c.from || '（空）' %> → <%= c.to || '（清空）' %></div><% }) %>
+                  <% r.warnings.forEach(w => { %><div class="import-warn">提醒：<%= w %></div><% }) %>
+                  <% if (r.action === 'create' && r.apply) { %><small class="form-hint"><%= [categories.find(c => c.code === r.apply.category) ? categories.find(c => c.code === r.apply.category).label : r.apply.category, r.apply.location, r.apply.values.ip_address].filter(Boolean).join('・') %></small><% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+<% } else { %>
+  <div class="card" style="max-width: 760px;">
+    <h2>上傳 CSV</h2>
+    <p class="form-hint">建議做法：先到資產管理「匯出 CSV」（或下載空白範本），用 Excel 修改或新增資料，再回來上傳。上傳後會先<strong>預覽</strong>每一列會新增或更新什麼，確認後才真的寫入。</p>
+    <form method="POST" action="/assets/import?_csrf=<%= csrfToken %>" enctype="multipart/form-data">
+      <div class="form-group">
+        <label class="form-label" for="file">CSV 檔案（上限 2MB、<%= maxRows %> 筆）</label>
+        <input class="form-input" type="file" id="file" name="file" accept=".csv,text/csv" required>
+      </div>
+      <button type="submit" class="btn btn--primary btn--md">上傳並預覽</button>
+      <a href="/assets/import-template.csv" class="btn btn--secondary btn--md">下載空白範本</a>
+      <a href="/assets/export.csv" class="btn btn--secondary btn--md">匯出目前全部資產</a>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>規則說明</h2>
+    <ul class="form-hint import-rules">
+      <li><strong>新增或更新</strong>：「資產ID」欄有填 ＝ 更新那一台；沒填 ＝ 新增。新增時如果已經有<strong>同名同類別</strong>的設備會被擋下（避免重複匯入變成一堆重複設備），要更新請填資產ID。</li>
+      <li><strong>空白儲存格</strong>：欄位存在但儲存格空白 ＝ 清空那個欄位；整個欄位不在檔案裡 ＝ 完全不動。預覽會把每一個「清空」標出來。只想改某幾個欄位的話，只保留「資產ID」和那幾欄就好。</li>
+      <li><strong>類別</strong>要填系統裡的類別名稱（<%= categories.map(c => c.label).join('、') %>）；已有檢查紀錄的設備不能變更類別。</li>
+      <li><strong>標籤</strong>用逗號或頓號分隔（每台最多 10 個）；<strong>IP／MAC</strong> 多個也用逗號分隔，MAC 會自動整理成大寫加冒號；<strong>購置日期</strong>用 年-月-日（Excel 存成 2024/3/15 也可以）；<strong>狀態</strong>填「啟用」或「停用」。</li>
+      <li>IP／MAC 格式不對、序號／財產編號等與其他設備重複，只會提醒、不擋匯入；日期、數字、下拉選項不對、類別不存在才算錯誤，該列會略過，其他列照常匯入。</li>
+      <li><strong>自訂欄位</strong>用欄位名稱當表頭<%= customFields.length ? '（目前有：' + customFields.map(f => f.label).join('、') + '）' : '' %>；下拉選單的值要在選項內，是／否填「是」或「否」。</li>
+      <li>用 Excel 開啟、存檔時請選「<strong>CSV UTF-8（逗號分隔）</strong>」（舊版「CSV（逗號分隔）」的 Big5 編碼也能自動辨識）。序號、財產編號這類前面有 0 的資料，請先把該欄設成「文字」格式再存，否則 Excel 會吃掉開頭的 0。</li>
+      <li>待整理的「舊識別碼」不在匯出／匯入範圍內；開頭是 <code>=</code>、<code>+</code>、<code>-</code>、<code>@</code> 的儲存格匯出時會多一個 <code>'</code> 防止被 Excel 當公式，匯入時會自動拿掉。</li>
+    </ul>
+  </div>
+<% } %>
+
+<%- include('../partials/footer') %>
