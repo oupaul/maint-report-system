@@ -85,20 +85,35 @@
 </div>
 
 <div class="card">
-  <h2>最近登入</h2>
+  <div class="page-header" style="margin-bottom: var(--space-2);">
+    <h2>最近登入</h2>
+    <div class="page-actions"><a href="/admin/logins" class="btn btn--secondary btn--sm">完整登入紀錄與使用時間統計</a></div>
+  </div>
   <% if (recentLogins.length === 0) { %>
     <div class="empty-state">尚無登入紀錄（這個功能啟用之後的登入才會記錄）。</div>
   <% } else { %>
     <div class="table-wrap">
       <table class="data-table">
-        <thead><tr><th>帳號</th><th>顯示名稱</th><th>最近登入時間（台北時間）</th></tr></thead>
+        <thead><tr><th>帳號</th><th>顯示名稱</th><th>最近登入時間（台北時間）</th><th>最後操作</th><th>使用時間</th><th>狀態</th></tr></thead>
         <tbody>
-          <% recentLogins.forEach(u => { %>
-            <tr><td><%= u.username %></td><td><%= u.display_name || '-' %></td><td><%= u.last_login_at %></td></tr>
+          <% recentLogins.forEach(u => { const li = loginInfo.get(u.id); %>
+            <tr>
+              <td><a href="/admin/logins?user=<%= u.id %>"><%= u.username %></a></td>
+              <td><%= u.display_name || '-' %></td>
+              <td><%= u.last_login_at %></td>
+              <% if (li) { %>
+                <td><%= li.last_at %></td>
+                <td><%= fmt.usage(li.secs) %></td>
+                <td><% if (li.status === 'online') { %><span class="status-badge status-badge--normal"><%= fmt.LOGIN_STATUS[li.status] %></span><% } else { %><%= fmt.LOGIN_STATUS[li.status] %><% } %></td>
+              <% } else { %>
+                <td colspan="3"><small class="form-hint">沒有使用時間紀錄（登入紀錄功能啟用之前的登入）</small></td>
+              <% } %>
+            </tr>
           <% }) %>
         </tbody>
       </table>
     </div>
+    <p class="form-hint">使用時間是這次登入實際操作的時間加總；超過 30 分鐘沒操作就視為那一段結束，閒置的時間不計入。</p>
   <% } %>
 </div>
 

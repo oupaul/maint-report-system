@@ -36,6 +36,7 @@ const MIGRATIONS = [
   'migrate_0021_issue_triage',
   'migrate_0022_customers',
   'migrate_0023_customer_tax_id',
+  'migrate_0024_login_sessions',
 ];
 
 async function run() {

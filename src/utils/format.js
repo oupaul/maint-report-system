@@ -31,7 +31,18 @@ function ago(ms, now = Date.now()) {
   return `${Math.floor(sec / 86400)} 天前`;
 }
 
+// 使用時間長度（登入紀錄用）：不到 1 分鐘、x 分鐘、x 小時 y 分（累計可能很長，不換算成天）
+function usage(seconds) {
+  const s = Math.max(0, Math.floor(seconds || 0));
+  if (s < 60) return '不到 1 分鐘';
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  return h > 0 ? `${h} 小時 ${m} 分` : `${m} 分鐘`;
+}
+
+const LOGIN_STATUS = { online: '線上', idle_now: '閒置中', logout: '已登出', idle_end: '閒置逾時' };
+
 const STATUS_LABEL = { ok: '正常', warn: '注意', bad: '異常' };
 const STATUS_CLASS = { ok: 'normal', warn: 'warning', bad: 'critical' };
 
-module.exports = { bytes, duration, ago, time: formatTaipei, STATUS_LABEL, STATUS_CLASS };
+module.exports = { bytes, duration, usage, LOGIN_STATUS, ago, time: formatTaipei, STATUS_LABEL, STATUS_CLASS };

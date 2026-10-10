@@ -17,6 +17,7 @@ function establishSession(req, user, { viaSso = false } = {}) {
       req.session.save((saveErr) => {
         if (saveErr) return reject(saveErr);
         try { User.recordLogin(user.id); } catch (e) { /* 只是記錄用，失敗不影響登入 */ }
+        require('../services/LoginTracker').start(req, user, viaSso ? 'm365' : 'password');
         resolve();
       });
     });

@@ -1,0 +1,84 @@
+<%- include('../layout', { title: '登入紀錄' }) %>
+
+<div class="page-header">
+  <h1>登入紀錄</h1>
+  <div class="page-actions"><a href="/admin/status" class="btn btn--secondary btn--md">回系統狀態</a></div>
+</div>
+
+<div class="card">
+  <form method="GET" action="/admin/logins" class="asset-filter">
+    <select class="form-select" name="user" aria-label="使用者" data-searchable>
+      <option value="">全部使用者</option>
+      <% users.forEach(u => { %><option value="<%= u.id %>" data-search="<%= u.display_name || '' %>" <%= selected && selected.id === u.id ? 'selected' : '' %>><%= u.username %><%= u.display_name ? '（' + u.display_name + '）' : '' %></option><% }) %>
+    </select>
+    <select class="form-select" name="days" aria-label="期間">
+      <% DAYS.forEach(d => { %><option value="<%= d %>" <%= d === days ? 'selected' : '' %>>最近 <%= d %> 天</option><% }) %>
+    </select>
+    <button type="submit" class="btn btn--secondary btn--md">查詢</button>
+    <% if (selected) { %><a href="/admin/logins?days=<%= days %>" class="btn btn--secondary btn--md">看全部使用者</a><% } %>
+  </form>
+  <p class="form-hint">「使用時間」＝這次登入實際操作的時間加總：從登入到最後一次操作；超過 30 分鐘沒操作就視為那一段結束，閒置的時間不計入，回來操作再開始新的一段。只記錄這個功能啟用之後的登入，保留 <%= retention %> 天。</p>
+</div>
+
+<% if (selected) { %>
+  <div class="stat-row">
+    <div class="card stat-card"><div class="stat-card__value"><%= mine ? mine.logins : 0 %></div><div class="stat-card__label"><%= selected.username %> 最近 <%= days %> 天登入次數</div></div>
+    <div class="card stat-card"><div class="stat-card__value"><%= mine ? fmt.usage(mine.secs) : '-' %></div><div class="stat-card__label">累計使用時間</div></div>
+    <div class="card stat-card"><div class="stat-card__value"><%= mine ? fmt.usage(mine.avg) : '-' %></div><div class="stat-card__label">平均每次登入的使用時間</div></div>
+  </div>
+<% } else { %>
+  <div class="card">
+    <h2>各使用者統計（最近 <%= days %> 天）</h2>
+    <% if (summary.length === 0) { %>
+      <div class="empty-state">這段期間沒有登入紀錄。</div>
+    <% } else { %>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>帳號</th><th>顯示名稱</th><th>登入次數</th><th>累計使用時間</th><th>平均每次</th><th>最近登入</th></tr></thead>
+          <tbody>
+            <% summary.forEach(m => { %>
+              <tr>
+                <td><a href="/admin/logins?user=<%= m.user_id %>&days=<%= days %>"><%= m.username || ('#' + m.user_id) %></a></td>
+                <td><%= m.display_name || '-' %></td>
+                <td><%= m.logins %></td>
+                <td><%= fmt.usage(m.secs) %></td>
+                <td><%= fmt.usage(m.avg) %></td>
+                <td><%= m.last %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+<% } %>
+
+<div class="card">
+  <h2>登入明細<%= selected ? '：' + selected.username : '' %></h2>
+  <% if (rows.length === 0) { %>
+    <div class="empty-state">這段期間沒有登入紀錄。</div>
+  <% } else { %>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><% if (!selected) { %><th>帳號</th><% } %><th>登入時間（台北時間）</th><th>最後操作</th><th>使用時間</th><th>狀態</th><th>登入方式</th><th>裝置</th><th>IP</th></tr></thead>
+        <tbody>
+          <% rows.forEach(s => { %>
+            <tr>
+              <% if (!selected) { %><td><a href="/admin/logins?user=<%= s.user_id %>&days=<%= days %>"><%= s.username || ('#' + s.user_id) %></a></td><% } %>
+              <td><%= s.started_at %></td>
+              <td><%= s.last_at %></td>
+              <td><%= fmt.usage(s.secs) %><% if (s.segs > 1) { %> <small class="form-hint">（<%= s.segs %> 段）</small><% } %></td>
+              <td><% if (s.status === 'online') { %><span class="status-badge status-badge--normal"><%= fmt.LOGIN_STATUS[s.status] %></span><% } else { %><%= fmt.LOGIN_STATUS[s.status] %><% } %></td>
+              <td><%= s.method === 'm365' ? 'Microsoft 365' : (s.method === 'password' ? '帳號密碼' : '-') %></td>
+              <td><%= s.agent || '-' %></td>
+              <td><%= s.ip || '-' %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% if (total > rows.length) { %><p class="form-hint">只列出最近 <%= rows.length %> 筆（共 <%= total %> 筆），想看更早的請縮短期間或選單一使用者。</p><% } %>
+  <% } %>
+</div>
+
+<%- include('../partials/footer') %>

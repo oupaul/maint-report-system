@@ -9,6 +9,7 @@ const User = require('../models/User');
 const BackupService = require('../services/BackupService');
 const HealthService = require('../services/HealthService');
 const ActivityTracker = require('../services/ActivityTracker');
+const LoginSession = require('../models/LoginSession');
 const BrandingService = require('../services/BrandingService');
 const fmt = require('../utils/format');
 
@@ -68,7 +69,9 @@ async function renderStatus(req, res, extra = {}) {
     .filter((u) => u.last_login_at)
     .sort((a, b) => (a.last_login_at < b.last_login_at ? 1 : -1))
     .slice(0, 10);
+  const loginInfo = LoginSession.latestPerUser(recentLogins.map((u) => u.id)); // 每個人最近一次登入的使用時間
   res.render('admin/status', {
+    loginInfo,
     health,
     online,
     onlineUsers: new Set(online.map((e) => e.userId)).size,
@@ -85,6 +88,25 @@ router.get('/status', async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+// ---- 登入紀錄（誰、什麼時候登入、用了多久）----
+// 一個「登入」＝同一個 session 的所有使用段合併；使用時間是各段加總（閒置超過 30 分鐘就算那一段結束，不計入）
+router.get('/logins', (req, res) => {
+  const DAYS = [7, 30, 90, 180];
+  const days = DAYS.includes(parseInt(req.query.days, 10)) ? parseInt(req.query.days, 10) : 30;
+  const userId = parseInt(req.query.user, 10) || null;
+  const selected = userId ? User.findById(userId) : null;
+  const all = LoginSession.sessions({ days, limit: 5000 });
+  const summary = LoginSession.summarize(all);
+  const rows = selected ? all.filter((s) => s.user_id === selected.id).slice(0, 300) : all.slice(0, 300);
+  const mine = selected ? summary.find((m) => m.user_id === selected.id) || null : null;
+  res.render('admin/logins', {
+    days, DAYS, selected, rows, summary, mine,
+    users: User.findAll(),
+    retention: LoginSession.RETENTION_DAYS,
+    total: selected ? all.filter((s) => s.user_id === selected.id).length : all.length,
+  });
 });
 
 router.post('/status/db-check', async (req, res, next) => {

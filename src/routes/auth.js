@@ -7,6 +7,7 @@ const AuthService = require('../services/AuthService');
 const M365AuthService = require('../services/M365AuthService');
 const LoginRateLimit = require('../middleware/loginRateLimit');
 const ActivityTracker = require('../services/ActivityTracker');
+const LoginTracker = require('../services/LoginTracker');
 const { establishSession } = require('../utils/session');
 const { safeReturnPath } = require('../utils/safeRedirect');
 
@@ -116,6 +117,7 @@ router.post('/auth/m365/token', async (req, res) => {
 
 router.post('/logout', (req, res) => {
   ActivityTracker.remove(req.sessionID);
+  LoginTracker.end(req.sessionID, 'logout');
   req.session.destroy(() => {
     res.redirect('/login');
   });

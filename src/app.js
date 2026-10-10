@@ -10,6 +10,7 @@ const SqliteSessionStore = require('./services/SqliteSessionStore');
 const db = require('./models/db');
 const User = require('./models/User');
 const ActivityTracker = require('./services/ActivityTracker');
+const LoginTracker = require('./services/LoginTracker');
 const Notification = require('./models/Notification');
 const Announcement = require('./models/Announcement');
 const PermissionGroup = require('./models/PermissionGroup');
@@ -136,6 +137,8 @@ app.use((req, res, next) => {
 
 // 記錄誰在線上（給「系統狀態」頁用）
 app.use(ActivityTracker.middleware);
+// 登入紀錄（登入時間、使用時間長度，寫進資料庫、保留 180 天）
+app.use(LoginTracker.middleware);
 
 // 必須先改密碼的帳號（初始亂數密碼、管理員代建或重設的密碼）只能進到變更密碼頁與登出
 const ALLOWED_WHEN_MUST_CHANGE = new Set(['/account/password', '/logout']);
@@ -244,6 +247,9 @@ const server = app.listen(config.PORT, () => {
   // 已讀超過 90 天的通知定期清掉（啟動時一次，之後每天一次）
   try { Notification.prune(); } catch (e) { /* 清不掉不影響服務 */ }
   setInterval(() => { try { Notification.prune(); } catch (e) { /* ignore */ } }, 24 * 60 * 60 * 1000).unref();
+  // 登入紀錄只留 180 天（啟動時一次，之後每天一次）
+  try { require('./models/LoginSession').prune(); } catch (e) { /* 清不掉不影響服務 */ }
+  setInterval(() => { try { require('./models/LoginSession').prune(); } catch (e) { /* ignore */ } }, 24 * 60 * 60 * 1000).unref();
 });
 
 server.on('error', (err) => {
