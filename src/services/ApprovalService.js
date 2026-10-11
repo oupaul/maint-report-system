@@ -145,6 +145,39 @@ function canAct(user, batch, record) {
   return !!record.group_id && user.group_id === record.group_id;
 }
 
+// 送出（送審／標記完成）前必須已經有「工程師」簽名：簽名是巡檢人員對這份紀錄的確認，沒簽就不能交出去。
+// 主管簽名不在這裡檢查——那是簽核人在審核時才簽的
+const SIGNATURE_REQUIRED_MESSAGE = '請先完成「工程師」簽名才能送出：到批次摘要頁最下方的「簽核」區塊簽名，再回來送出。';
+function hasEngineerSignature(batchId) {
+  return !!db.prepare("SELECT 1 FROM batch_signatures WHERE batch_id = ? AND role = 'engineer'").get(batchId);
+}
+
+// 核准前，核准的人要先簽「主管」欄：簽名必須是他自己簽的，而且是這一關輪到之後才簽的
+// （上一關的人、或送審之前就留在那裡的簽名都不算，避免沒簽就沿用舊簽名核准；嚴格晚於輪到的時間，同一秒不算）
+const SUPERVISOR_SIGNATURE_MESSAGE = '請先完成您的簽名（主管簽名）才能核准：到批次摘要頁最下方的「簽核」區塊簽名，再回來核准。如果這一關輪到之後您還沒簽過，之前留下的簽名不算。';
+
+// 這一關是什麼時候輪到的：送審時間，或上一關核准的時間（取較晚的）
+function currentSince(batch, record) {
+  const prev = db.prepare(
+    "SELECT MAX(acted_at) AS t FROM approval_records WHERE batch_id = ? AND round = ? AND status = 'approved'"
+  ).get(batch.id, record.round).t;
+  return [batch.submitted_at, prev].filter(Boolean).sort().pop() || '';
+}
+
+function supervisorSignatureReady(batch, record, user) {
+  if (!record || !user) return false;
+  const sig = db.prepare("SELECT user_id, signed_at FROM batch_signatures WHERE batch_id = ? AND role = 'supervisor'").get(batch.id);
+  return !!sig && sig.user_id === user.id && sig.signed_at > currentSince(batch, record);
+}
+
+// 誰可以簽「主管」欄：管理員，或這個批次目前這一關的簽核人（群組成員也算）
+function canSignSupervisor(user, batch) {
+  if (!user) return false;
+  if (isAdmin(user)) return true;
+  const record = currentRecord(batch);
+  return !!record && canAct(user, batch, record);
+}
+
 function canSubmit(batch) {
   return isEnabled() && batch.status === 'draft' && (batch.approval_status === 'none' || batch.approval_status === 'returned');
 }
@@ -263,6 +296,7 @@ function submit(batchId, user, comment) {
     if (!canSubmit(batch)) { result = { ok: false, error: '這個批次目前不能送出審核（可能已在審核中或已核准）' }; return; }
     const count = db.prepare('SELECT COUNT(*) AS n FROM inspection_items WHERE batch_id = ?').get(batch.id).n;
     if (count === 0) { result = { ok: false, error: '還沒有填寫任何檢查項目，無法送出審核' }; return; }
+    if (!hasEngineerSignature(batch.id)) { result = { ok: false, error: SIGNATURE_REQUIRED_MESSAGE }; return; }
     const stages = listStages();
     if (stages.length === 0) { result = { ok: false, error: '尚未設定任何簽核關卡，請聯絡管理員' }; return; }
 
@@ -299,6 +333,10 @@ function decide(batchId, user, action, comment) {
     if (!canAct(user, batch, record)) {
       const self = getSettings().block_self_approval && batch.submitted_by === user.id;
       result = { ok: false, error: self ? '不能簽核自己送出的批次，請由其他人處理' : '您不是這個關卡的簽核人', status: 403 };
+      return;
+    }
+    if (action === 'approve' && !supervisorSignatureReady(batch, record, user)) {
+      result = { ok: false, error: SUPERVISOR_SIGNATURE_MESSAGE };
       return;
     }
     const text = cleanComment(comment);
@@ -408,6 +446,7 @@ module.exports = {
   MAX_STAGE_LABEL, MAX_COMMENT,
   getSettings, isEnabled, updateSettings,
   listStages, findStage, validateStageLabel, createStage, updateStage, setStageActive, moveStage, stageUsed, removeStage, groupInUse,
+  hasEngineerSignature, SIGNATURE_REQUIRED_MESSAGE, supervisorSignatureReady, canSignSupervisor, SUPERVISOR_SIGNATURE_MESSAGE,
   isLocked, latestRound, recordsOf, currentRecord, approversOf, canAct, canSubmit, canWithdraw, canReopen,
   pendingFor, statusInfo, history, lastReturnNote, approvalSummary,
   submit, approve, returnBatch, withdraw, reopen,

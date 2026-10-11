@@ -66,7 +66,10 @@
         <label class="form-label" for="submit-comment">給簽核人的說明（選填）</label>
         <textarea class="form-input" id="submit-comment" name="comment" maxlength="<%= approval.maxComment %>"></textarea>
       </div>
-      <div><button type="submit" class="btn btn--primary btn--md">送出審核</button></div>
+      <div>
+        <button type="submit" class="btn btn--primary btn--md" <%= approval.engineerSigned ? '' : 'disabled' %>>送出審核</button>
+        <% if (!approval.engineerSigned) { %><span class="form-hint">送出前請先在下方「簽核」區塊完成<strong>工程師簽名</strong>。</span><% } %>
+      </div>
     </form>
   <% } %>
 
@@ -78,9 +81,12 @@
         <textarea class="form-input" id="decision-comment" name="comment" maxlength="<%= approval.maxComment %>"></textarea>
       </div>
       <div class="page-actions">
-        <button type="submit" class="btn btn--primary btn--md">核准「<%= approval.current.record.stage_label %>」</button>
+        <button type="submit" class="btn btn--primary btn--md" <%= approval.current.supervisorSigned ? '' : 'disabled' %>>核准「<%= approval.current.record.stage_label %>」</button>
         <button type="submit" formaction="/batches/<%= batch.id %>/return" class="btn btn--secondary btn--md">退回修改</button>
       </div>
+      <% if (!approval.current.supervisorSigned) { %>
+        <p class="form-hint">核准前請先在下方「簽核」區塊的<strong>主管欄簽名</strong>（要是您自己簽的，而且是輪到這一關之後簽的）。退回不需要簽名。</p>
+      <% } %>
     </form>
   <% } %>
 
@@ -189,16 +195,16 @@
   </section>
 <% }) %>
 
-<section class="asset-section">
+<section class="asset-section" id="signatures">
   <div class="asset-section__header">
     <h2>簽核</h2>
   </div>
   <div class="signature-grid">
     <% signatureRoles.forEach(role => {
       const sig = signaturesByRole[role];
-      // 主管簽核僅限管理員帳號（見 routes/batches.js 的對應檢查），這裡只是
-      // 對應的 UI 提示——不要讓非管理員帳號簽完一整筆手寫簽名送出後才被拒絕。
-      const canSign = role !== 'supervisor' || (currentUser && currentUser.role === 'admin');
+      // 主管簽名僅限管理員或這個批次目前這一關的簽核人（見 routes/batches.js 的對應檢查），這裡只是
+      // 對應的 UI 提示——不要讓沒有資格的帳號簽完一整筆手寫簽名送出後才被拒絕。
+      const canSign = role !== 'supervisor' || approval.canSignSupervisor;
     %>
       <div class="signature-col">
         <h3 class="signature-col__title"><%= signatureRoleLabels[role] %></h3>

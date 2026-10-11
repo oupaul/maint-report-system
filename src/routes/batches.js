@@ -290,6 +290,7 @@ router.get('/:id/entry', requireLogin, (req, res) => {
     statusColors,
     addAssetError: null,
     returnNote: ApprovalService.lastReturnNote(data.batch),
+    engineerSigned: ApprovalService.hasEngineerSignature(data.batch.id), // 沒簽名時「送出」按鈕停用並提示
   });
 });
 
@@ -321,6 +322,8 @@ router.post('/:id/assets', requireLogin, (req, res) => {
       statuses: ITEM_STATUSES,
       statusColors,
       addAssetError: emptyError,
+      returnNote: ApprovalService.lastReturnNote(data.batch),
+      engineerSigned: ApprovalService.hasEngineerSignature(data.batch.id), // 填寫頁的送出按鈕要用（兩個 render 路徑都要傳）
     });
   }
   const allAssetIds = [...assetIds, ...quick.rows.map(r => Asset.create(r).id)];
@@ -471,6 +474,9 @@ router.post('/:id/complete', requireLogin, (req, res) => {
     });
   }
   if (rejectIfLocked(req, res, batch)) return;
+  if (!ApprovalService.hasEngineerSignature(batch.id)) {
+    return res.status(400).render('error', { title: '請先簽名', message: ApprovalService.SIGNATURE_REQUIRED_MESSAGE });
+  }
   InspectionBatch.complete(batch.id);
   res.redirect(`/batches/${batch.id}`);
 });
@@ -562,12 +568,15 @@ router.get('/:id', requireLogin, (req, res) => {
     current: record ? {
       record,
       canAct: ApprovalService.canAct(req.user, batch, record),
+      supervisorSigned: ApprovalService.supervisorSignatureReady(batch, record, req.user), // 沒簽名就不能核准
       approverNames: ApprovalService.approversOf(record, batch).map(u => u.display_name || u.username),
     } : null,
     submittedByName: batch.submitted_by ? ((User.findById(batch.submitted_by) || {}).display_name || (User.findById(batch.submitted_by) || {}).username) : null,
     flash: APPROVAL_FLASH[req.query.ok] || null,
     notice: req.query.msg === 'locked' ? '審核中或已核准的批次不能編輯。如需修改，請先撤回審核（送審的人或管理員），或由管理員重新開啟。' : null,
     maxComment: ApprovalService.MAX_COMMENT,
+    engineerSigned: !!signaturesByRole.engineer,
+    canSignSupervisor: ApprovalService.canSignSupervisor(req.user, batch),
   };
 
   res.render('batches/show', {
@@ -603,13 +612,13 @@ router.post('/:id/signatures/:role', requireLogin, async (req, res, next) => {
     return res.status(400).render('error', { title: '無效的簽名角色', message: '無效的簽名角色' });
   }
 
-  // 主管簽核只開放給系統角色是 admin 的帳號，避免技術人員帳號自己簽自己的
-  // 主管審核欄位、讓簽核失去稽核意義。工程師欄位任何登入帳號都能簽（本來就
+  // 主管簽名只開放給管理員，或這個批次目前這一關的簽核人（群組成員也算），避免技術人員帳號
+  // 自己簽自己的主管審核欄位、讓簽核失去稽核意義。工程師欄位任何登入帳號都能簽（本來就
   // 代表「執行巡檢的人」，沒有審核性質）。
-  if (role === 'supervisor' && req.user.role !== 'admin') {
+  if (role === 'supervisor' && !ApprovalService.canSignSupervisor(req.user, batch)) {
     return res.status(403).render('error', {
       title: '權限不足',
-      message: '主管簽核僅限管理員帳號，請聯絡管理員協助簽署',
+      message: '主管簽名僅限管理員，或這個批次目前輪到的簽核人。請聯絡管理員協助簽署',
     });
   }
 

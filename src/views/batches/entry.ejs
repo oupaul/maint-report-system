@@ -5,15 +5,18 @@
   <div class="page-actions">
     <a href="/batches/<%= batch.id %>" class="btn btn--secondary btn--md">查看摘要</a>
     <% if (batch.status === 'draft') { %>
+      <% if (!engineerSigned) { %>
+        <a href="/batches/<%= batch.id %>#signatures" class="btn btn--secondary btn--md" title="送出前要先完成「工程師」簽名">先到摘要頁簽名</a>
+      <% } %>
       <% if (approvalEnabled) { %>
         <form method="POST" action="/batches/<%= batch.id %>/submit" data-confirm="確定要送出審核嗎？送出後這個批次會鎖定，審核通過或被退回前不能編輯。" style="display:inline;">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-          <button type="submit" class="btn btn--primary btn--md">送出審核</button>
+          <button type="submit" class="btn btn--primary btn--md" <%= engineerSigned ? '' : 'disabled title="請先完成工程師簽名"' %>>送出審核</button>
         </form>
       <% } else { %>
         <form method="POST" action="/batches/<%= batch.id %>/complete" data-confirm="確定要將此批次標記為已完成嗎？完成後仍可查看與產生報告。" style="display:inline;">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-          <button type="submit" class="btn btn--primary btn--md">標記為已完成</button>
+          <button type="submit" class="btn btn--primary btn--md" <%= engineerSigned ? '' : 'disabled title="請先完成工程師簽名"' %>>標記為已完成</button>
         </form>
       <% } %>
     <% } %>
