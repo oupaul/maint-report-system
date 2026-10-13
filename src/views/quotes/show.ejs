@@ -40,10 +40,11 @@
     <p class="form-hint">來源：<a href="/batches/<%= i.batch_id %>#item-<%= i.inspection_item_id %>"><%= i.batch_date %> <%= i.batch_title %></a>（送出當下的內容）</p>
     <% if (i.photos.length > 0) { %>
       <div class="photo-thumb-list">
-        <% i.photos.forEach(p => { %>
-          <div class="photo-thumb-list__item"><a href="/quotes/<%= request.id %>/photo/<%= p.id %>" target="_blank" rel="noopener"><img class="screenshot-thumb" src="/quotes/<%= request.id %>/photo/<%= p.id %>" alt="<%= i.label %> 截圖"></a></div>
+        <% i.photos.forEach((p, pi) => { %>
+          <div class="photo-thumb-list__item"><a href="/quotes/<%= request.id %>/photo/<%= p.id %>" target="_blank" rel="noopener" data-viewer="viewer-qi<%= i.inspection_item_id %>" data-label="<%= i.label %>・截圖 <%= pi + 1 %>" title="點一下就地放大檢視（可縮放）"><img class="screenshot-thumb" src="/quotes/<%= request.id %>/photo/<%= p.id %>" alt="<%= i.label %> 截圖"></a></div>
         <% }) %>
       </div>
+      <div id="viewer-qi<%= i.inspection_item_id %>" class="photo-viewer-host" data-viewer-host hidden></div>
     <% } %>
   </div>
 <% }) %>
@@ -103,4 +104,5 @@
   </form>
 </div>
 
+<script src="<%= assetUrl('/js/photo-viewer.js') %>"></script>
 <%- include('../partials/footer') %>

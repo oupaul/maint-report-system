@@ -505,6 +505,8 @@ p { margin: 0 0 var(--space-4) 0; }
 
 /* 截圖就地檢視區（public/js/photo-viewer.js） */
 .photo-viewer-host { margin-top: var(--space-2); }
+/* 摘要頁的檢視區放在表格列裡：表格比螢幕寬（手機）時，檢視區要貼在可視範圍內，不能跟著表格寬度撐出去 */
+.photo-viewer-row .photo-viewer-host { position: sticky; left: var(--space-4); width: min(100%, calc(100vw - 4 * var(--space-4))); }
 .photo-viewer-row > td { padding: 0 var(--space-4) var(--space-4); border-top: none; }
 .photo-viewer {
   background: var(--color-text);
@@ -532,20 +534,32 @@ p { margin: 0 0 var(--space-4) 0; }
 }
 .photo-viewer__btn:hover { background: rgba(255, 255, 255, 0.26); }
 .photo-viewer__stage {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  max-height: 70vh;
-  min-height: 6rem;
-  overflow: auto;
+  height: 62vh;
+  min-height: 14rem;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.35);
+  touch-action: none;       /* 讓瀏覽器不要搶走雙指與拖曳手勢（見 photo-viewer.js） */
+  user-select: none;
 }
+.photo-viewer__stage.is-zoomed { cursor: grab; }
+.photo-viewer__stage.is-zoomed.is-interacting { cursor: grabbing; }
 .photo-viewer__msg { color: #CBD5E1; font-size: var(--text-sm); padding: var(--space-6); }
 .photo-viewer__img {
   max-width: 100%;
-  max-height: 65vh;
+  max-height: 100%;
   object-fit: contain;
   transition: transform 150ms ease;
+  -webkit-user-drag: none;
 }
+.photo-viewer__stage.is-interacting .photo-viewer__img { transition: none; }
+.photo-viewer__zoom { color: #fff; font-size: var(--text-sm); min-width: 3rem; text-align: center; align-self: center; }
+.photo-viewer__btn:disabled { opacity: 0.4; cursor: default; }
+.photo-viewer__hint { margin: var(--space-2) 0 0; color: #94A3B8; font-size: var(--text-xs, 0.75rem); }
 .photo-thumb-list__item a.is-viewing .screenshot-thumb { outline: 2px solid var(--color-primary); outline-offset: 1px; }
 a.is-viewing { font-weight: 600; }
 
