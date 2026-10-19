@@ -63,7 +63,7 @@ Node.js + Express + SQLite（`better-sqlite3`）的 IT 例行維護巡檢紀錄�
 - **CSV／PDF 下載一律不可被快取**（`middleware/securityHeaders.js` 對路徑結尾 `.csv`／`.pdf` 送 `Cache-Control: private, no-store`）：Cloudflare 等 CDN 預設依副檔名快取 .csv／.pdf，曾造成使用者下載到舊範本與空的匯出檔。新增下載路由時網址請維持 `.csv`／`.pdf` 結尾（或自己明確設 `Cache-Control`）；有人說「匯出內容不對／太舊」但主機上的程式是對的，先懷疑 CDN／瀏覽器快取（網址加 `?v=1` 可繞過）
 - `src/app.js` 每個請求都會重新讀取登入者（停用／角色變更立即生效）；`TRUST_PROXY` 環境變數預設關閉，只在確定前面有反向代理時設定，否則 `X-Forwarded-For` 可偽造來繞過登入限流
 - `src/services/PdfReportService.js` 的換頁保護邏輯（估算高度 → 判斷是否 `doc.addPage()` → 才畫區塊）刻意把「估算」與「畫」分成兩步；修改任一步時要同步檢查另一步有沒有跟著失準（尤其是圖片顯示高度的估算依據是 DB 存的 `screenshot_width`/`screenshot_height`，跟畫的時候重新解碼出來的實際尺寸可能不完全一致）
-- pdfkit 不支援原生畫 WebP，`PdfReportService` 無論 `screenshot_format` 是什麼都會先用 `sharp` 重新解碼成 PNG buffer 再畫；改動截圖儲存格式邏輯（`src/services/ImageService.js`）時要記得這個假設沒變
+- **圖片畫質鏈**（放大 PDF 看起來糊時先看這裡）：`ImageService.processScreenshot` 是唯一的入口，長邊上限 `MAX_DIMENSION=3200`、PNG／GIF 來源用 `nearLossless` WebP、其他品質 90，**原圖不保留**，所以上傳當下就決定了之後的最佳畫質（調低等於永久損失，舊圖無法補救）。pdfkit 不支援原生畫 WebP，`PdfReportService.prepareImageForPdf` 依儲存檔「每像素位元組數」（>0.25＝相機照片）選 JPEG（品質 92、4:4:4）或 PNG（螢幕截圖，超過 3MB 也改 JPEG），**不再縮小像素**；單張顯示寬 `IMAGE_DISPLAY_WIDTH=450pt`（估算與繪製共用同一常數）。附錄原圖頁 `drawPhotoAppendix` 由 `?appendix=1` 控制（報告與 ZIP 都支援，只含該份報告有的設備）。報價 PDF 有兩檔畫質 `PHOTO_PROFILES`（high 2000px/品質85、standard 900px/品質70），Email 附件超過 `MAX_PDF_BYTES` 時 `QuoteService` 自動改用 standard 重產。改動截圖儲存格式邏輯（`src/services/ImageService.js`）時，pdfkit 只能吃 JPEG／PNG 這個假設要記得；改動截圖儲存格式邏輯（`src/services/ImageService.js`）時要記得這個假設沒變
 - `/uploads/:batchId/:filename` 是自訂的認證後靜態檔案服務路由（`src/routes/reports.js`），刻意不用 `express.static` 公開掛載，避免未登入使用者直接列出/存取截圖；新增檔案服務路由時比照這個模式做路徑穿越檢查
 
 ## 本機開發／測試 vs VM 測試

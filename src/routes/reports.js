@@ -78,7 +78,7 @@ router.get('/batches/:id/report.pdf', requireLogin, async (req, res) => {
   res.setHeader('Content-Disposition', ReportScope.contentDisposition('inline', asciiName, utf8Name));
 
   try {
-    await PdfReportService.generateBatchReport({ batch, assets, itemsByAssetId: data.itemsByAssetId, signaturesByRole: data.signaturesByRole, approval: data.approval, partial }, res);
+    await PdfReportService.generateBatchReport({ batch, assets, itemsByAssetId: data.itemsByAssetId, signaturesByRole: data.signaturesByRole, approval: data.approval, partial, appendix: req.query.appendix === '1' }, res);
   } catch (err) {
     console.error('[reports] PDF 產生失敗:', err);
     if (!res.headersSent) {
@@ -117,6 +117,7 @@ router.get('/batches/:id/reports.zip', requireLogin, async (req, res) => {
         signaturesByRole: data.signaturesByRole,
         approval: data.approval,
         partial: groups.length > 1, // 批次只有一家客戶時，這份就是完整報告
+        appendix: req.query.appendix === '1',
       });
       let name = `batch-${batch.id}-${ReportScope.fileSafe(g.name)}.pdf`;
       if (used.has(name)) name = `batch-${batch.id}-${ReportScope.fileSafe(g.name)}-${g.key}.pdf`;

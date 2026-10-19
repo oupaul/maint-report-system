@@ -6,7 +6,11 @@
     <% if (!approval.locked) { %>
       <a href="/batches/<%= batch.id %>/entry" class="btn btn--secondary btn--md"><%= batch.status === 'draft' ? '繼續填寫' : '編輯內容' %></a>
     <% } %>
-    <a href="/batches/<%= batch.id %>/report.pdf" class="btn btn--primary btn--md" target="_blank">下載 PDF 報告</a>
+    <% const hasPhotos = [...itemsByAssetId.values()].some(list => list.some(it => it.photos && it.photos.length > 0)); %>
+    <% if (hasPhotos) { %>
+      <label class="report-option" title="報告最後多附幾頁：每張截圖獨佔一頁、盡量放大，需要看細節時翻這裡（頁數會增加、檔案會比較大）"><input type="checkbox" id="report-appendix"> 附錄原圖頁</label>
+    <% } %>
+    <a href="/batches/<%= batch.id %>/report.pdf" class="btn btn--primary btn--md" target="_blank" id="report-main-link">下載 PDF 報告</a>
     <% if (reportGroups.length > 1) { %>
       <details class="report-picker" id="report-picker">
         <summary class="btn btn--secondary btn--md">選擇客戶…</summary>
@@ -27,6 +31,7 @@
             <button type="submit" class="btn btn--primary btn--sm" formtarget="_blank" id="report-pdf-btn">下載選取客戶的 PDF</button>
             <button type="submit" class="btn btn--secondary btn--sm" formaction="/batches/<%= batch.id %>/reports.zip" id="report-zip-btn" title="選到的每一家客戶各產生一份 PDF，打包成一個 ZIP">每家客戶各一份（ZIP）</button>
           </div>
+          <input type="hidden" name="appendix" value="1" id="report-appendix-field" disabled>
           <p class="form-hint">只選部分客戶時，報告封面只列出這些客戶並註明不是完整內容；簽名與簽核紀錄每份都保留。<strong>批次標題與備註會原樣印出</strong>，請確認其中沒有其他客戶的資訊。</p>
         </form>
       </details>

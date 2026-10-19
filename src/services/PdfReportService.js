@@ -15,7 +15,7 @@ const SIGNATURE_SECTION_HEIGHT = 100; // 標題 + 兩欄簽名（含圖片、簽
 const SIGNATURE_IMG_MAX_HEIGHT = 40;
 const SIGNATURE_IMG_MAX_WIDTH = 180;
 
-const IMAGE_DISPLAY_WIDTH = 260; // 單張照片時的顯示寬度（維持原本大小，不受下面兩欄排版影響）
+const IMAGE_DISPLAY_WIDTH = 450; // 單張照片時的顯示寬度（接近整個內文寬度，放大看小字才不會糊；兩張以上時另外排成兩欄）
 const IMAGE_COL_GAP = 12; // 兩欄照片之間的水平間距
 const IMAGE_FALLBACK_HEIGHT = 180;
 const IMAGE_GAP = 8;
@@ -115,6 +115,37 @@ function computeImageDisplayHeight(photo, displayWidth, maxHeight) {
   return Math.min(raw, maxHeight);
 }
 
+// 附錄：截圖原圖，每張照片獨佔一頁、盡量放大（要看細節的人翻這裡）。只含這份報告有的設備（部分客戶報告不會混進別人的）。
+async function drawPhotoAppendix(doc, assets, itemsByAssetId, fonts) {
+  const entries = [];
+  for (const asset of assets) {
+    for (const item of (itemsByAssetId.get(asset.id) || [])) {
+      const photos = item.photos || [];
+      photos.forEach((photo, i) => entries.push({ asset, item, photo, n: i + 1, total: photos.length }));
+    }
+  }
+  if (entries.length === 0) return;
+  const left = doc.page.margins.left;
+  const width = doc.page.width - left - doc.page.margins.right;
+  const CAPTION_H = 34;
+  for (let i = 0; i < entries.length; i++) {
+    const { asset, item, photo, n, total } = entries[i];
+    doc.addPage();
+    const top = doc.page.margins.top;
+    doc.font(fonts.bold).fontSize(i === 0 ? 11 : 10).fillColor('#64748B');
+    doc.text(i === 0 ? `附錄：截圖原圖（每張一頁，共 ${entries.length} 張）` : '附錄：截圖原圖', left, top, { width, lineBreak: false });
+    doc.font(fonts.regular).fontSize(10).fillColor('#1E293B');
+    doc.text(`${asset.name}・${item.checklist_label}・截圖 ${n}${total > 1 ? ' / ' + total : ''}`, left, top + 14, { width, lineBreak: false });
+    const maxH = doc.page.height - doc.page.margins.bottom - top - CAPTION_H;
+    try {
+      const imgBuffer = await prepareImageForPdf(photo.path);
+      doc.image(imgBuffer, left, top + CAPTION_H, { fit: [width, maxH], align: 'center' });
+    } catch (err) {
+      doc.font(fonts.regular).fontSize(9).fillColor('#DC2626').text('圖片無法顯示', left, top + CAPTION_H);
+    }
+  }
+}
+
 /**
  * 只估算「核心內容＋第一張照片」需要的高度，用來在畫之前決定要不要主動換頁
  * （doc.heightOfString 不會移動 doc.y，可安全用來測量）。
@@ -162,11 +193,21 @@ function estimateItemLeadHeight(doc, item, contentWidth, maxImageHeight, fonts) 
   return height + BLOCK_GAP;
 }
 
-async function decodeScreenshotToPng(screenshotPath) {
+// pdfkit 的 doc.image() 只原生支援 JPEG/PNG，不支援 WebP，所以要先轉。轉成什麼：
+// - 螢幕截圖（平坦色塊、文字）：PNG（無損，文字邊緣最銳利，檔案也不大）
+// - 相機照片這類「很吃空間」的影像：PNG 會大好幾倍，改嵌 JPEG（品質 92、不做色度抽樣），肉眼看不出差別
+// 判斷依據是「儲存的 WebP 每像素位元組數」（截圖約 0.05～0.2、照片約 0.3 以上），不必兩種都編碼一次；
+// PNG 結果超過 3MB 也改用 JPEG，避免一張圖就把報告撐爆。圖片尺寸一律維持儲存的像素，不再縮小。
+const PHOTO_BYTES_PER_PIXEL = 0.25;
+const PNG_MAX_BYTES = 3 * 1024 * 1024;
+async function prepareImageForPdf(screenshotPath) {
   const raw = fs.readFileSync(screenshotPath);
-  // pdfkit 的 doc.image() 只原生支援 JPEG/PNG，不支援 WebP，
-  // 因此無論儲存格式為何，一律重新解碼成 PNG buffer 再交給 pdfkit。
-  return sharp(raw).png().toBuffer();
+  const meta = await sharp(raw).metadata();
+  const toJpeg = () => sharp(raw).flatten({ background: '#ffffff' }).jpeg({ quality: 92, chromaSubsampling: '4:4:4' }).toBuffer();
+  const bpp = meta.width && meta.height ? raw.length / (meta.width * meta.height) : 0;
+  if (bpp > PHOTO_BYTES_PER_PIXEL) return toJpeg();
+  const png = await sharp(raw).png().toBuffer();
+  return png.length > PNG_MAX_BYTES ? toJpeg() : png;
 }
 
 function drawStatusBadge(doc, x, y, status, fonts) {
@@ -248,8 +289,8 @@ async function drawItemBlock(doc, item, contentWidth, maxImageHeight, fonts) {
         const x = startX + col * (imgColWidth + IMAGE_COL_GAP);
 
         try {
-          const pngBuffer = await decodeScreenshotToPng(photo.path);
-          doc.image(pngBuffer, x, cursorY, {
+          const imgBuffer = await prepareImageForPdf(photo.path);
+          doc.image(imgBuffer, x, cursorY, {
             fit: [imgColWidth, displayHeight],
           });
         } catch (err) {
@@ -380,7 +421,7 @@ function drawApprovalSection(doc, approval, fonts) {
  * @param {import('stream').Writable} outputStream 目標輸出串流（例如 Express res）
  */
 // partial＝只含部分客戶的設備（選客戶下載、或每家客戶各一份）：封面只寫這些客戶，並註明不是完整內容
-async function generateBatchReport({ batch, assets, itemsByAssetId, signaturesByRole, approval, partial = false }, outputStream) {
+async function generateBatchReport({ batch, assets, itemsByAssetId, signaturesByRole, approval, partial = false, appendix = false }, outputStream) {
   // 含已停用的類型：舊報告仍要顯示得出類型名稱
   const categoryLabels = AssetCategory.labelMap();
   const doc = new PDFDocument({ size: 'A4', margin: 50, bufferPages: true });
@@ -478,6 +519,7 @@ async function generateBatchReport({ batch, assets, itemsByAssetId, signaturesBy
 
   drawSignatureSection(doc, signaturesByRole || {}, fonts);
   drawApprovalSection(doc, approval, fonts);
+  if (appendix) await drawPhotoAppendix(doc, assets, itemsByAssetId, fonts);
 
   doc.end();
 

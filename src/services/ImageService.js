@@ -9,10 +9,14 @@ const MIME_TO_EXT = {
   'image/gif': 'gif',
 };
 
-// 長邊上限（寬、高都不超過這個值）：手機截圖／相機照片動輒 4000px 以上、好幾 MB，
-// 巡檢截圖只要看得清楚文字即可。縮小 + WebP 壓縮通常能把檔案壓到原本的 20~40%。
-const MAX_DIMENSION = 2000;
-const WEBP_QUALITY = 82;
+// 長邊上限（寬、高都不超過這個值）：手機截圖／相機照片動輒 4000px 以上、好幾 MB，縮小 + WebP 壓縮能大幅省空間。
+// 3200px 足以讓 Retina 螢幕截圖（常見 2880px 寬）不被縮小、放大看小字仍然清楚；PDF 與畫面檢視都用這份。
+// （原圖不保留，所以上傳當下的品質就是之後能看到的最好品質——不要為了省空間隨便調低。）
+const MAX_DIMENSION = 3200;
+// 來源是 PNG／GIF 這類無損格式＝螢幕截圖或圖形：用「近無損」WebP，文字邊緣不會出現壓縮雜訊；
+// 其他（JPEG 相機照片等）用一般有損 WebP，品質 90。
+const WEBP_QUALITY = 90;
+const LOSSLESS_SOURCE_FORMATS = new Set(['png', 'gif', 'tiff', 'svg']);
 
 // 檔案根本不是能解碼的圖片（毀損、上傳到一半、副檔名/類型是假的）：回給使用者一個看得懂的訊息，
 // 不要讓不明內容以「圖片」的名義存進系統。
@@ -37,10 +41,14 @@ async function processScreenshot(buffer, mimetype, destPath) {
   fs.mkdirSync(path.dirname(destPath), { recursive: true });
 
   try {
+    const meta = await sharp(buffer).metadata();
+    const webpOptions = LOSSLESS_SOURCE_FORMATS.has(meta.format)
+      ? { nearLossless: true, quality: WEBP_QUALITY }
+      : { quality: WEBP_QUALITY };
     const { data, info } = await sharp(buffer)
       .rotate()
       .resize({ width: MAX_DIMENSION, height: MAX_DIMENSION, fit: 'inside', withoutEnlargement: true })
-      .webp({ quality: WEBP_QUALITY })
+      .webp(webpOptions)
       .toBuffer({ resolveWithObject: true });
 
     const finalPath = `${destPath}.webp`;
@@ -69,4 +77,4 @@ async function processScreenshot(buffer, mimetype, destPath) {
   }
 }
 
-module.exports = { processScreenshot, UnsupportedImageError };
+module.exports = { processScreenshot, UnsupportedImageError, MAX_DIMENSION, WEBP_QUALITY };

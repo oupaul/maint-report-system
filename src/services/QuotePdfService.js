@@ -1,5 +1,5 @@
 // 單張報價請求的 PDF（一份請求一個檔，含送出當下的設備資料、異常項目、截圖），附在通知業務的 Email 裡，
-// 沒有系統帳號的人也看得到完整內容。截圖縮成適合的大小再轉 JPEG，避免檔案太大寄不出去。
+// 沒有系統帳號的人也看得到完整內容。截圖縮成適合的大小再轉 JPEG；Email 附件有大小上限，太大時由呼叫端改用 'standard' 重產。
 const fs = require('fs');
 const PDFDocument = require('pdfkit');
 const sharp = require('sharp');
@@ -27,7 +27,15 @@ function visibleAssetLines(snap, settings) {
   return lines;
 }
 
-async function generate(detail, settings) {
+// quality：'high'（預設，畫面下載用；截圖 2000px、JPEG 品質 85，印寬一點，放大才看得清楚）
+//          'standard'（Email 附件太大寄不出去時的退路；900px、品質 70）
+const PHOTO_PROFILES = {
+  high: { px: 2000, quality: 85, maxW: 460, maxH: 320 },
+  standard: { px: 900, quality: 70, maxW: 300, maxH: 240 },
+};
+
+async function generate(detail, settings, { quality = 'high' } = {}) {
+  const prof = PHOTO_PROFILES[quality] || PHOTO_PROFILES.high;
   const { request, asset, items } = detail;
   const doc = new PDFDocument({ size: 'A4', margin: 50 });
   const chunks = [];
@@ -70,10 +78,10 @@ async function generate(detail, settings) {
     for (const photo of item.photos) {
       try {
         if (!fs.existsSync(photo.path)) continue;
-        const buf = await sharp(photo.path).resize({ width: 900, withoutEnlargement: true }).jpeg({ quality: 70 }).toBuffer();
+        const buf = await sharp(photo.path).resize({ width: prof.px, withoutEnlargement: true }).jpeg({ quality: prof.quality, chromaSubsampling: '4:4:4' }).toBuffer();
         const meta = await sharp(buf).metadata();
-        const w = Math.min(300, width);
-        const h = Math.min(w * (meta.height / meta.width), 240);
+        const w = Math.min(prof.maxW, width);
+        const h = Math.min(w * (meta.height / meta.width), prof.maxH);
         if (doc.y + h > bottom()) doc.addPage();
         doc.image(buf, left, doc.y, { fit: [w, h] });
         doc.y += h + 8;

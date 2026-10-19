@@ -364,7 +364,8 @@ function queueRichEmails(requestId, users, notifMap, title, reminder) {
       let attachNote = '';
       if (settings.attach_pdf) {
         try {
-          const pdf = await QuotePdf.generate(detail, settings);
+          let pdf = await QuotePdf.generate(detail, settings);
+          if (pdf.length > MAX_PDF_BYTES) pdf = await QuotePdf.generate(detail, settings, { quality: 'standard' }); // 附件太大就降一級畫質再試
           if (pdf.length <= MAX_PDF_BYTES) attachments = [{ filename: `報價請求-Q${requestId}.pdf`, content: pdf, contentType: 'application/pdf' }];
           else attachNote = '（PDF 檔案太大沒有附上，請登入系統查看完整內容與截圖）';
         } catch (e) {
