@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 
+const AuditLog = require('../models/AuditLog');
+
 const ApprovalService = require('../services/ApprovalService');
 const PermissionGroup = require('../models/PermissionGroup');
 
@@ -110,6 +112,7 @@ router.post('/stages/:id/delete', (req, res) => {
     return res.redirect('/admin/approval?err=laststage');
   }
   if (!ApprovalService.removeStage(stage.id)) return res.redirect('/admin/approval?err=stageused');
+  AuditLog.record(req.user, 'approval_stage.delete', { type: 'approval_stage', id: stage.id, label: stage.label });
   res.redirect('/admin/approval?ok=deleted');
 });
 

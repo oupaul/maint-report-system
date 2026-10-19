@@ -6,13 +6,19 @@ const InspectionBatch = {
     return db.prepare('SELECT * FROM inspection_batches WHERE id = ?').get(id);
   },
 
-  findAll() {
+  // archived：false＝只要沒封存的（預設，清單／儀表板／挑選器用）；true＝只要已封存的
+  findAll({ archived = false } = {}) {
     return db.prepare(
       `SELECT b.*, u.display_name AS created_by_name, u.username AS created_by_username
        FROM inspection_batches b
        LEFT JOIN users u ON u.id = b.created_by
+       WHERE b.archived_at IS ${archived ? 'NOT NULL' : 'NULL'}
        ORDER BY b.batch_date DESC, b.id DESC`
     ).all();
+  },
+
+  archivedCount() {
+    return db.prepare('SELECT COUNT(*) AS n FROM inspection_batches WHERE archived_at IS NOT NULL').get().n;
   },
 
   create({ title, batch_date, created_by, notes }) {

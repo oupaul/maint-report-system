@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 
+const AuditLog = require('../models/AuditLog');
+
 const AssetField = require('../models/AssetField');
 const AssetCategory = require('../models/AssetCategory');
 
@@ -164,6 +166,7 @@ router.post('/:id/delete', (req, res) => {
   const field = load(req, res);
   if (!field) return;
   if (!AssetField.remove(field.id)) return res.redirect('/admin/fields?err=inuse');
+  AuditLog.record(req.user, 'field.delete', { type: 'field', id: field.id, label: field.label });
   console.log(`[資產欄位] ${req.user.username} 刪除欄位「${field.label}」`);
   res.redirect('/admin/fields?ok=deleted');
 });

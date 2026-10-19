@@ -41,6 +41,7 @@
 </div>
 
 <% if (approval.flash) { %><div class="form-success"><%= approval.flash %></div><% } %>
+<% if (batch.archived_at) { %><div class="form-warning">這個批次已封存（<%= batch.archived_at.slice(0, 16) %>）：不會出現在批次清單與儀表板，資料與報告仍然完整保留。<% if (manage.canUnarchive) { %> <form method="POST" action="/batches/<%= batch.id %>/unarchive" style="display:inline;"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button type="submit" class="btn btn--secondary btn--sm">還原封存</button></form><% } %></div><% } %>
 <% if (approval.notice) { %><div class="form-error"><%= approval.notice %></div><% } %>
 
 <p class="form-hint">
@@ -268,12 +269,40 @@
             </form>
           </dialog>
         <% } else { %>
-          <p class="form-hint">主管簽核僅限管理員帳號</p>
+          <p class="form-hint">主管簽名僅限管理員，或這個批次目前輪到的簽核人</p>
         <% } %>
       </div>
     <% }) %>
   </div>
 </section>
+
+<% if (manage.canManage || manage.canArchive) { %>
+<section class="card" id="batch-manage">
+  <h2>批次管理</h2>
+  <% if (manage.canArchive) { %>
+    <form method="POST" action="/batches/<%= batch.id %>/archive" class="approval-actions" data-confirm="確定要封存這個批次嗎？封存後它會從批次清單與儀表板隱藏（資料、報告、待處理項目與趨勢都照常保留），之後可以從「已封存」還原。">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <div class="page-actions"><button type="submit" class="btn btn--secondary btn--md">封存這個批次</button></div>
+      <p class="form-hint">已完成的批次不能刪除（保留作為歷史紀錄）。封存只是從清單隱藏，隨時可以還原。</p>
+    </form>
+  <% } %>
+  <% if (manage.canManage) { %>
+    <% if (!manage.deleteBlocker) { %>
+      <form method="POST" action="/batches/<%= batch.id %>/delete" class="approval-actions" data-confirm="確定要刪除這個批次嗎？批次裡所有的檢查紀錄、截圖、簽名都會永久刪除，無法復原。">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="form-group" style="margin:0;">
+          <label class="form-label" for="confirm-title">刪除批次（無法復原）：請輸入批次標題「<strong><%= batch.title %></strong>」確認</label>
+          <input class="form-input" type="text" id="confirm-title" name="confirm_title" autocomplete="off" required placeholder="輸入完整的批次標題">
+        </div>
+        <div class="page-actions"><button type="submit" class="btn btn--secondary btn--md">刪除這個批次</button></div>
+        <p class="form-hint">只有草稿批次（還沒送審過、也沒有報價請求引用）能刪除；會連同檢查紀錄、截圖與簽名一起刪掉。刪除動作會記在「稽核紀錄」。</p>
+      </form>
+    <% } else if (!manage.canArchive) { %>
+      <p class="form-hint">不能刪除這個批次：<%= manage.deleteBlocker %>。</p>
+    <% } %>
+  <% } %>
+</section>
+<% } %>
 
 <script src="<%= assetUrl('/js/report-picker.js') %>"></script>
 <script src="<%= assetUrl('/js/signature-pad.js') %>"></script>

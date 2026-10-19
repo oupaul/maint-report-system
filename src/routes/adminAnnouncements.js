@@ -8,8 +8,8 @@ const ActivityTracker = require('../services/ActivityTracker');
 const MailService = require('../services/MailService');
 
 // 掛在 /admin/announcements，上層（routes/admin.js）已限定管理員。網址只帶固定代碼。
-const FLASH_OK = { sent: '系統通知已發送', cancelled: '已撤回，橫幅馬上就會從大家的畫面消失' };
-const FLASH_ERR = { notfound: '找不到這則通知', alreadydone: '這則通知已經結束（已撤回或已到期）' };
+const FLASH_OK = { sent: '系統通知已發送', cancelled: '已撤回，橫幅馬上就會從大家的畫面消失', deleted: '已刪除這則通知' };
+const FLASH_ERR = { notfound: '找不到這則通知', alreadydone: '這則通知已經結束（已撤回或已到期）', stillactive: '這則通知還在顯示，請先撤回再刪除' };
 
 const DURATION_LABEL = { 15: '15 分鐘', 30: '30 分鐘', 60: '1 小時', 180: '3 小時', 1440: '24 小時' };
 
@@ -79,6 +79,13 @@ router.post('/:id/cancel', (req, res) => {
   if (!Announcement.cancel(id)) return res.redirect('/admin/announcements?err=alreadydone');
   console.log(`[系統通知] ${req.user.username} 撤回通知 #${id}`);
   res.redirect('/admin/announcements?ok=cancelled');
+});
+
+// 刪除已經結束（撤回或到期）的通知歷史；還在顯示的要先撤回
+router.post('/:id/delete', (req, res) => {
+  const result = require('../services/DeletionService').deleteAnnouncement(parseInt(req.params.id, 10), req.user);
+  if (!result.ok) return res.redirect(`/admin/announcements?err=${result.status === 404 ? 'notfound' : 'stillactive'}`);
+  res.redirect('/admin/announcements?ok=deleted');
 });
 
 module.exports = router;

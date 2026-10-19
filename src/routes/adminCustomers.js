@@ -3,6 +3,7 @@ const router = express.Router();
 
 const multer = require('multer');
 const Customer = require('../models/Customer');
+const AuditLog = require('../models/AuditLog');
 const CustomerCsvService = require('../services/CustomerCsvService');
 const AssetCsvService = require('../services/AssetCsvService');
 const csv = require('../utils/csv');
@@ -120,6 +121,7 @@ router.post('/:id/delete', (req, res) => {
   const c = load(req, res);
   if (!c) return;
   if (!Customer.remove(c.id)) return res.redirect('/admin/customers?err=inuse');
+  AuditLog.record(req.user, 'customer.delete', { type: 'customer', id: c.id, label: c.name });
   console.log(`[客戶] ${req.user.username} 刪除客戶「${c.name}」`);
   res.redirect('/admin/customers?ok=deleted');
 });

@@ -72,23 +72,27 @@
   }
 })();
 
-// 批次設定客戶：勾選設備、更新「套用到已選的 N 台」按鈕
+// 批次操作（設定客戶、刪除）：勾選設備、更新按鈕上的台數與停用狀態
 (function () {
   const bar = document.getElementById('bulk-bar');
   if (!bar) return;
   const boxes = Array.prototype.slice.call(document.querySelectorAll('.row-check'));
   const all = document.getElementById('select-all');
-  const apply = document.getElementById('bulk-apply');
+  const apply = document.getElementById('bulk-apply');          // 沒有啟用中的客戶時沒有這組
   const count = document.getElementById('bulk-count');
   const scopeAll = document.getElementById('bulk-all');
+  const del = document.getElementById('bulk-delete');
+  const delCount = document.getElementById('bulk-del-count');
   function refresh() {
     const n = boxes.filter(function (b) { return b.checked; }).length;
-    count.textContent = n;
-    apply.disabled = !(n > 0 || scopeAll.checked);
+    if (count) count.textContent = n;
+    if (apply) apply.disabled = !(n > 0 || (scopeAll && scopeAll.checked));
+    if (delCount) delCount.textContent = n;
+    if (del) del.disabled = n === 0; // 刪除只處理勾選的，沒有「全部」選項
     if (all) all.checked = boxes.length > 0 && n === boxes.length;
   }
   boxes.forEach(function (b) { b.addEventListener('change', refresh); });
   if (all) all.addEventListener('change', function () { boxes.forEach(function (b) { b.checked = all.checked; }); refresh(); });
-  scopeAll.addEventListener('change', refresh);
+  if (scopeAll) scopeAll.addEventListener('change', refresh);
   refresh();
 })();

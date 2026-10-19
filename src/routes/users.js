@@ -5,6 +5,7 @@ const { requireRole } = require('../middleware/auth');
 const User = require('../models/User');
 const PermissionGroup = require('../models/PermissionGroup');
 const MailService = require('../services/MailService');
+const DeletionService = require('../services/DeletionService');
 const AuthService = require('../services/AuthService');
 const { USER_ROLES, isValidRole } = require('../utils/validators');
 const { validatePasswordStrength } = require('../utils/password');
@@ -19,7 +20,24 @@ function parseGroup(value) {
 
 router.get('/', requireRole('admin'), (req, res) => {
   const users = User.findAll();
-  res.render('users/list', { users });
+  res.render('users/list', { users, flash: req.query.ok === 'deleted' ? '已刪除使用者。' : null });
+});
+
+// 編輯頁的「刪除使用者」區塊要用：沒有工作紀錄才能刪（其他維持停用）。所有編輯頁的 render 路徑都共用這個
+router.use('/:id', requireRole('admin'), (req, res, next) => {
+  const target = /^\d+$/.test(req.params.id) ? User.findById(req.params.id) : null;
+  if (target) {
+    const blocker = DeletionService.userDeleteBlocker(target, req.user);
+    res.locals.userDeleteBlocker = blocker ? blocker.error : null;
+  }
+  next();
+});
+
+router.post('/:id/delete', requireRole('admin'), (req, res) => {
+  const result = DeletionService.deleteUser(parseInt(req.params.id, 10), req.user);
+  if (!result.ok) return res.status(result.status || 400).render('error', { title: '無法刪除使用者', message: result.error });
+  console.log(`[使用者] ${req.user.username} 刪除使用者「${result.username}」`);
+  res.redirect('/users?ok=deleted');
 });
 
 router.get('/new', requireRole('admin'), (req, res) => {

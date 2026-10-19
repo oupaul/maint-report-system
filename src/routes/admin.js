@@ -10,6 +10,7 @@ const BackupService = require('../services/BackupService');
 const HealthService = require('../services/HealthService');
 const ActivityTracker = require('../services/ActivityTracker');
 const LoginSession = require('../models/LoginSession');
+const AuditLog = require('../models/AuditLog');
 const BrandingService = require('../services/BrandingService');
 const fmt = require('../utils/format');
 
@@ -109,6 +110,15 @@ router.get('/logins', (req, res) => {
   });
 });
 
+// ---- 稽核紀錄（刪除、封存等動作：誰、什麼時候、處理了什麼）----
+router.get('/audit', (req, res) => {
+  const DAYS = [7, 30, 90, 180];
+  const days = DAYS.includes(parseInt(req.query.days, 10)) ? parseInt(req.query.days, 10) : 30;
+  const action = AuditLog.ACTIONS[req.query.action] ? req.query.action : '';
+  const rows = AuditLog.list({ days, action, limit: 500 });
+  res.render('admin/audit', { rows, days, DAYS, action, ACTIONS: AuditLog.ACTIONS, retention: AuditLog.RETENTION_DAYS });
+});
+
 router.post('/status/db-check', async (req, res, next) => {
   try {
     await renderStatus(req, res, { dbCheck: HealthService.quickCheck(), refreshSeconds: undefined });
@@ -192,7 +202,7 @@ router.get('/backups/:name/download', (req, res) => {
 router.post('/backups/:name/delete', async (req, res, next) => {
   try {
     const removed = await BackupService.remove(req.params.name);
-    if (removed) console.log(`[備份] ${req.user.username} 刪除備份檔 ${req.params.name}`);
+    if (removed) { AuditLog.record(req.user, 'backup.delete', { type: 'backup', label: req.params.name }); console.log(`[備份] ${req.user.username} 刪除備份檔 ${req.params.name}`); }
     res.redirect(removed ? '/admin/backups?ok=deleted' : '/admin/backups?err=notfound');
   } catch (err) {
     next(err);

@@ -24,6 +24,8 @@ function formData(asset, error) {
     // 格式問題與重複只提示、不擋存檔；編輯頁每次顯示都即時計算，所以日後別台設備改了也會反映
     warnings: asset && asset.id ? assetFields.warningsFor(asset, Asset.findAll({ includeInactive: true })) : [],
     saved: false,
+    // 刪除：沒用過的設備才能刪；用過的只能停用（顯示原因）
+    deleteBlocker: asset && asset.id ? DeletionService.assetDeleteBlocker(asset.id) : null,
     // 標籤輸入框的內容（驗證失敗時帶回使用者剛輸入的）、可點選加入的現有標籤、位置自動完成清單
     tagsText: asset && typeof asset.tags_input === 'string' ? asset.tags_input : (asset && asset.tags ? asset.tags.join(', ') : ''),
     tagSuggestions: AssetTag.inUse(),
@@ -42,6 +44,7 @@ const AssetTag = require('../models/AssetTag');
 const InspectionVolume = require('../models/InspectionVolume');
 const AssetCsvService = require('../services/AssetCsvService');
 const Customer = require('../models/Customer');
+const DeletionService = require('../services/DeletionService');
 const csv = require('../utils/csv');
 const multer = require('multer');
 
@@ -100,7 +103,8 @@ router.get('/', requireLogin, (req, res) => {
     categoryLabels: AssetCategory.labelMap(),
     categoryOrder: AssetCategory.findAll().map(c => c.code),
     locations: Asset.locations(),
-    flash: req.query.ok === 'customer' ? `已更新 ${parseInt(req.query.n, 10) || 0} 台設備的客戶。` : null,
+    flash: req.query.ok === 'customer' ? `已更新 ${parseInt(req.query.n, 10) || 0} 台設備的客戶。`
+      : (req.query.ok === 'deleted' ? `已刪除 ${parseInt(req.query.n, 10) || 0} 台設備${parseInt(req.query.skipped, 10) ? `；另有 ${parseInt(req.query.skipped, 10)} 台已經用過（只能停用），沒有刪除` : ''}。` : null),
     customerList: Customer.findAll(),
     unassignedCount: Asset.query({ customer: 'none', per: 10 }).total,
     tagList: AssetTag.inUse(),
@@ -278,6 +282,23 @@ router.post('/:id/edit', requirePermission('assets.manage'), (req, res) => {
   // 有格式問題或重複時留在編輯頁讓人看到提示（已經存好了），否則回列表
   const warnings = assetFields.warningsFor(saved, Asset.findAll({ includeInactive: true }));
   res.redirect(warnings.length > 0 ? `/assets/${asset.id}/edit?saved=1` : '/assets');
+});
+
+// 刪除設備：只有從來沒用過（沒出現在任何批次、報價、處理建議）的才能刪；用過的只能停用
+router.post('/:id/delete', requirePermission('assets.manage'), (req, res) => {
+  const result = DeletionService.deleteAsset(parseInt(req.params.id, 10), req.user);
+  if (!result.ok) return res.status(result.status || 400).render('error', { title: '無法刪除設備', message: result.error });
+  console.log(`[資產] ${req.user.username} 刪除設備「${result.name}」`);
+  res.redirect('/assets?ok=deleted&n=1');
+});
+
+// 批次刪除：只處理勾選的（沒有「目前篩選條件下的全部」，避免一次誤刪太多）；用過的略過並計入「略過」
+router.post('/bulk-delete', requirePermission('assets.manage'), (req, res) => {
+  const ids = [].concat(req.body.ids || []);
+  if (ids.length === 0) return res.status(400).render('error', { title: '沒有選取設備', message: '請先勾選要刪除的設備' });
+  const out = DeletionService.deleteAssets(ids, req.user);
+  console.log(`[資產] ${req.user.username} 批次刪除設備：刪除 ${out.deleted.length} 台、略過 ${out.skipped.length} 台（已用過）`);
+  res.redirect(`/assets?ok=deleted&n=${out.deleted.length}&skipped=${out.skipped.length}`);
 });
 
 module.exports = router;

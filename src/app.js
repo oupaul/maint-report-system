@@ -250,6 +250,9 @@ const server = app.listen(config.PORT, () => {
   // 登入紀錄只留 180 天（啟動時一次，之後每天一次）
   try { require('./models/LoginSession').prune(); } catch (e) { /* 清不掉不影響服務 */ }
   setInterval(() => { try { require('./models/LoginSession').prune(); } catch (e) { /* ignore */ } }, 24 * 60 * 60 * 1000).unref();
+  // 稽核紀錄只留 180 天
+  try { require('./models/AuditLog').prune(); } catch (e) { /* 清不掉不影響服務 */ }
+  setInterval(() => { try { require('./models/AuditLog').prune(); } catch (e) { /* ignore */ } }, 24 * 60 * 60 * 1000).unref();
 });
 
 server.on('error', (err) => {

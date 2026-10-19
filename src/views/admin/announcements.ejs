@@ -93,6 +93,11 @@
                     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                     <button type="submit" class="btn btn--secondary btn--sm">撤回</button>
                   </form>
+                <% } else { %>
+                  <form method="POST" action="/admin/announcements/<%= a.id %>/delete" data-confirm="確定要刪除這則已結束的通知紀錄嗎？無法復原。">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button type="submit" class="btn btn--secondary btn--sm">刪除</button>
+                  </form>
                 <% } %>
               </td>
             </tr>

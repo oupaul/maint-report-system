@@ -32,6 +32,7 @@
   <ul class="saveall-bar__errors" id="saveall-errors" hidden></ul>
 </div>
 
+<% if (typeof flash !== 'undefined' && flash) { %><div class="form-success"><%= flash %></div><% } %>
 <% if (typeof returnNote !== 'undefined' && returnNote) { %>
   <div class="form-error">
     這個批次被<%= returnNote.kind === 'returned' ? '退回' : (returnNote.kind === 'withdrawn' ? '撤回' : '重新開啟') %>了（<%= returnNote.text %>，<%= returnNote.who %>）。<% if (returnNote.comment) { %><br>意見：<%= returnNote.comment %><% } %><br>修改完成後，請再按「送出審核」。
@@ -54,6 +55,14 @@
     <div class="asset-section__header">
       <h2><%= section.asset.name %></h2>
       <span class="form-hint"><%= categoryLabels[section.asset.category] || section.asset.category %><% if (section.asset.location) { %> ・ <%= section.asset.location %><% } %></span>
+      <% if (canRemoveAssets) {
+        const filled = section.rows.filter(r => r.existing).length;
+      %>
+        <form method="POST" action="/batches/<%= batch.id %>/assets/<%= section.asset.id %>/remove" class="asset-section__remove" data-confirm="確定要把「<%= section.asset.name %>」移出這個批次嗎？它在這個批次已填寫的 <%= filled %> 筆檢查紀錄與所有截圖都會永久刪除，無法復原（設備本身不會被刪除）。">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <button type="submit" class="btn btn--secondary btn--sm">移出本次巡檢</button>
+        </form>
+      <% } %>
     </div>
 
     <% section.rows.forEach(row => { %>

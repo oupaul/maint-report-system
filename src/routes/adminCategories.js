@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 
+const AuditLog = require('../models/AuditLog');
+
 const AssetCategory = require('../models/AssetCategory');
 const ChecklistItem = require('../models/ChecklistItem');
 
@@ -134,6 +136,7 @@ router.post('/:id/delete', (req, res) => {
   const category = loadCategory(req, res);
   if (!category) return;
   if (!AssetCategory.remove(category.id)) return res.redirect('/admin/categories?err=inuse');
+  AuditLog.record(req.user, 'category.delete', { type: 'category', id: category.id, label: category.label });
   console.log(`[設備類型] ${req.user.username} 刪除類型「${category.label}」`);
   res.redirect('/admin/categories?ok=deleted');
 });
@@ -224,6 +227,7 @@ router.post('/:id/items/:itemId/delete', (req, res) => {
   const item = loadItem(req, res, category);
   if (!item) return;
   if (!ChecklistItem.remove(item.id)) return res.redirect(`/admin/categories/${category.id}?err=itemused`);
+  AuditLog.record(req.user, 'checklist_item.delete', { type: 'checklist_item', id: item.id, label: item.label, detail: `類型：${category.label}` });
   res.redirect(`/admin/categories/${category.id}?ok=deleted`);
 });
 

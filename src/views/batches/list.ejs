@@ -8,7 +8,18 @@
   </div>
 </div>
 
+<% if (flash) { %><div class="form-success"><%= flash %></div><% } %>
+
 <div class="card">
+  <% if (archivedCount > 0 || showArchived) { %>
+    <p class="form-hint">
+      <% if (showArchived) { %>
+        <strong>已封存的批次</strong>（不會出現在一般清單與儀表板；點進去可以還原）　<a href="/batches<%= filter ? '?customer=' + filter : '' %>">← 回到進行中的批次</a>
+      <% } else { %>
+        <a href="/batches?archived=1<%= filter ? '&customer=' + filter : '' %>">已封存的批次（<%= archivedCount %>）</a>
+      <% } %>
+    </p>
+  <% } %>
   <% if (customerList.length > 0) { %>
     <form method="GET" action="/batches" class="asset-filter" id="batch-filter">
       <select class="form-select" name="customer" aria-label="依客戶篩選" data-searchable>
@@ -17,11 +28,12 @@
         <% customerList.forEach(c => { %><option value="<%= c.id %>" <%= filter === String(c.id) ? 'selected' : '' %>><%= c.name %></option><% }) %>
       </select>
       <noscript><button type="submit" class="btn btn--secondary btn--md">篩選</button></noscript>
-      <% if (filter) { %><a href="/batches" class="btn btn--secondary btn--md">清除</a><% } %>
+      <% if (showArchived) { %><input type="hidden" name="archived" value="1"><% } %>
+      <% if (filter) { %><a href="/batches<%= showArchived ? '?archived=1' : '' %>" class="btn btn--secondary btn--md">清除</a><% } %>
     </form>
   <% } %>
   <% if (batches.length === 0) { %>
-    <div class="empty-state">尚無巡檢批次。</div>
+    <div class="empty-state"><%= showArchived ? '沒有已封存的批次。' : '尚無巡檢批次。' %></div>
   <% } else { %>
     <div class="table-wrap">
       <table class="data-table">
@@ -38,7 +50,7 @@
         <tbody>
           <% batches.forEach(b => { %>
             <tr>
-              <td><%= b.title %></td>
+              <td><%= b.title %><% if (b.archived_at) { %> <span class="badge">已封存</span><% } %></td>
               <td><%= b.batch_date %></td>
               <td>
                 <% const names = b.cust.customers.map(c => c.name); %>

@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 
+const AuditLog = require('../models/AuditLog');
+
 const PermissionGroup = require('../models/PermissionGroup');
 const { PERMISSIONS } = require('../utils/permissions');
 const ApprovalService = require('../services/ApprovalService');
@@ -114,6 +116,7 @@ router.post('/:id/delete', (req, res) => {
   if (!group) return;
   if (ApprovalService.groupInUse(group.id)) return res.redirect(`/admin/groups/${group.id}?err=instage`);
   if (!PermissionGroup.remove(group.id)) return res.redirect(`/admin/groups/${group.id}?err=hasmembers`);
+  AuditLog.record(req.user, 'group.delete', { type: 'group', id: group.id, label: group.name });
   console.log(`[權限群組] ${req.user.username} 刪除群組「${group.name}」`);
   res.redirect('/admin/groups?ok=deleted');
 });

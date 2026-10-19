@@ -72,4 +72,19 @@
   </form>
 </div>
 
+<% if (targetUser && targetUser.id) { %>
+<div class="card" style="max-width: 640px;" id="user-delete">
+  <h2>刪除使用者</h2>
+  <% if (typeof userDeleteBlocker !== 'undefined' && !userDeleteBlocker) { %>
+    <form method="POST" action="/users/<%= targetUser.id %>/delete" data-confirm="確定要刪除使用者「<%= targetUser.username %>」嗎？無法復原；他目前的登入會立刻失效。">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <p class="form-hint">這個帳號沒有任何工作紀錄（沒建立過批次、沒填寫過檢查項目、沒簽過名、沒簽核過、沒經手報價），可以直接刪除，例如測試帳號或建錯的帳號。刪除動作會記在「稽核紀錄」。</p>
+      <button type="submit" class="btn btn--secondary btn--md">刪除這個使用者</button>
+    </form>
+  <% } else if (typeof userDeleteBlocker !== 'undefined') { %>
+    <p class="form-hint"><%= userDeleteBlocker %>。不再需要時，請取消勾選上方的「啟用中」。</p>
+  <% } %>
+</div>
+<% } %>
+
 <%- include('../partials/footer') %>

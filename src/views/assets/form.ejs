@@ -174,5 +174,20 @@
   </form>
 </div>
 
+<% if (asset && asset.id) { %>
+<div class="card" style="max-width: 640px;" id="asset-delete">
+  <h2>刪除設備</h2>
+  <% if (!deleteBlocker) { %>
+    <form method="POST" action="/assets/<%= asset.id %>/delete" data-confirm="確定要刪除設備「<%= asset.name %>」嗎？它的欄位資料與標籤會一併刪除，無法復原。">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <p class="form-hint">這台設備從來沒有出現在任何巡檢批次或報價請求，可以直接刪除（例如打錯字建立、匯入錯誤的資料）。刪除動作會記在「稽核紀錄」。</p>
+      <button type="submit" class="btn btn--secondary btn--md">刪除這台設備</button>
+    </form>
+  <% } else { %>
+    <p class="form-hint"><%= deleteBlocker %>。不再使用時，請取消勾選上方的「啟用中」。</p>
+  <% } %>
+</div>
+<% } %>
+
 <script src="<%= assetUrl('/js/asset-form.js') %>"></script>
 <%- include('../partials/footer') %>

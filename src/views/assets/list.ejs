@@ -109,8 +109,9 @@
   <% } else if (total === 0) { %>
     <div class="empty-state">沒有符合條件的資產。</div>
   <% } else { %>
-    <% if (manage && customerList.some(c => c.is_active)) { %>
+    <% if (manage) { const hasCust = customerList.some(c => c.is_active); %>
       <div class="bulk-bar" id="bulk-bar">
+        <% if (hasCust) { %>
         <span class="form-hint">批次設定客戶：先勾選下面的設備，</span>
         <select class="form-select" name="customer_id" form="bulk-form" id="bulk-customer" aria-label="要設定的客戶" data-searchable>
           <option value="">（清除客戶＝未指定）</option>
@@ -118,6 +119,8 @@
         </select>
         <button type="submit" form="bulk-form" class="btn btn--secondary btn--sm" id="bulk-apply" disabled>套用到已選的 <span id="bulk-count">0</span> 台</button>
         <label class="form-hint"><input type="checkbox" name="scope" value="all" form="bulk-form" id="bulk-all"> 改成套用到「目前篩選條件下的全部 <%= total %> 台」</label>
+        <% } else { %><span class="form-hint">批次操作：先勾選下面的設備，</span><% } %>
+        <button type="submit" form="bulk-form" formaction="/assets/bulk-delete" class="btn btn--secondary btn--sm" id="bulk-delete" disabled data-confirm="確定要刪除已選的設備嗎？沒用過的會永久刪除；已經用過（出現在巡檢批次或報價請求）的會自動略過，不會刪除。" title="只刪除沒用過的設備；用過的請改用停用">刪除已選的 <span id="bulk-del-count">0</span> 台</button>
       </div>
     <% } %>
     <form method="POST" action="/assets/bulk-customer" id="bulk-form" data-confirm="確定要變更這些設備的客戶嗎？">

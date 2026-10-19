@@ -36,6 +36,9 @@ router.use((req, res, next) => {
 });
 
 // 審核中與已核准的批次鎖定：伺服器端一律擋下（不只是把按鈕藏起來）
+// 建立這個批次的人或管理員：可以刪除批次、把設備移出批次
+const canManageBatch = (batch, user) => !!user && (user.role === 'admin' || batch.created_by === user.id);
+
 function rejectIfLocked(req, res, batch) {
   if (!ApprovalService.isLocked(batch)) return false;
   sendError(req, res, 409, '批次已鎖定', batch.approval_status === 'pending'
@@ -102,22 +105,34 @@ async function rowPayload(req, res, batch, asset, checklistItem, item) {
 // 儲存／刪除之後導回填寫頁時，帶上錨點，瀏覽器會捲到剛處理的那一列（沒有 JavaScript 時的退路）
 const rowAnchor = (assetId, checklistItemId) => `#row-a${assetId}-c${checklistItemId}`;
 
+const BATCH_FLASH = {
+  deleted: '已刪除批次（連同檢查紀錄與截圖）。',
+  archived: '已封存批次：它不會再出現在批次清單與儀表板，需要時可以從「已封存」還原。',
+  unarchived: '已還原封存的批次。',
+};
+
 router.get('/', requireLogin, (req, res) => {
   const summary = InspectionBatch.customerSummary();
   const filter = req.query.customer === 'none' ? 'none' : (/^\d{1,9}$/.test(String(req.query.customer || '')) ? Number(req.query.customer) : '');
-  let batches = InspectionBatch.findAll().map(b => ({
+  const showArchived = req.query.archived === '1';
+  let batches = InspectionBatch.findAll({ archived: showArchived }).map(b => ({
     ...b, statusInfo: ApprovalService.statusInfo(b), locked: ApprovalService.isLocked(b),
     cust: summary.get(b.id) || { customers: [], unassigned: 0, total: 0 },
   }));
   // 依客戶篩選：批次只要有一台設備屬於那個客戶就算（「未指定」＝有設備還沒指定客戶）
   if (filter === 'none') batches = batches.filter(b => b.cust.unassigned > 0);
   else if (filter) batches = batches.filter(b => b.cust.customers.some(c => c.id === filter));
-  res.render('batches/list', { batches, customerList: Customer.findAll(), filter: String(filter) });
+  res.render('batches/list', {
+    batches, customerList: Customer.findAll(), filter: String(filter),
+    showArchived, archivedCount: InspectionBatch.archivedCount(),
+    flash: BATCH_FLASH[req.query.ok] || null,
+  });
 });
 
 // ---- 匯出（要放在 /:id 之前）----
 const BatchExportService = require('../services/BatchExportService');
 const ReportScope = require('../services/ReportScope');
+const DeletionService = require('../services/DeletionService');
 
 function csvDownload(res, name, result) {
   res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${name}-${new Date().toISOString().slice(0, 10)}.csv"` });
@@ -291,6 +306,8 @@ router.get('/:id/entry', requireLogin, (req, res) => {
     addAssetError: null,
     returnNote: ApprovalService.lastReturnNote(data.batch),
     engineerSigned: ApprovalService.hasEngineerSignature(data.batch.id), // 沒簽名時「送出」按鈕停用並提示
+    canRemoveAssets: canManageBatch(data.batch, req.user) && data.assetSections.length > 1, // 建立者或管理員、而且不能把最後一台移光
+    flash: req.query.ok === 'removed' ? '已把設備移出這個批次（連同它在這個批次的檢查紀錄與截圖）。' : null,
   });
 });
 
@@ -324,6 +341,8 @@ router.post('/:id/assets', requireLogin, (req, res) => {
       addAssetError: emptyError,
       returnNote: ApprovalService.lastReturnNote(data.batch),
       engineerSigned: ApprovalService.hasEngineerSignature(data.batch.id), // 填寫頁的送出按鈕要用（兩個 render 路徑都要傳）
+      canRemoveAssets: canManageBatch(data.batch, req.user) && data.assetSections.length > 1,
+      flash: null,
     });
   }
   const allAssetIds = [...assetIds, ...quick.rows.map(r => Asset.create(r).id)];
@@ -481,6 +500,42 @@ router.post('/:id/complete', requireLogin, (req, res) => {
   res.redirect(`/batches/${batch.id}`);
 });
 
+// ---- 刪除、移出設備、封存（規則與理由見 services/DeletionService.js）----
+
+function deletionFailure(res, result) {
+  return res.status(result.status || 400).render('error', { title: '無法完成這個動作', message: result.error });
+}
+
+// 刪除草稿批次：要輸入批次標題確認
+router.post('/:id/delete', requireLogin, (req, res) => {
+  const result = DeletionService.deleteBatch(parseInt(req.params.id, 10), req.user, req.body.confirm_title);
+  if (!result.ok) return deletionFailure(res, result);
+  console.log(`[批次] ${req.user.username} 刪除批次「${result.title}」`);
+  res.redirect('/batches?ok=deleted');
+});
+
+// 把設備移出草稿批次（連同它在這個批次的檢查紀錄與截圖）
+router.post('/:id/assets/:assetId/remove', requireLogin, (req, res) => {
+  const batch = InspectionBatch.findById(req.params.id);
+  if (batch && rejectIfLocked(req, res, batch)) return;
+  const result = DeletionService.removeAssetFromBatch(parseInt(req.params.id, 10), parseInt(req.params.assetId, 10), req.user);
+  if (!result.ok) return deletionFailure(res, result);
+  console.log(`[批次] ${req.user.username} 將設備「${result.assetName}」移出批次 #${req.params.id}`);
+  res.redirect(`/batches/${req.params.id}/entry?ok=removed`);
+});
+
+router.post('/:id/archive', requireLogin, (req, res) => {
+  const result = DeletionService.archiveBatch(parseInt(req.params.id, 10), req.user);
+  if (!result.ok) return deletionFailure(res, result);
+  res.redirect('/batches?ok=archived');
+});
+
+router.post('/:id/unarchive', requireLogin, (req, res) => {
+  const result = DeletionService.unarchiveBatch(parseInt(req.params.id, 10), req.user);
+  if (!result.ok) return deletionFailure(res, result);
+  res.redirect(`/batches/${req.params.id}?ok=unarchived`);
+});
+
 // ---- 簽核動作 ----
 
 function approvalFailure(res, result) {
@@ -528,6 +583,7 @@ const APPROVAL_FLASH = {
   approved: '已核准，批次完成，所有簽核關卡都已通過。',
   returned: '已退回，並通知送審的人修改。',
   withdrawn: '已撤回審核，批次可以重新編輯。',
+  unarchived: '已還原封存的批次，它會重新出現在批次清單與儀表板。',
   reopened: '已重新開啟，批次可以重新編輯，修改後需要重新送出審核。',
 };
 
@@ -578,8 +634,16 @@ router.get('/:id', requireLogin, (req, res) => {
     engineerSigned: !!signaturesByRole.engineer,
     canSignSupervisor: ApprovalService.canSignSupervisor(req.user, batch),
   };
+  // 刪除／封存區塊：只給能管理這個批次的人看；不能刪的話顯示原因
+  const manage = {
+    canManage: canManageBatch(batch, req.user),
+    deleteBlocker: (DeletionService.batchDeleteBlocker(batch, null) || {}).error || null,
+    canArchive: req.user.role === 'admin' && batch.status === 'completed' && !batch.archived_at,
+    canUnarchive: req.user.role === 'admin' && !!batch.archived_at,
+  };
 
   res.render('batches/show', {
+    manage,
     approval,
     batch,
     assets,

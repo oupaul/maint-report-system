@@ -1,0 +1,46 @@
+<%- include('../layout', { title: '稽核紀錄' }) %>
+
+<div class="page-header">
+  <h1>稽核紀錄</h1>
+  <div class="page-actions"><a href="/admin/status" class="btn btn--secondary btn--md">回系統狀態</a></div>
+</div>
+
+<div class="card">
+  <form method="GET" action="/admin/audit" class="asset-filter">
+    <select class="form-select" name="action" aria-label="動作">
+      <option value="">全部動作</option>
+      <% Object.keys(ACTIONS).forEach(k => { %><option value="<%= k %>" <%= k === action ? 'selected' : '' %>><%= ACTIONS[k] %></option><% }) %>
+    </select>
+    <select class="form-select" name="days" aria-label="期間">
+      <% DAYS.forEach(d => { %><option value="<%= d %>" <%= d === days ? 'selected' : '' %>>最近 <%= d %> 天</option><% }) %>
+    </select>
+    <button type="submit" class="btn btn--secondary btn--md">查詢</button>
+  </form>
+  <p class="form-hint">記錄「刪除」與「封存」這類事後想查是誰做的動作：誰、什麼時候、處理了什麼。對象的名稱是當下的快照，即使資料或帳號已經刪除，這裡仍然看得到。保留 <%= retention %> 天，之後自動清除。</p>
+</div>
+
+<div class="card">
+  <% if (rows.length === 0) { %>
+    <div class="empty-state">這段期間沒有紀錄。</div>
+  <% } else { %>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>時間（台北時間）</th><th>操作者</th><th>動作</th><th>對象</th><th>說明</th></tr></thead>
+        <tbody>
+          <% rows.forEach(r => { %>
+            <tr>
+              <td><%= r.at %></td>
+              <td><%= r.username || '-' %></td>
+              <td><%= ACTIONS[r.action] || r.action %></td>
+              <td><%= r.target_label || '-' %><% if (r.target_id) { %> <small class="form-hint">#<%= r.target_id %></small><% } %></td>
+              <td><small class="form-hint"><%= r.detail || '' %></small></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% if (rows.length >= 500) { %><p class="form-hint">只列出最近 500 筆，想看更早的請縮短期間或選單一動作。</p><% } %>
+  <% } %>
+</div>
+
+<%- include('../partials/footer') %>

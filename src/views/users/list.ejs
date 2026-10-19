@@ -6,6 +6,7 @@
     <a href="/users/new" class="btn btn--primary btn--md">新增使用者</a>
   </div>
 </div>
+<% if (typeof flash !== 'undefined' && flash) { %><div class="form-success"><%= flash %></div><% } %>
 
 <div class="card">
   <div class="table-wrap">
