@@ -38,6 +38,10 @@ router.use((req, res, next) => {
 // 審核中與已核准的批次鎖定：伺服器端一律擋下（不只是把按鈕藏起來）
 // 建立這個批次的人或管理員：可以刪除批次、把設備移出批次
 const canManageBatch = (batch, user) => !!user && (user.role === 'admin' || batch.created_by === user.id);
+// 填寫頁哪些設備旁邊要有「移除」按鈕：使用者有權限移除的（見 DeletionService.canRemoveAssetFromBatch），批次只剩一台時一律不給
+const removableAssetIds = (data, user) => (data.assetSections.length > 1
+  ? data.assetSections.filter(s => DeletionService.canRemoveAssetFromBatch(data.batch, s.asset, user)).map(s => s.asset.id)
+  : []);
 
 function rejectIfLocked(req, res, batch) {
   if (!ApprovalService.isLocked(batch)) return false;
@@ -234,19 +238,14 @@ router.post('/new', requireLogin, (req, res) => {
     });
   }
 
-  // 驗證都通過才建立新設備（標題或客戶填錯時不會留下半途建立的設備）
-  const allAssetIds = [...assetIds, ...quick.rows.map(r => Asset.create(r).id)];
-
-  const batch = InspectionBatch.create({
-    title,
-    batch_date,
-    created_by: req.user.id,
-    notes,
-  });
-
-  for (const assetId of allAssetIds) {
-    InspectionBatch.addAsset(batch.id, assetId);
-  }
+  // 驗證都通過才建立（標題或客戶填錯時不會留下半途建立的設備）；批次與新設備在同一個交易，
+  // 新設備記下「是在這個批次新增的、誰加的」，之後可以在移出批次時一併刪除
+  const batch = db.transaction(() => {
+    const b = InspectionBatch.create({ title, batch_date, created_by: req.user.id, notes });
+    const newIds = quick.rows.map(r => Asset.create({ ...r, created_in_batch_id: b.id, created_by: req.user.id }).id);
+    for (const assetId of [...assetIds, ...newIds]) InspectionBatch.addAsset(b.id, assetId);
+    return b;
+  })();
 
   res.redirect(`/batches/${batch.id}/entry`);
 });
@@ -306,8 +305,9 @@ router.get('/:id/entry', requireLogin, (req, res) => {
     addAssetError: null,
     returnNote: ApprovalService.lastReturnNote(data.batch),
     engineerSigned: ApprovalService.hasEngineerSignature(data.batch.id), // 沒簽名時「送出」按鈕停用並提示
-    canRemoveAssets: canManageBatch(data.batch, req.user) && data.assetSections.length > 1, // 建立者或管理員、而且不能把最後一台移光
-    flash: req.query.ok === 'removed' ? '已把設備移出這個批次（連同它在這個批次的檢查紀錄與截圖）。' : null,
+    removableAssetIds: removableAssetIds(data, req.user), // 建立者／管理員／新增那台設備的人；而且不能把最後一台移光
+    flash: req.query.ok === 'removed' ? '已把設備移出這個批次（連同它在這個批次的檢查紀錄與截圖）。'
+      : (req.query.ok === 'removed_deleted' ? '已移除這台設備：它是在這次巡檢新增的，設備本身與它在這個批次的檢查紀錄、截圖都已刪除。' : null),
   });
 });
 
@@ -341,15 +341,14 @@ router.post('/:id/assets', requireLogin, (req, res) => {
       addAssetError: emptyError,
       returnNote: ApprovalService.lastReturnNote(data.batch),
       engineerSigned: ApprovalService.hasEngineerSignature(data.batch.id), // 填寫頁的送出按鈕要用（兩個 render 路徑都要傳）
-      canRemoveAssets: canManageBatch(data.batch, req.user) && data.assetSections.length > 1,
+      removableAssetIds: removableAssetIds(data, req.user),
       flash: null,
     });
   }
-  const allAssetIds = [...assetIds, ...quick.rows.map(r => Asset.create(r).id)];
-
-  for (const assetId of allAssetIds) {
-    InspectionBatch.addAsset(batch.id, assetId);
-  }
+  db.transaction(() => {
+    const newIds = quick.rows.map(r => Asset.create({ ...r, created_in_batch_id: batch.id, created_by: req.user.id }).id);
+    for (const assetId of [...assetIds, ...newIds]) InspectionBatch.addAsset(batch.id, assetId);
+  })();
 
   res.redirect(`/batches/${batch.id}/entry`);
 });
@@ -520,8 +519,8 @@ router.post('/:id/assets/:assetId/remove', requireLogin, (req, res) => {
   if (batch && rejectIfLocked(req, res, batch)) return;
   const result = DeletionService.removeAssetFromBatch(parseInt(req.params.id, 10), parseInt(req.params.assetId, 10), req.user);
   if (!result.ok) return deletionFailure(res, result);
-  console.log(`[批次] ${req.user.username} 將設備「${result.assetName}」移出批次 #${req.params.id}`);
-  res.redirect(`/batches/${req.params.id}/entry?ok=removed`);
+  console.log(`[批次] ${req.user.username} 將設備「${result.assetName}」移出批次 #${req.params.id}${result.assetDeleted ? '（設備是在這次巡檢新增的，一併刪除）' : ''}`);
+  res.redirect(`/batches/${req.params.id}/entry?ok=${result.assetDeleted ? 'removed_deleted' : 'removed'}`);
 });
 
 router.post('/:id/archive', requireLogin, (req, res) => {

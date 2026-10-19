@@ -55,12 +55,16 @@
     <div class="asset-section__header">
       <h2><%= section.asset.name %></h2>
       <span class="form-hint"><%= categoryLabels[section.asset.category] || section.asset.category %><% if (section.asset.location) { %> ・ <%= section.asset.location %><% } %></span>
-      <% if (canRemoveAssets) {
+      <% if (removableAssetIds.includes(section.asset.id)) {
         const filled = section.rows.filter(r => r.existing).length;
+        // 在這次巡檢新增的設備：移除時設備本身也會刪除（沒有其他用途時）；從資產管理挑進來的只是移出批次
+        const createdHere = Number(section.asset.created_in_batch_id) === batch.id;
       %>
-        <form method="POST" action="/batches/<%= batch.id %>/assets/<%= section.asset.id %>/remove" class="asset-section__remove" data-confirm="確定要把「<%= section.asset.name %>」移出這個批次嗎？它在這個批次已填寫的 <%= filled %> 筆檢查紀錄與所有截圖都會永久刪除，無法復原（設備本身不會被刪除）。">
+        <form method="POST" action="/batches/<%= batch.id %>/assets/<%= section.asset.id %>/remove" class="asset-section__remove" data-confirm="<%= createdHere
+          ? `確定要移除「${section.asset.name}」嗎？它是在這次巡檢新增的：設備本身會一併刪除（從資產管理消失），它在這個批次已填寫的 ${filled} 筆檢查紀錄與所有截圖也會永久刪除，無法復原。`
+          : `確定要把「${section.asset.name}」移出這個批次嗎？它在這個批次已填寫的 ${filled} 筆檢查紀錄與所有截圖都會永久刪除，無法復原（設備本身不會被刪除）。` %>">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-          <button type="submit" class="btn btn--secondary btn--sm">移出本次巡檢</button>
+          <button type="submit" class="btn btn--secondary btn--sm"><%= createdHere ? '移除這台設備' : '移出本次巡檢' %></button>
         </form>
       <% } %>
     </div>

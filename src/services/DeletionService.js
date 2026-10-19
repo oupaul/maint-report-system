@@ -83,14 +83,25 @@ function deleteBatch(batchId, user, confirmTitle) {
   return result;
 }
 
-// 把一台設備移出（草稿）批次：該設備在這個批次的檢查紀錄、截圖、磁碟區一併刪除
+// 誰可以把這台設備移出這個批次：建立批次的人、管理員，或「這台設備就是他在這個批次新增的」
+// （在巡檢中順手新增、發現加錯的設備，新增的人自己就能移除）
+function canRemoveAssetFromBatch(batch, asset, user) {
+  if (!user || !batch) return false;
+  if (isAdmin(user) || batch.created_by === user.id) return true;
+  return !!asset && asset.created_in_batch_id === batch.id && asset.created_by === user.id;
+}
+
+// 把一台設備移出（草稿）批次：該設備在這個批次的檢查紀錄、截圖、磁碟區一併刪除。
+// 如果這台設備就是「在這個批次新增的」、而且移出後沒有任何其他用途（沒在別的批次、報價、處理建議出現），
+// 設備本身也一併刪除（否則會在資產管理裡留下沒人用的殘留設備）；從資產管理挑進來的既有設備只會移出、不會刪。
 function removeAssetFromBatch(batchId, assetId, user) {
   let result;
   let photoPaths = [];
   db.transaction(() => {
     const batch = db.prepare('SELECT * FROM inspection_batches WHERE id = ?').get(batchId);
     if (!batch) { result = fail('找不到批次', 404); return; }
-    if (!(isAdmin(user) || batch.created_by === user.id)) { result = fail('只有建立這個批次的人或管理員可以把設備移出批次', 403); return; }
+    const assetRow = db.prepare('SELECT * FROM assets WHERE id = ?').get(assetId);
+    if (!canRemoveAssetFromBatch(batch, assetRow, user)) { result = fail('只有建立這個批次的人、管理員，或是新增這台設備的人可以把它移出批次', 403); return; }
     if (batch.status !== 'draft' || (batch.approval_status !== 'none' && batch.approval_status !== 'returned')) {
       result = fail('這個批次已完成或正在審核，不能再移出設備', 409); return;
     }
@@ -102,7 +113,7 @@ function removeAssetFromBatch(batchId, assetId, user) {
     if (count('SELECT COUNT(*) AS n FROM quote_request_items WHERE batch_id = ? AND asset_id = ?', batch.id, assetId) > 0) {
       result = fail('這台設備在這個批次的檢查項目已經送出過報價請求，不能移出', 409); return;
     }
-    const asset = db.prepare('SELECT name FROM assets WHERE id = ?').get(assetId);
+    const asset = assetRow;
     photoPaths = db.prepare(
       'SELECT p.path FROM inspection_item_photos p JOIN inspection_items i ON i.id = p.inspection_item_id WHERE i.batch_id = ? AND i.asset_id = ?'
     ).all(batch.id, assetId).map(r => r.path);
@@ -112,11 +123,14 @@ function removeAssetFromBatch(batchId, assetId, user) {
     db.prepare(`DELETE FROM inspection_item_volumes WHERE inspection_item_id IN (${sub})`).run(batch.id, assetId);
     db.prepare('DELETE FROM inspection_items WHERE batch_id = ? AND asset_id = ?').run(batch.id, assetId);
     db.prepare('DELETE FROM inspection_batch_assets WHERE batch_id = ? AND asset_id = ?').run(batch.id, assetId);
+    // 在這個批次新增的設備：移出後如果沒有其他用途就一併刪除（deleteAssetTx 會自己再檢查一次並寫稽核紀錄）
+    let assetDeleted = false;
+    if (asset && asset.created_in_batch_id === batch.id) assetDeleted = deleteAssetTx(assetId, user).ok === true;
     AuditLog.record(user, 'batch.remove_asset', {
       type: 'batch', id: batch.id, label: batch.title,
-      detail: `移出設備「${asset ? asset.name : '#' + assetId}」；一併刪除檢查紀錄 ${nItems} 筆、截圖 ${photoPaths.length} 張`,
+      detail: `移出設備「${asset ? asset.name : '#' + assetId}」；一併刪除檢查紀錄 ${nItems} 筆、截圖 ${photoPaths.length} 張${assetDeleted ? '；這台設備是在這次巡檢新增的，設備本身也一併刪除' : ''}`,
     });
-    result = { ok: true, assetName: asset ? asset.name : '' };
+    result = { ok: true, assetName: asset ? asset.name : '', assetDeleted };
   })();
   if (result && result.ok) photoPaths.forEach(unlinkQuiet);
   return result;
@@ -280,7 +294,7 @@ function deleteAnnouncement(id, user) {
 }
 
 module.exports = {
-  batchDeleteBlocker, deleteBatch, removeAssetFromBatch, archiveBatch, unarchiveBatch,
+  batchDeleteBlocker, deleteBatch, removeAssetFromBatch, canRemoveAssetFromBatch, archiveBatch, unarchiveBatch,
   assetUsage, assetDeleteBlocker, deleteAsset, deleteAssets,
   userWorkRecords, userDeleteBlocker, deleteUser, deleteAnnouncement,
 };

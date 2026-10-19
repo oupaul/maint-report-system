@@ -153,7 +153,8 @@ const Asset = {
   },
 
   // custom：AssetField.parse 的結果（{欄位id: 值或 null}），和資產本身放在同一個交易裡寫入
-  create({ name, category, customer_id, location, ip_address, mac_address, hostname, serial_number, asset_tag, brand, model, purchase_date, notes, custom, tags }) {
+  // created_in_batch_id／created_by：從批次「快速新增設備」建立的才會帶（見 migration 0026），資產管理新增的不帶
+  create({ name, category, customer_id, location, ip_address, mac_address, hostname, serial_number, asset_tag, brand, model, purchase_date, notes, custom, tags, created_in_batch_id, created_by }) {
     const id = db.transaction(() => {
       const result = db.prepare(
         `INSERT INTO assets (name, category, location, ip_address, mac_address, hostname, serial_number, asset_tag, brand, model, purchase_date, notes, is_active, created_at)
@@ -161,6 +162,7 @@ const Asset = {
       ).run(name, category, location || null, ip_address || null, mac_address || null, hostname || null, serial_number || null,
         asset_tag || null, brand || null, model || null, purchase_date || null, notes || null, nowTaipei());
       if (customer_id) db.prepare('UPDATE assets SET customer_id = ? WHERE id = ?').run(customer_id, result.lastInsertRowid);
+      if (created_in_batch_id) db.prepare('UPDATE assets SET created_in_batch_id = ?, created_by = ? WHERE id = ?').run(created_in_batch_id, created_by || null, result.lastInsertRowid);
       if (custom) AssetField.saveValues(result.lastInsertRowid, custom);
       if (tags) AssetTag.setForAsset(result.lastInsertRowid, tags);
       return result.lastInsertRowid;
