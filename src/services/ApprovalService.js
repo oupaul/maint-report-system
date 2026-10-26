@@ -178,6 +178,16 @@ function canSignSupervisor(user, batch) {
   return !!record && canAct(user, batch, record);
 }
 
+// 誰可以「送出」（送審，或沒啟用簽核時的標記完成）：建立這個批次的人，或在這個批次裡填寫過檢查項目的人。
+// 簽核人（主管、管理員）沒參與填寫就不能替人送——否則誤按的人會變成「送審人」，
+// 因為「不能簽核自己送出的批次」，他自己就不能審，變成要換另一位管理員處理。
+const SUBMIT_NOT_ALLOWED_MESSAGE = '只有建立這個批次的人，或在這個批次裡填寫過檢查項目的人，可以送出。如果你是簽核人，請等建立者送出審核後再審核。';
+function isEligibleSubmitter(user, batch) {
+  if (!user || !batch) return false;
+  if (batch.created_by === user.id) return true;
+  return !!db.prepare('SELECT 1 FROM inspection_items WHERE batch_id = ? AND recorded_by = ? LIMIT 1').get(batch.id, user.id);
+}
+
 function canSubmit(batch) {
   return isEnabled() && batch.status === 'draft' && (batch.approval_status === 'none' || batch.approval_status === 'returned');
 }
@@ -294,6 +304,7 @@ function submit(batchId, user, comment) {
     if (!batch) { result = { ok: false, error: '找不到批次' }; return; }
     if (!isEnabled()) { result = { ok: false, error: '尚未啟用簽核流程' }; return; }
     if (!canSubmit(batch)) { result = { ok: false, error: '這個批次目前不能送出審核（可能已在審核中或已核准）' }; return; }
+    if (!isEligibleSubmitter(user, batch)) { result = { ok: false, error: SUBMIT_NOT_ALLOWED_MESSAGE, status: 403 }; return; }
     const count = db.prepare('SELECT COUNT(*) AS n FROM inspection_items WHERE batch_id = ?').get(batch.id).n;
     if (count === 0) { result = { ok: false, error: '還沒有填寫任何檢查項目，無法送出審核' }; return; }
     if (!hasEngineerSignature(batch.id)) { result = { ok: false, error: SIGNATURE_REQUIRED_MESSAGE }; return; }
@@ -313,11 +324,22 @@ function submit(batchId, user, comment) {
 
     const after = fresh(batch.id);
     const first = currentRecord(after);
-    notifyAll(approversOf(first, after), after, {
+    const approvers = approversOf(first, after);
+    notifyAll(approvers, after, {
       type: 'submitted',
       title: `待簽核：${batch.title}`,
       message: `${display(user)} 送出了巡檢批次「${batch.title}」（${batch.batch_date}），目前在「${first.stage_label}」關卡，請登入系統查看並簽核。`,
     });
+    // 送審的人不是批次建立者（例如同事幫忙填寫後送出）：讓建立者知道（建立者本身就是簽核人、已收到「待簽核」就不重複通知）
+    const creator = batch.created_by && batch.created_by !== user.id
+      ? db.prepare('SELECT * FROM users WHERE id = ? AND is_active = 1').get(batch.created_by) : null;
+    if (creator && !approvers.some(a => a.id === creator.id)) {
+      notifyAll([creator], after, {
+        type: 'submitted_by_other',
+        title: `已代為送出：${batch.title}`,
+        message: `${display(user)} 把你建立的巡檢批次「${batch.title}」（${batch.batch_date}）送出審核了，目前在「${first.stage_label}」關卡。如果不是你預期的，可以請他在批次摘要頁按「撤回審核」。`,
+      });
+    }
     result = { ok: true };
   })();
   return result;
@@ -446,6 +468,7 @@ module.exports = {
   MAX_STAGE_LABEL, MAX_COMMENT,
   getSettings, isEnabled, updateSettings,
   listStages, findStage, validateStageLabel, createStage, updateStage, setStageActive, moveStage, stageUsed, removeStage, groupInUse,
+  isEligibleSubmitter, SUBMIT_NOT_ALLOWED_MESSAGE,
   hasEngineerSignature, SIGNATURE_REQUIRED_MESSAGE, supervisorSignatureReady, canSignSupervisor, SUPERVISOR_SIGNATURE_MESSAGE,
   isLocked, latestRound, recordsOf, currentRecord, approversOf, canAct, canSubmit, canWithdraw, canReopen,
   pendingFor, statusInfo, history, lastReturnNote, approvalSummary,

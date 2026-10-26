@@ -305,6 +305,8 @@ router.get('/:id/entry', requireLogin, (req, res) => {
     addAssetError: null,
     returnNote: ApprovalService.lastReturnNote(data.batch),
     engineerSigned: ApprovalService.hasEngineerSignature(data.batch.id), // 沒簽名時「送出」按鈕停用並提示
+    canSubmitHere: ApprovalService.isEligibleSubmitter(req.user, data.batch), // 簽核人沒參與填寫就不給送出按鈕
+    createdByName: (User.findById(data.batch.created_by) || {}).display_name || (User.findById(data.batch.created_by) || {}).username || '',
     removableAssetIds: removableAssetIds(data, req.user), // 建立者／管理員／新增那台設備的人；而且不能把最後一台移光
     flash: req.query.ok === 'removed' ? '已把設備移出這個批次（連同它在這個批次的檢查紀錄與截圖）。'
       : (req.query.ok === 'removed_deleted' ? '已移除這台設備：它是在這次巡檢新增的，設備本身與它在這個批次的檢查紀錄、截圖都已刪除。' : null),
@@ -341,6 +343,8 @@ router.post('/:id/assets', requireLogin, (req, res) => {
       addAssetError: emptyError,
       returnNote: ApprovalService.lastReturnNote(data.batch),
       engineerSigned: ApprovalService.hasEngineerSignature(data.batch.id), // 填寫頁的送出按鈕要用（兩個 render 路徑都要傳）
+      canSubmitHere: ApprovalService.isEligibleSubmitter(req.user, data.batch),
+      createdByName: (User.findById(data.batch.created_by) || {}).display_name || (User.findById(data.batch.created_by) || {}).username || '',
       removableAssetIds: removableAssetIds(data, req.user),
       flash: null,
     });
@@ -492,6 +496,9 @@ router.post('/:id/complete', requireLogin, (req, res) => {
     });
   }
   if (rejectIfLocked(req, res, batch)) return;
+  if (!ApprovalService.isEligibleSubmitter(req.user, batch)) {
+    return res.status(403).render('error', { title: '無法送出', message: ApprovalService.SUBMIT_NOT_ALLOWED_MESSAGE });
+  }
   if (!ApprovalService.hasEngineerSignature(batch.id)) {
     return res.status(400).render('error', { title: '請先簽名', message: ApprovalService.SIGNATURE_REQUIRED_MESSAGE });
   }
@@ -617,7 +624,12 @@ router.get('/:id', requireLogin, (req, res) => {
     status: ApprovalService.statusInfo(batch),
     locked: ApprovalService.isLocked(batch),
     history: ApprovalService.history(batch),
-    canSubmit: ApprovalService.canSubmit(batch),
+    canSubmit: ApprovalService.canSubmit(batch) && ApprovalService.isEligibleSubmitter(req.user, batch),
+    // 批次還在填寫、使用者不是建立者也沒填寫過：不給送出按鈕，改顯示說明（避免簽核人誤按成為送審人）
+    waitingForSubmit: ApprovalService.canSubmit(batch) && !ApprovalService.isEligibleSubmitter(req.user, batch),
+    createdByName: batch.created_by ? ((User.findById(batch.created_by) || {}).display_name || (User.findById(batch.created_by) || {}).username || null) : null,
+    // 你是送審人、又不能簽核自己送的批次：提醒誤按的退路
+    isSubmitterBlocked: batch.approval_status === 'pending' && batch.submitted_by === req.user.id && !!ApprovalService.getSettings().block_self_approval,
     canWithdraw: ApprovalService.canWithdraw(req.user, batch),
     canReopen: ApprovalService.canReopen(req.user, batch),
     current: record ? {

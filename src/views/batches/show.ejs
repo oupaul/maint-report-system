@@ -66,17 +66,25 @@
   <% } %>
 
   <% if (approval.canSubmit) { %>
-    <form method="POST" action="/batches/<%= batch.id %>/submit" class="approval-actions" data-confirm="確定要送出審核嗎？送出後這個批次會鎖定，審核通過或被退回前不能編輯。">
+    <form method="POST" action="/batches/<%= batch.id %>/submit" class="approval-actions" data-confirm="確定要送出審核嗎？送出後這個批次會鎖定，審核通過或被退回前不能編輯；你就是「送審人」，不能自己核准這個批次。">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
       <div class="form-group" style="margin:0;">
         <label class="form-label" for="submit-comment">給簽核人的說明（選填）</label>
         <textarea class="form-input" id="submit-comment" name="comment" maxlength="<%= approval.maxComment %>"></textarea>
       </div>
       <div>
-        <button type="submit" class="btn btn--primary btn--md" <%= approval.engineerSigned ? '' : 'disabled' %>>送出審核</button>
+        <button type="submit" class="btn btn--primary btn--md" <%= approval.engineerSigned ? '' : 'disabled' %>>完成填寫，送出給主管審核</button>
         <% if (!approval.engineerSigned) { %><span class="form-hint">送出前請先在下方「簽核」區塊完成<strong>工程師簽名</strong>。</span><% } %>
       </div>
     </form>
+  <% } %>
+
+  <% if (approval.waitingForSubmit) { %>
+    <p class="form-hint">這個批次還在填寫中，尚未送審（建立者：<%= approval.createdByName || '-' %>）。送出審核由建立者或填寫的人處理；送出之後會通知簽核人，到時候再來審核。</p>
+  <% } %>
+
+  <% if (approval.isSubmitterBlocked) { %>
+    <p class="form-hint" style="color: var(--color-status-warning);">你是這個批次的送審人，依照簽核設定不能簽核自己送出的批次，要由其他簽核人處理。如果是誤按送出，可以按下方的「撤回審核」，批次會回到草稿。</p>
   <% } %>
 
   <% if (approval.current && approval.current.canAct) { %>
