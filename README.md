@@ -423,6 +423,16 @@ sudo systemctl restart maint-report-system
 
 ---
 
+## 測試
+
+```bash
+npm run test:e2e        # 端到端測試：用 Chrome 操作沙盒中的真實伺服器（不碰 data/、uploads/）
+```
+
+需要 Node 20 與本機 Chrome；詳見 [`tests/e2e/README.md`](tests/e2e/README.md)。
+
+---
+
 ## 系統需求
 
 - Ubuntu 24.04 LTS（推薦）或其他 Linux

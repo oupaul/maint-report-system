@@ -87,5 +87,6 @@ Repo 目前**沒有任何 Dockerfile 或 compose.yaml**，部署完全走 system
 - `npm run dev` — 開發模式（`node --watch`，改檔案自動重啟；不再使用 nodemon——它的相依套件 `braces` 有已知漏洞而且上游沒有修正版。這只影響開發機：正式環境用 `npm ci --omit=dev`，`npm audit --omit=dev` 一直是 0）
 - `npm start` — 正式啟動（純 `node`，不會自動 reload）
 - `npm test` — jest
+- `npm run test:e2e` — 端到端測試（`tests/e2e/`，puppeteer-core + 本機 Chrome，在系統暫存目錄的**沙盒副本**與全新資料庫上跑，不碰 `data/`、`uploads/`，可放心執行；用 Node 20）。改到 UI、權限、刪除、匯出入、簽核、PDF 等行為時請跑相關 spec（`-- --only 名稱`），新功能請順手補 spec；spec 的寫法與涵蓋範圍見 `tests/e2e/README.md`。傳給 `page.$$eval`／`evaluate` 的函式在瀏覽器執行，不能引用外層變數。`puppeteer-core` 25 的 engines 要求 Node ≥ 22.12，但在 Node 20 實測可用（只是 devDependency）
 - `npm run migrate` — 執行 migrations/runner.js（見上方「高風險操作」，需先確認）
 - `scripts/health-check.sh <PORT>` — 打 `GET /login` 驗證服務是否正常回應，`update.sh` 會自動呼叫，也可隨時手動執行
