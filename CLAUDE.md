@@ -83,7 +83,7 @@ Repo 目前**沒有任何 Dockerfile 或 compose.yaml**，部署完全走 system
 
 ## 常用指令
 
-- `npm run dev` — nodemon 開發模式
+- `npm run dev` — 開發模式（`node --watch`，改檔案自動重啟；不再使用 nodemon——它的相依套件 `braces` 有已知漏洞而且上游沒有修正版。這只影響開發機：正式環境用 `npm ci --omit=dev`，`npm audit --omit=dev` 一直是 0）
 - `npm start` — 正式啟動（純 `node`，不會自動 reload）
 - `npm test` — jest
 - `npm run migrate` — 執行 migrations/runner.js（見上方「高風險操作」，需先確認）
