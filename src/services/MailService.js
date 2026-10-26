@@ -161,9 +161,10 @@ function formatMailError(err) {
   if (code === 'EAUTH' || /535|Invalid login|authentication failed/i.test(raw)) {
     return 'SMTP 登入失敗：帳號或密碼不正確（Microsoft 365 / Gmail 通常需要「應用程式密碼」，且可能已停用基本驗證）';
   }
-  if (code === 'ECONNREFUSED') return '連不上 SMTP 主機：連線被拒絕，請確認主機位址與埠號';
-  if (code === 'ETIMEDOUT' || code === 'ESOCKET' && /timeout/i.test(raw)) return '連線 SMTP 主機逾時，請確認主機位址、埠號與防火牆';
-  if (code === 'ENOTFOUND' || code === 'EDNS') return '找不到 SMTP 主機名稱，請確認拼字與 DNS';
+  // nodemailer 的連線錯誤 code 常是 ESOCKET／ECONNECTION，真正的系統錯誤代碼只在訊息裡（例如 "connect ECONNREFUSED 127.0.0.1:25"），所以兩邊都看
+  if (code === 'ECONNREFUSED' || /ECONNREFUSED/.test(raw)) return '連不上 SMTP 主機：連線被拒絕，請確認主機位址與埠號';
+  if (code === 'ETIMEDOUT' || /ETIMEDOUT|timed? ?out|timeout/i.test(raw)) return '連線 SMTP 主機逾時，請確認主機位址、埠號與防火牆';
+  if (code === 'ENOTFOUND' || code === 'EDNS' || /ENOTFOUND|EAI_AGAIN/.test(raw)) return '找不到 SMTP 主機名稱，請確認拼字與 DNS';
   if (/self.signed|unable to verify|certificate/i.test(raw)) return 'SMTP 主機的憑證不被信任（自簽或內部 CA 憑證）。若確定是自己的內部主機，可勾選「信任自我簽署憑證」';
   if (/wrong version number|ssl routines/i.test(raw)) return 'SSL/TLS 設定與埠號不符：465 埠通常要勾選「使用 SSL/TLS」，587 埠則不勾（會自動升級加密）';
   return raw.length > 300 ? `${raw.slice(0, 300)}…` : raw;
